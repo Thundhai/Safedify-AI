@@ -463,4 +463,42 @@ Provide a comprehensive executive summary highlighting key performance indicator
   }
 };
 
+/**
+ * 13. Inspection Fix Suggestions
+ */
+export const suggestInspectionFixAI = async (question: string, comment: string) => {
+  try {
+    const prompt = `Provide a practical fix suggestion for this failed inspection item:
+
+Inspection Question: "${question}"
+Inspector Comment: "${comment}"
+
+Give a concise, actionable recommendation to address this issue and pass the inspection.`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            suggestion: { type: Type.STRING },
+            priority: { type: Type.STRING, enum: ["Low", "Medium", "High", "Critical"] },
+            estimatedTime: { type: Type.STRING },
+            resources: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["suggestion"]
+        }
+      }
+    });
+    
+    const result = JSON.parse(response.text || '{"suggestion": ""}');
+    return result.suggestion || "Unable to provide suggestion at this time.";
+  } catch (error) {
+    console.error("Inspection Fix Suggestion Error:", error);
+    return "AI suggestion service temporarily unavailable. Please consult safety guidelines or contact your supervisor for guidance.";
+  }
+};
+
 // ... Remaining logic for analyzeRiskTrendsAI, evaluateContractorComplianceAI etc. follows the MODEL_NAME + JSON schema pattern.
