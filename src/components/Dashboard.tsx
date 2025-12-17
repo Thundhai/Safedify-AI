@@ -81,7 +81,7 @@ export const Dashboard: React.FC = () => {
 
     setStats({
       totalIncidents: incidents.length,
-      openActions: actions.filter(a => a.status !== 'Done').length,
+      openActions: (actions || []).filter(a => a.status !== 'Done').length,
       severityBreakdown: severityData,
       monthlyTrends: monthlyData
     });
@@ -307,9 +307,9 @@ export const Dashboard: React.FC = () => {
                     {/* Bar Chart */}
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                         <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4 uppercase tracking-wide">Incident Trends (YTD)</h3>
-                        <div className="h-64">
+                        <div className="h-64 w-full" style={{ minHeight: '200px', minWidth: '300px' }}>
                             {stats.totalIncidents > 0 && Array.isArray(stats.monthlyTrends) && stats.monthlyTrends.length > 0 ? (
-                                <ResponsiveContainer width="100%" height="100%">
+                                <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
                                     <BarChart data={stats.monthlyTrends || []}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                         <XAxis dataKey="name" tick={{fontSize: 12, fill: '#94a3b8'}} axisLine={false} tickLine={false} />
@@ -339,10 +339,10 @@ export const Dashboard: React.FC = () => {
                     {/* Pie Chart */}
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                         <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4 uppercase tracking-wide">Severity Breakdown</h3>
-                        <div className="h-64 relative">
+                        <div className="h-64 w-full" style={{ minHeight: '200px', minWidth: '300px' }}>
                             {stats.totalIncidents > 0 && Array.isArray(stats.severityBreakdown) && stats.severityBreakdown.length > 0 ? (
                                 <>
-                                    <ResponsiveContainer width="100%" height="100%">
+                                    <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
                                         <PieChart>
                                             <Pie
                                                 data={stats.severityBreakdown || []}
@@ -355,7 +355,7 @@ export const Dashboard: React.FC = () => {
                                                 stroke="none"
                                             >
                                             {(stats.severityBreakdown || []).map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                    <Cell key={`cell-${index}`} fill={COLORS[index % (COLORS?.length || 5)]} />
                                                 ))}
                                             </Pie>
                                             <Tooltip 
@@ -384,7 +384,7 @@ export const Dashboard: React.FC = () => {
                             <div className="flex flex-wrap justify-center gap-3 mt-2">
                                 {stats.severityBreakdown.map((entry, index) => (
                                     <div key={entry.name} className="flex items-center gap-1.5">
-                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
+                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[index % (COLORS?.length || 5)] }}></div>
                                         <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{entry.name}</span>
                                     </div>
                                 ))}
@@ -406,7 +406,7 @@ export const Dashboard: React.FC = () => {
                     </div>
                     
                     <div className="flex-1 flex flex-col items-center justify-center relative my-6">
-                        <ResponsiveContainer width="100%" height={220}>
+                        <ResponsiveContainer width="100%" height={220} minWidth={250} minHeight={200}>
                             <PieChart>
                                 <Pie
                                     data={gaugeData}
@@ -510,7 +510,7 @@ export const Dashboard: React.FC = () => {
                             <div className="flex items-center justify-center h-full text-slate-400 gap-2">
                                 <Loader2 className="animate-spin" /> Analyzing historical data...
                             </div>
-                        ) : predictiveAlerts.length > 0 ? (
+                        ) : (predictiveAlerts || []).length > 0 ? (
                             predictiveAlerts.map((alert, idx) => (
                                 <div key={idx} className="bg-white/10 border border-white/10 p-4 rounded-xl flex items-start gap-4 backdrop-blur-sm hover:bg-white/20 transition-colors">
                                     <div className={`mt-1.5 w-3 h-3 rounded-full shrink-0 ${alert.likelihood === 'High' ? 'bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)]' : 'bg-yellow-500'}`}></div>
