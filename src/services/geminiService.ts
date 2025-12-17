@@ -402,4 +402,65 @@ Based on patterns, trends, and seasonality, predict potential safety issues and 
   }
 };
 
+/**
+ * 12. Executive Report Generation
+ */
+export const generateExecutiveReportAI = async (metrics: any) => {
+  try {
+    const prompt = `Generate an executive HSE report based on these metrics:
+
+${JSON.stringify(metrics, null, 2)}
+
+Provide a comprehensive executive summary highlighting key performance indicators, trends, and strategic recommendations for HSE improvement.`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            executiveSummary: { type: Type.STRING },
+            recommendations: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  description: { type: Type.STRING },
+                  priority: { type: Type.STRING, enum: ["High", "Medium", "Low"] },
+                  timeframe: { type: Type.STRING }
+                },
+                required: ["title", "description"]
+              }
+            },
+            keyInsights: { type: Type.ARRAY, items: { type: Type.STRING } },
+            riskAreas: { type: Type.ARRAY, items: { type: Type.STRING } },
+            overallScore: { type: Type.NUMBER }
+          },
+          required: ["executiveSummary", "recommendations"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("Executive Report Generation Error:", error);
+    return {
+      executiveSummary: "Executive report generation is temporarily unavailable. Please check your API configuration and try again.",
+      recommendations: [
+        {
+          title: "Service Restoration",
+          description: "Contact system administrator to restore AI reporting functionality.",
+          priority: "High",
+          timeframe: "Immediate"
+        }
+      ],
+      keyInsights: [],
+      riskAreas: [],
+      overallScore: 0
+    };
+  }
+};
+
 // ... Remaining logic for analyzeRiskTrendsAI, evaluateContractorComplianceAI etc. follows the MODEL_NAME + JSON schema pattern.
