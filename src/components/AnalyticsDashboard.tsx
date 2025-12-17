@@ -360,8 +360,8 @@ export const AnalyticsDashboard: React.FC = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                             <h3 className="font-bold text-slate-800 mb-6">Lagging Indicators (Incident Types)</h3>
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
+                                <div className="h-64 w-full" style={{ minHeight: '200px', minWidth: '300px' }}>
+                                <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
                                     <BarChart data={[
                                         { name: 'LTI', count: metrics.ltiCount },
                                         { name: 'Medical', count: metrics.mtcCount },
@@ -393,8 +393,8 @@ export const AnalyticsDashboard: React.FC = () => {
 
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                             <h3 className="font-bold text-slate-800 mb-6">Incident Ratios</h3>
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
+                            <div className="h-64 w-full" style={{ minHeight: '200px', minWidth: '300px' }}>
+                                <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
                                     <PieChart>
                                         <Pie
                                             data={typeData}

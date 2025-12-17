@@ -16,7 +16,7 @@ if (!apiKey) {
 }
 
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
-const MODEL_NAME = "gemini-1.5-flash"; // Google Gemini Flash model
+const MODEL_NAME = "gemini-pro"; // Stable Gemini model name
 
 /**
  * Helper: Check if AI is available and create a safe wrapper for AI calls
