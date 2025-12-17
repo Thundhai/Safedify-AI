@@ -9,6 +9,31 @@ import App from './App';
  * It uses StrictMode to help identify potential problems during development.
  */
 
+// Global error handler for MetaMask and other wallet injection errors
+window.addEventListener('error', (event) => {
+  // Suppress MetaMask connection errors that aren't initiated by our app
+  if (event.message && 
+      (event.message.includes('MetaMask extension not found') ||
+       event.message.includes('Failed to connect to MetaMask') ||
+       event.filename?.includes('inpage.js'))) {
+    console.warn('MetaMask auto-injection error suppressed:', event.message);
+    event.preventDefault();
+    return false;
+  }
+});
+
+// Suppress unhandled promise rejections from MetaMask auto-connect attempts
+window.addEventListener('unhandledrejection', (event) => {
+  if (event.reason && 
+      (event.reason.message?.includes('MetaMask') ||
+       event.reason.message?.includes('ethereum') ||
+       event.reason.toString().includes('Failed to connect'))) {
+    console.warn('MetaMask promise rejection suppressed:', event.reason);
+    event.preventDefault();
+    return false;
+  }
+});
+
 const rootElement = document.getElementById('root');
 
 if (!rootElement) {
