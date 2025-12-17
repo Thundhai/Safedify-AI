@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import { getSyncQueue, processSyncQueue } from '../services/offlineService';
 import { AIChatAssistant } from './AIChatAssistant';
+import { MetaMaskInstallBanner, MetaMaskFloatingPrompt } from './MetaMaskInstallBanner';
 import { useAuth } from '../context/AuthContext';
 import { SubscriptionTier } from '../types';
 
@@ -445,6 +446,9 @@ export const Layout: React.FC = () => {
         {/* Scrollable Page Content */}
         <main className="flex-1 overflow-auto bg-slate-50 dark:bg-slate-950 p-4 md:p-8 print:p-0 print:bg-white print:overflow-visible relative scroll-smooth print:h-auto">
           <div className="max-w-7xl mx-auto pb-20 md:pb-0 print:max-w-none print:pb-0 min-h-full">
+            {/* MetaMask Installation Banner */}
+            <MetaMaskInstallBanner className="mb-4" />
+            
             <Outlet />
           </div>
           
@@ -504,6 +508,9 @@ export const Layout: React.FC = () => {
 
           {/* AI Chatbot Overlay */}
           <AIChatAssistant />
+          
+          {/* MetaMask Floating Prompt */}
+          <MetaMaskFloatingPrompt />
         </main>
       </div>
     </div>
