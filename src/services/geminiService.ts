@@ -902,4 +902,51 @@ Assess the safety impact and provide specific action recommendations for restock
   }
 };
 
+/**
+ * 20. Permit Audit
+ */
+export const auditPermitAI = async (permitType: string, description: string, controlsText: string[], hazards: string[]) => {
+  try {
+    const prompt = `Audit this work permit for safety compliance:
+
+Permit Type: ${permitType}
+Work Description: "${description}"
+Control Measures: ${controlsText.join(', ')}
+Associated Hazards: ${hazards.join(', ')}
+
+Review for completeness, adequacy of controls, and compliance with safety standards. Identify any gaps or missing requirements.`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            issues: { type: Type.ARRAY, items: { type: Type.STRING } },
+            overallRating: { type: Type.STRING, enum: ["Pass", "Conditional", "Fail"] },
+            riskLevel: { type: Type.STRING, enum: ["Low", "Medium", "High", "Critical"] },
+            recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+            missingControls: { type: Type.ARRAY, items: { type: Type.STRING } },
+            complianceScore: { type: Type.INTEGER }
+          },
+          required: ["issues", "overallRating"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{"issues": [], "overallRating": "Pass"}');
+  } catch (error) {
+    console.error("Permit Audit Error:", error);
+    return {
+      issues: ["AI audit service temporarily unavailable. Manual review required."],
+      overallRating: "Conditional",
+      riskLevel: "Medium",
+      recommendations: ["Conduct manual permit review", "Verify all safety controls are in place"],
+      missingControls: [],
+      complianceScore: 50
+    };
+  }
+};
+
 // ... Remaining logic for analyzeRiskTrendsAI, evaluateContractorComplianceAI etc. follows the MODEL_NAME + JSON schema pattern.
