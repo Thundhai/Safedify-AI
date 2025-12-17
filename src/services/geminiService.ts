@@ -990,4 +990,55 @@ export const extractCertificateDataAI = async (base64Image: string) => {
   }
 };
 
-// ... Remaining logic for analyzeRiskTrendsAI, evaluateContractorComplianceAI etc. follows the MODEL_NAME + JSON schema pattern.
+/**
+ * 22. Contractor Compliance Evaluation
+ */
+export const evaluateContractorComplianceAI = async (contractor: any, workerCount: number) => {
+  try {
+    const prompt = `Evaluate contractor compliance and performance:
+
+Contractor: ${contractor.name}
+Contact: ${contractor.contactPerson} (${contractor.email})
+Current Status: ${contractor.status}
+Worker Count: ${workerCount}
+Documents: ${contractor.documents.map((d: any) => `${d.title} (${d.type})`).join(', ')}
+Current Compliance Score: ${contractor.complianceScore}
+
+Assess contractor compliance, identify issues, and provide performance rating based on documentation, worker management, and safety standards.`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            complianceScore: { type: Type.INTEGER },
+            performanceRating: { type: Type.STRING, enum: ["Excellent", "Good", "Fair", "Poor"] },
+            issues: { type: Type.ARRAY, items: { type: Type.STRING } },
+            recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+            riskLevel: { type: Type.STRING, enum: ["Low", "Medium", "High", "Critical"] },
+            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+            nextReviewDate: { type: Type.STRING }
+          },
+          required: ["complianceScore", "performanceRating", "issues"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("Contractor Compliance Evaluation Error:", error);
+    return {
+      complianceScore: 50,
+      performanceRating: "Fair",
+      issues: ["Compliance evaluation service temporarily unavailable"],
+      recommendations: ["Schedule manual compliance review", "Verify contractor documentation"],
+      riskLevel: "Medium",
+      strengths: [],
+      nextReviewDate: ""
+    };
+  }
+};
+
+// ... Remaining logic for analyzeRiskTrendsAI, etc. follows the MODEL_NAME + JSON schema pattern.
