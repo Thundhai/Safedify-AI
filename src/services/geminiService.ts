@@ -1041,4 +1041,52 @@ Assess contractor compliance, identify issues, and provide performance rating ba
   }
 };
 
-// ... Remaining logic for analyzeRiskTrendsAI, etc. follows the MODEL_NAME + JSON schema pattern.
+/**
+ * 23. Document Summarization
+ */
+export const summarizeDocumentAI = async (contentUrl: string, title: string) => {
+  try {
+    const prompt = `Summarize this HSE document for quick reference:
+
+Document Title: "${title}"
+Content: ${contentUrl}
+
+Provide a concise summary highlighting key safety requirements, procedures, and important points for HSE management.`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: [
+        { inlineData: { mimeType: "image/jpeg", data: cleanBase64(contentUrl) } },
+        { text: prompt }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            summary: { type: Type.STRING },
+            keyPoints: { type: Type.ARRAY, items: { type: Type.STRING } },
+            safetyRequirements: { type: Type.ARRAY, items: { type: Type.STRING } },
+            documentType: { type: Type.STRING },
+            riskLevel: { type: Type.STRING, enum: ["Low", "Medium", "High", "Critical"] },
+            applicableRoles: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["summary"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("Document Summarization Error:", error);
+    return {
+      summary: "Document summarization service temporarily unavailable. Please review the document manually for key safety requirements and procedures.",
+      keyPoints: [],
+      safetyRequirements: [],
+      documentType: "Unknown",
+      riskLevel: "Medium",
+      applicableRoles: []
+    };
+  }
+};
+
+// Remaining logic for analyzeRiskTrendsAI, etc. follows the MODEL_NAME + JSON schema pattern.
