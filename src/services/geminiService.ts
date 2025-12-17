@@ -350,4 +350,56 @@ Provide safety recommendations and risk assessment.`;
   }
 };
 
+/**
+ * 11. Predictive Safety Alerts
+ */
+export const predictiveSafetyAlertsAI = async (metrics: any, incidents: any[]) => {
+  try {
+    const prompt = `Analyze HSE data to predict safety risks for the next 7 days:
+
+Metrics: ${JSON.stringify(metrics)}
+Recent Incidents: ${JSON.stringify(incidents.slice(-10))}
+
+Based on patterns, trends, and seasonality, predict potential safety issues and provide proactive mitigation strategies.`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            predictions: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  alert: { type: Type.STRING },
+                  likelihood: { type: Type.STRING, enum: ["Low", "Medium", "High"] },
+                  suggestedMitigation: { type: Type.STRING },
+                  timeframe: { type: Type.STRING },
+                  riskCategory: { type: Type.STRING }
+                },
+                required: ["alert", "likelihood", "suggestedMitigation"]
+              }
+            },
+            confidence: { type: Type.NUMBER },
+            trendsAnalysis: { type: Type.STRING }
+          },
+          required: ["predictions"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{"predictions": []}');
+  } catch (error) {
+    console.error("Predictive Safety Alerts Error:", error);
+    return {
+      predictions: [],
+      confidence: 0,
+      trendsAnalysis: "Analysis service temporarily unavailable"
+    };
+  }
+};
+
 // ... Remaining logic for analyzeRiskTrendsAI, evaluateContractorComplianceAI etc. follows the MODEL_NAME + JSON schema pattern.
