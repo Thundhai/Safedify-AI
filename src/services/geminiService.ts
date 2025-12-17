@@ -851,4 +851,55 @@ Identify missing training requirements and recommend specific modules to address
   }
 };
 
+/**
+ * 19. PPE Stock Analysis
+ */
+export const analyzePPEStockAI = async (lowStockItems: any[]) => {
+  try {
+    const prompt = `Analyze low PPE stock situation and provide recommendations:
+
+Low Stock Items:
+${lowStockItems.map(item => 
+  `- ${item.name} (Category: ${item.category}, Current: ${item.stockQuantity}, Min: ${item.minStockThreshold})`
+).join('\n')}
+
+Assess the safety impact and provide specific action recommendations for restocking and risk mitigation.`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            priority: { type: Type.STRING, enum: ["Low", "Medium", "High", "Critical"] },
+            summary: { type: Type.STRING },
+            recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+            safetyImpact: { type: Type.STRING },
+            estimatedRestockTime: { type: Type.STRING },
+            alternativeSources: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["priority", "summary", "recommendations"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("PPE Stock Analysis Error:", error);
+    return {
+      priority: "High",
+      summary: "PPE stock analysis service temporarily unavailable. Critical PPE items are below minimum thresholds.",
+      recommendations: [
+        "Contact PPE suppliers immediately",
+        "Review emergency PPE protocols",
+        "Consider temporary work restrictions for affected areas"
+      ],
+      safetyImpact: "High risk of safety incidents due to inadequate PPE availability",
+      estimatedRestockTime: "Unknown",
+      alternativeSources: []
+    };
+  }
+};
+
 // ... Remaining logic for analyzeRiskTrendsAI, evaluateContractorComplianceAI etc. follows the MODEL_NAME + JSON schema pattern.
