@@ -44,6 +44,7 @@ import { ProfileSettings } from './components/ProfileSettings';
 // Services & Types
 import { getActions, getIncidents, saveAction } from './services/storageService';
 import { addToSyncQueue } from './services/offlineService';
+import { initializeWalletService } from './services/walletService';
 import { Incident, ActionItem, IncidentSeverity, IncidentType } from './types';
 
 // Icons
@@ -246,6 +247,15 @@ const IncidentList: React.FC = () => {
 
 /* --- MAIN APP --- */
 function App() {
+  // Initialize wallet service on app startup
+  useEffect(() => {
+    try {
+      initializeWalletService();
+    } catch (error) {
+      console.warn('Wallet service initialization failed:', error);
+    }
+  }, []);
+
   return (
     <AuthProvider>
       <HashRouter>
