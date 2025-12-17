@@ -706,4 +706,55 @@ Identify key themes, recurring patterns, and actionable insights to improve safe
   }
 };
 
+/**
+ * 16. Observation Analysis
+ */
+export const analyzeObservationAI = async (description: string) => {
+  try {
+    const prompt = `Analyze this safety observation and suggest appropriate classifications:
+
+Observation Description: "${description}"
+
+Based on the description, suggest:
+1. Type (Unsafe Act, Unsafe Condition, Near Miss, Good Practice)
+2. Category (PPE, Housekeeping, Tools & Equipment, Working at Height, Lifting / Manual Handling, Electrical, Chemicals, Traffic / Vehicles)
+3. Immediate action required to address the observation`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            type: { 
+              type: Type.STRING, 
+              enum: ["Unsafe Act", "Unsafe Condition", "Near Miss", "Good Practice"] 
+            },
+            category: { 
+              type: Type.STRING, 
+              enum: ["PPE", "Housekeeping", "Tools & Equipment", "Working at Height", "Lifting / Manual Handling", "Electrical", "Chemicals", "Traffic / Vehicles"] 
+            },
+            immediateAction: { type: Type.STRING },
+            riskLevel: { type: Type.STRING, enum: ["Low", "Medium", "High", "Critical"] },
+            reasoning: { type: Type.STRING }
+          },
+          required: ["type", "category", "immediateAction"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("Observation Analysis Error:", error);
+    return {
+      type: "Unsafe Condition",
+      category: "PPE", 
+      immediateAction: "Review and address identified safety concern",
+      riskLevel: "Medium",
+      reasoning: "AI analysis service temporarily unavailable"
+    };
+  }
+};
+
 // ... Remaining logic for analyzeRiskTrendsAI, evaluateContractorComplianceAI etc. follows the MODEL_NAME + JSON schema pattern.
