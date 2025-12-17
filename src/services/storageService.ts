@@ -480,15 +480,21 @@ export const getStorageUsage = (): number => {
 };
 
 export const checkQuota = (newDataSize: number = 0): boolean => {
-    const user = getCurrentUser();
-    const limit = user?.tier === SubscriptionTier.FREE ? QUOTA_FREE : QUOTA_PRO;
-    const currentUsage = getStorageUsage();
-    
-    if (currentUsage + newDataSize > limit) {
-        alert("Storage Quota Exceeded! Please upgrade your plan or delete old data (Images/Videos) to continue.");
-        return false;
+    try {
+        const user = getCurrentUser();
+        const limit = user?.tier === SubscriptionTier.FREE ? QUOTA_FREE : QUOTA_PRO;
+        const currentUsage = getStorageUsage();
+        
+        if (currentUsage + newDataSize > limit) {
+            alert("Storage Quota Exceeded! Please upgrade your plan or delete old data (Images/Videos) to continue.");
+            return false;
+        }
+        return true;
+    } catch (error) {
+        console.error('Error checking quota:', error);
+        // In case of error, allow the operation to proceed
+        return true;
     }
-    return true;
 };
 
 // Clear all non-system data
@@ -499,8 +505,15 @@ export const clearUserData = () => {
 };
 
 const get = <T>(key: string, initial: T): T => {
-  const stored = localStorage.getItem(key);
-  return stored ? JSON.parse(stored) : initial;
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? JSON.parse(stored) : initial;
+  } catch (error) {
+    console.error(`Error parsing stored data for key ${key}:`, error);
+    // Clear corrupted data and return initial value
+    localStorage.removeItem(key);
+    return initial;
+  }
 };
 
 const set = <T>(key: string, data: T) => {
@@ -519,7 +532,10 @@ const set = <T>(key: string, data: T) => {
 // --- Exports ---
 
 // Incidents
-export const getIncidents = (): Incident[] => get(STORAGE_KEYS.INCIDENTS, initialIncidents);
+export const getIncidents = (): Incident[] => {
+  const result = get(STORAGE_KEYS.INCIDENTS, initialIncidents);
+  return Array.isArray(result) ? result : [];
+};
 export const getIncidentById = (id: string): Incident | undefined => getIncidents().find(i => i.id === id);
 export const saveIncident = (incident: Incident) => {
   const incidents = getIncidents();
@@ -531,7 +547,10 @@ export const updateIncident = (incident: Incident) => {
 };
 
 // Inspections
-export const getInspections = (): Inspection[] => get(STORAGE_KEYS.INSPECTIONS, []);
+export const getInspections = (): Inspection[] => {
+  const result = get(STORAGE_KEYS.INSPECTIONS, []);
+  return Array.isArray(result) ? result : [];
+};
 export const saveInspection = (inspection: Inspection) => {
   const list = getInspections();
   set(STORAGE_KEYS.INSPECTIONS, [inspection, ...list]);
@@ -546,7 +565,10 @@ export const saveInspectionTemplate = (template: InspectionTemplate) => {
 };
 
 // Actions
-export const getActions = (): ActionItem[] => get(STORAGE_KEYS.ACTIONS, initialActions);
+export const getActions = (): ActionItem[] => {
+  const result = get(STORAGE_KEYS.ACTIONS, initialActions);
+  return Array.isArray(result) ? result : [];
+};
 export const saveAction = (action: ActionItem) => {
   const actions = getActions();
   set(STORAGE_KEYS.ACTIONS, [action, ...actions]);
@@ -557,7 +579,10 @@ export const updateAction = (action: ActionItem) => {
 };
 
 // Risk Assessments
-export const getRiskAssessments = (): RiskAssessment[] => get(STORAGE_KEYS.RISK_ASSESSMENTS, initialRiskAssessments);
+export const getRiskAssessments = (): RiskAssessment[] => {
+  const result = get(STORAGE_KEYS.RISK_ASSESSMENTS, initialRiskAssessments);
+  return Array.isArray(result) ? result : [];
+};
 export const getRiskAssessmentById = (id: string): RiskAssessment | undefined => getRiskAssessments().find(r => r.id === id);
 export const saveRiskAssessment = (ra: RiskAssessment) => {
     const list = getRiskAssessments();
@@ -774,41 +799,58 @@ export const getManHours = (): number => {
 export const saveManHours = (hours: number) => set(STORAGE_KEYS.MAN_HOURS, hours);
 
 export const calculateHSEMetrics = (): HSEMetrics => {
-    const incidents = getIncidents();
-    const actions = getActions();
-    const inspections = getInspections();
-    const manHours = getManHours();
+    try {
+        const incidents = getIncidents();
+        const actions = getActions();
+        const inspections = getInspections();
+        const manHours = getManHours();
 
-    const ltiCount = incidents.filter(i => i.type === IncidentType.LTI).length;
-    const mtcCount = incidents.filter(i => i.type === IncidentType.MEDICAL_TREATMENT).length;
-    const facCount = incidents.filter(i => i.type === IncidentType.FIRST_AID).length;
-    const nmCount = incidents.filter(i => i.type === IncidentType.NEAR_MISS).length;
-    
-    // TRIR = (Total Recordable * 200,000) / Man Hours
-    const recordables = ltiCount + mtcCount;
-    const trir = manHours > 0 ? (recordables * 200000) / manHours : 0;
-    
-    // LTIFR = (LTI * 1,000,000) / Man Hours
-    const ltifr = manHours > 0 ? (ltiCount * 1000000) / manHours : 0;
+        const ltiCount = incidents.filter(i => i.type === IncidentType.LTI).length;
+        const mtcCount = incidents.filter(i => i.type === IncidentType.MEDICAL_TREATMENT).length;
+        const facCount = incidents.filter(i => i.type === IncidentType.FIRST_AID).length;
+        const nmCount = incidents.filter(i => i.type === IncidentType.NEAR_MISS).length;
+        
+        // TRIR = (Total Recordable * 200,000) / Man Hours
+        const recordables = ltiCount + mtcCount;
+        const trir = manHours > 0 ? (recordables * 200000) / manHours : 0;
+        
+        // LTIFR = (LTI * 1,000,000) / Man Hours
+        const ltifr = manHours > 0 ? (ltiCount * 1000000) / manHours : 0;
 
-    const closedActions = actions.filter(a => a.status === 'Done').length;
-    const closureRate = actions.length > 0 ? (closedActions / actions.length) * 100 : 100;
+        const closedActions = actions.filter(a => a.status === 'Done').length;
+        const closureRate = actions.length > 0 ? (closedActions / actions.length) * 100 : 100;
 
-    const passedInspections = inspections.filter(i => i.score >= 80).length;
-    const inspectionCompliance = inspections.length > 0 ? (passedInspections / inspections.length) * 100 : 100;
+        const passedInspections = inspections.filter(i => i.score >= 80).length;
+        const inspectionCompliance = inspections.length > 0 ? (passedInspections / inspections.length) * 100 : 100;
 
-    return {
-        totalManHours: manHours,
-        ltiCount,
-        mtcCount, // Used as approx for RWC in MVP
-        rwcCount: 0,
-        facCount,
-        nmCount,
-        trir,
-        ltifr,
-        actionClosureRate: Math.round(closureRate),
-        inspectionCompliance: Math.round(inspectionCompliance)
-    };
+        return {
+            totalManHours: manHours || 0,
+            ltiCount: ltiCount || 0,
+            mtcCount: mtcCount || 0,
+            rwcCount: 0,
+            facCount: facCount || 0,
+            nmCount: nmCount || 0,
+            trir: isFinite(trir) ? trir : 0,
+            ltifr: isFinite(ltifr) ? ltifr : 0,
+            actionClosureRate: Math.round(closureRate) || 0,
+            inspectionCompliance: Math.round(inspectionCompliance) || 0
+        };
+    } catch (error) {
+        console.error('Error calculating HSE metrics:', error);
+        // Return safe default values
+        return {
+            totalManHours: 0,
+            ltiCount: 0,
+            mtcCount: 0,
+            rwcCount: 0,
+            facCount: 0,
+            nmCount: 0,
+            trir: 0,
+            ltifr: 0,
+            actionClosureRate: 0,
+            inspectionCompliance: 0
+        };
+    }
 };
 
 export const calculateSiteSafetyScore = (): SiteSafetyScore => {

@@ -34,10 +34,11 @@ export const Dashboard: React.FC = () => {
   });
 
   useEffect(() => {
-    const incidents = getIncidents();
-    const actions = getActions();
-    const inspections = getInspections();
-    const risks = getRiskAssessments();
+    try {
+      const incidents = getIncidents() || [];
+      const actions = getActions() || [];
+      const inspections = getInspections() || [];
+      const risks = getRiskAssessments() || [];
     
     // Calculate Onboarding
     const hasIncidents = incidents.length > 0;
@@ -104,6 +105,22 @@ export const Dashboard: React.FC = () => {
             .finally(() => setLoadingPredictions(false));
     }
 
+    } catch (error) {
+      console.error('Dashboard data loading error:', error);
+      // Set safe defaults to prevent crashes
+      setStats({
+        totalIncidents: 0,
+        openActions: 0,
+        severityBreakdown: [],
+        monthlyTrends: []
+      });
+      setSiteScore({ 
+        score: 0, 
+        rating: 'Poor', 
+        breakdown: { incidents: 0, observations: 0, inspections: 0, training: 0, actions: 0 }
+      });
+      setOnboardingProgress(0);
+    }
   }, [user]);
 
   const COLORS = ['#22c55e', '#eab308', '#f97316', '#ef4444'];
@@ -291,9 +308,9 @@ export const Dashboard: React.FC = () => {
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                         <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4 uppercase tracking-wide">Incident Trends (YTD)</h3>
                         <div className="h-64">
-                            {stats.totalIncidents > 0 ? (
+                            {stats.totalIncidents > 0 && Array.isArray(stats.monthlyTrends) && stats.monthlyTrends.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={stats.monthlyTrends}>
+                                    <BarChart data={stats.monthlyTrends || []}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                                         <XAxis dataKey="name" tick={{fontSize: 12, fill: '#94a3b8'}} axisLine={false} tickLine={false} />
                                         <YAxis tick={{fontSize: 12, fill: '#94a3b8'}} axisLine={false} tickLine={false} />
@@ -323,12 +340,12 @@ export const Dashboard: React.FC = () => {
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                         <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4 uppercase tracking-wide">Severity Breakdown</h3>
                         <div className="h-64 relative">
-                            {stats.totalIncidents > 0 ? (
+                            {stats.totalIncidents > 0 && Array.isArray(stats.severityBreakdown) && stats.severityBreakdown.length > 0 ? (
                                 <>
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
                                             <Pie
-                                                data={stats.severityBreakdown}
+                                                data={stats.severityBreakdown || []}
                                                 cx="50%"
                                                 cy="50%"
                                                 innerRadius={60}
@@ -337,7 +354,7 @@ export const Dashboard: React.FC = () => {
                                                 dataKey="value"
                                                 stroke="none"
                                             >
-                                                {stats.severityBreakdown.map((entry, index) => (
+                                            {(stats.severityBreakdown || []).map((entry, index) => (
                                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                 ))}
                                             </Pie>
