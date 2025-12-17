@@ -501,4 +501,152 @@ Give a concise, actionable recommendation to address this issue and pass the ins
   }
 };
 
+/**
+ * 14. Risk Assessment Functions
+ */
+export const identifyHazardsAI = async (taskDescription: string, type: string) => {
+  try {
+    const prompt = `Identify potential hazards for this work task:
+
+Task: "${taskDescription}"
+Assessment Type: ${type}
+
+Provide a comprehensive list of potential hazards that could occur during this task.`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            hazards: { type: Type.ARRAY, items: { type: Type.STRING } },
+            riskLevel: { type: Type.STRING },
+            additionalNotes: { type: Type.STRING }
+          },
+          required: ["hazards"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{"hazards": []}');
+  } catch (error) {
+    console.error("Hazard Identification Error:", error);
+    return { hazards: [], riskLevel: "Unknown", additionalNotes: "AI service temporarily unavailable" };
+  }
+};
+
+export const suggestControlsAI = async (hazardDescription: string) => {
+  try {
+    const prompt = `Suggest safety controls for this hazard:
+
+Hazard: "${hazardDescription}"
+
+Provide specific control measures using the hierarchy of controls (Elimination, Substitution, Engineering, Administrative, PPE).`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            controls: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  type: { type: Type.STRING, enum: ["Elimination", "Substitution", "Engineering", "Administrative", "PPE"] },
+                  description: { type: Type.STRING }
+                },
+                required: ["type", "description"]
+              }
+            }
+          },
+          required: ["controls"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{"controls": []}');
+  } catch (error) {
+    console.error("Control Suggestion Error:", error);
+    return { controls: [] };
+  }
+};
+
+export const explainRiskScoreAI = async (riskScore: number, description: string, probability: number, severity: number) => {
+  try {
+    const prompt = `Explain this risk assessment score:
+
+Hazard: "${description}"
+Risk Score: ${riskScore} (Probability: ${probability}, Severity: ${severity})
+
+Provide a clear explanation of why this risk score was calculated and what it means.`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            explanation: { type: Type.STRING },
+            riskLevel: { type: Type.STRING },
+            recommendations: { type: Type.ARRAY, items: { type: Type.STRING } }
+          },
+          required: ["explanation"]
+        }
+      }
+    });
+    
+    const result = JSON.parse(response.text || '{"explanation": ""}');
+    return result.explanation || "Risk score explanation temporarily unavailable.";
+  } catch (error) {
+    console.error("Risk Explanation Error:", error);
+    return "Unable to explain risk score at this time. Please consult safety guidelines.";
+  }
+};
+
+export const reviewRiskAssessmentAI = async (taskDescription: string, hazardsList: string[]) => {
+  try {
+    const prompt = `Review this risk assessment for completeness and accuracy:
+
+Task: "${taskDescription}"
+Identified Hazards: ${hazardsList.join(', ')}
+
+Provide feedback on the risk assessment quality, missing hazards, and improvement suggestions.`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            overallScore: { type: Type.NUMBER },
+            completeness: { type: Type.STRING },
+            missingHazards: { type: Type.ARRAY, items: { type: Type.STRING } },
+            improvements: { type: Type.ARRAY, items: { type: Type.STRING } },
+            summary: { type: Type.STRING }
+          },
+          required: ["overallScore", "completeness", "summary"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("Risk Assessment Review Error:", error);
+    return {
+      overallScore: 0,
+      completeness: "Unable to review",
+      missingHazards: [],
+      improvements: [],
+      summary: "AI review service temporarily unavailable."
+    };
+  }
+};
+
 // ... Remaining logic for analyzeRiskTrendsAI, evaluateContractorComplianceAI etc. follows the MODEL_NAME + JSON schema pattern.
