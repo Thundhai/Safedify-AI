@@ -75,7 +75,15 @@ export const classifyIncidentAI = async (description: string) => {
     return JSON.parse(response.text || "{}");
   } catch (error) {
     console.error("AI Classification Error:", error);
-    throw error;
+    // Return safe fallback instead of throwing
+    return {
+      type: 'Safety',
+      severity: 'Low',
+      confidence: 50,
+      reasoning: 'Unable to analyze - API unavailable',
+      causes: ['Service temporarily unavailable'],
+      contributingFactors: ['API error']
+    };
   }
 };
 

@@ -24,7 +24,7 @@ export const WorkerDetail: React.FC = () => {
     useEffect(() => {
         if (id) {
             setWorker(getWorkerById(id));
-            setRecords(getTrainingRecords().filter(r => r.workerId === id));
+            setRecords((getTrainingRecords() || []).filter(r => r.workerId === id));
         }
     }, [id]);
 
@@ -73,11 +73,11 @@ export const WorkerDetail: React.FC = () => {
         setIsAnalyzing(true);
         try {
             // Context: Find incidents where the worker was the reporter OR mentioned in the description
-            const relevantIncidents = getIncidents()
+            const relevantIncidents = (getIncidents() || [])
                 .filter(i => i.reporter === worker.name || i.description.includes(worker.name))
                 .map(i => `${i.type} (${i.severity}): ${i.description}`);
             
-            const trainingTitles = records.map(r => r.moduleTitle);
+            const trainingTitles = (records || []).map(r => r.moduleTitle);
 
             const result = await analyzeSkillGapAI(worker.role, trainingTitles, relevantIncidents);
             setGapAnalysis(result);
