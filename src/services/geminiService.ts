@@ -649,4 +649,61 @@ Provide feedback on the risk assessment quality, missing hazards, and improvemen
   }
 };
 
+/**
+ * 15. Observation Trends Analysis
+ */
+export const analyzeObservationTrendsAI = async (observations: any[]) => {
+  try {
+    const prompt = `Analyze these safety observations for patterns and trends:
+
+${JSON.stringify(observations.map(o => ({
+  type: o.type,
+  category: o.category,
+  description: o.description,
+  date: o.date,
+  location: o.location
+})), null, 2)}
+
+Identify key themes, recurring patterns, and actionable insights to improve safety performance.`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            trends: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  theme: { type: Type.STRING },
+                  count: { type: Type.INTEGER },
+                  insight: { type: Type.STRING },
+                  priority: { type: Type.STRING, enum: ["Low", "Medium", "High"] },
+                  recommendations: { type: Type.ARRAY, items: { type: Type.STRING } }
+                },
+                required: ["theme", "count", "insight"]
+              }
+            },
+            summary: { type: Type.STRING },
+            overallScore: { type: Type.NUMBER }
+          },
+          required: ["trends"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{"trends": []}');
+  } catch (error) {
+    console.error("Observation Trends Analysis Error:", error);
+    return {
+      trends: [],
+      summary: "Trends analysis service temporarily unavailable.",
+      overallScore: 0
+    };
+  }
+};
+
 // ... Remaining logic for analyzeRiskTrendsAI, evaluateContractorComplianceAI etc. follows the MODEL_NAME + JSON schema pattern.
