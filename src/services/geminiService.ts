@@ -949,4 +949,45 @@ Review for completeness, adequacy of controls, and compliance with safety standa
   }
 };
 
+/**
+ * 21. Certificate Data Extraction for Assets
+ */
+export const extractCertificateDataAI = async (base64Image: string) => {
+  try {
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: [
+        { inlineData: { mimeType: "image/jpeg", data: cleanBase64(base64Image) } },
+        { text: "Extract certificate/document information for asset management: document title, expiry date, certificate number, type." }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            expiryDate: { type: Type.STRING },
+            certificateNumber: { type: Type.STRING },
+            documentType: { type: Type.STRING },
+            issuingAuthority: { type: Type.STRING },
+            issueDate: { type: Type.STRING }
+          },
+          required: ["title"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("Certificate Data Extraction Error:", error);
+    return {
+      title: "Certificate Document",
+      expiryDate: "",
+      certificateNumber: "",
+      documentType: "Unknown",
+      issuingAuthority: "",
+      issueDate: ""
+    };
+  }
+};
+
 // ... Remaining logic for analyzeRiskTrendsAI, evaluateContractorComplianceAI etc. follows the MODEL_NAME + JSON schema pattern.
