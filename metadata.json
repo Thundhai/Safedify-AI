@@ -1,0 +1,9 @@
+{
+  "name": "Safedify AI Platform",
+  "description": "A comprehensive offline-first HSE platform for site teams to report incidents, perform inspections, and utilize AI for risk assessment and PPE detection.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ]
+}
