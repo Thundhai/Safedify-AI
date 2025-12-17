@@ -302,4 +302,52 @@ export const playGeneratedAudio = async (base64Audio: string) => {
     }
 };
 
+/**
+ * 10. Weather Risk Analysis
+ */
+export const analyzeWeatherRisksAI = async (weatherData: EnvironmentalData) => {
+  try {
+    const prompt = `Analyze weather conditions for construction safety risks:
+Temperature: ${weatherData.temperature}°C
+Humidity: ${weatherData.humidity}%
+Wind Speed: ${weatherData.windSpeed} km/h
+Weather Condition: ${weatherData.condition}
+Air Quality: ${weatherData.airQuality}
+Noise Level: ${weatherData.noiseLevel} dB
+
+Provide safety recommendations and risk assessment.`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            riskLevel: { type: Type.STRING, enum: ["Low", "Medium", "High", "Critical"] },
+            riskScore: { type: Type.INTEGER },
+            risks: { type: Type.ARRAY, items: { type: Type.STRING } },
+            recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+            workStoppageRequired: { type: Type.BOOLEAN },
+            reasoning: { type: Type.STRING }
+          },
+          required: ["riskLevel", "riskScore", "risks", "recommendations", "workStoppageRequired", "reasoning"]
+        }
+      }
+    });
+    return JSON.parse(response.text || "{}");
+  } catch (error) {
+    console.error("Weather Risk Analysis Error:", error);
+    return {
+      riskLevel: "Medium",
+      riskScore: 50,
+      risks: ["Unable to analyze current conditions"],
+      recommendations: ["Monitor weather conditions regularly"],
+      workStoppageRequired: false,
+      reasoning: "Analysis service temporarily unavailable"
+    };
+  }
+};
+
 // ... Remaining logic for analyzeRiskTrendsAI, evaluateContractorComplianceAI etc. follows the MODEL_NAME + JSON schema pattern.
