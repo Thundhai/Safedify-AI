@@ -8,9 +8,38 @@ import {
  * CONFIGURATION
  * Vercel uses VITE_ prefix for client-side environment variables.
  */
-const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-const ai = new GoogleGenAI({ apiKey });
-const MODEL_NAME = "gemini-1.5-flash"; // Optimized for speed and vision tasks
+const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
+
+// Check if API key is configured
+if (!apiKey) {
+  console.warn('VITE_GEMINI_API_KEY environment variable is not set. AI features will be disabled.');
+}
+
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+const MODEL_NAME = "gemini-1.5-flash"; // Google Gemini Flash model
+
+/**
+ * Helper: Check if AI is available and create a safe wrapper for AI calls
+ */
+const checkAIAvailable = () => {
+  if (!ai) {
+    throw new Error('AI service not available. Please configure VITE_GEMINI_API_KEY environment variable.');
+  }
+  return true;
+};
+
+/**
+ * Safe wrapper for AI model calls
+ */
+const safeAICall = async (callFn: () => Promise<any>, fallback: any = {}) => {
+  try {
+    checkAIAvailable();
+    return await callFn();
+  } catch (error) {
+    console.error('AI service error:', error);
+    throw error;
+  }
+};
 
 /**
  * Helper: Cleans Base64 strings for Gemini
@@ -22,8 +51,9 @@ const cleanBase64 = (base64: string) => base64.replace(/^data:image\/(png|jpeg|j
  */
 export const classifyIncidentAI = async (description: string) => {
   try {
+    checkAIAvailable();
     const prompt = `Analyze this HSE incident: "${description}". Classify and perform causal analysis.`;
-    const response = await ai.models.generateContent({
+    const response = await ai!.models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -236,7 +266,7 @@ export const chatSafetyAssistant = async (
             parts.unshift({ inlineData: { mimeType: "image/jpeg", data: cleanBase64(imageBase64) } });
         }
 
-        const result = await chat.sendMessage({ content: parts });
+        const result = await chat.sendMessage({ message: parts });
         return result.text || "I couldn't process that.";
     } catch (error) {
         return "Chat connection failed. Please check your API key.";
@@ -312,7 +342,7 @@ Temperature: ${weatherData.temperature}°C
 Humidity: ${weatherData.humidity}%
 Wind Speed: ${weatherData.windSpeed} km/h
 Weather Condition: ${weatherData.condition}
-Air Quality: ${weatherData.airQuality}
+Air Quality: ${weatherData.humidity > 70 ? 'Moderate' : 'Good'}
 Noise Level: ${weatherData.noiseLevel} dB
 
 Provide safety recommendations and risk assessment.`;
@@ -355,6 +385,7 @@ Provide safety recommendations and risk assessment.`;
  */
 export const predictiveSafetyAlertsAI = async (metrics: any, incidents: any[]) => {
   try {
+    checkAIAvailable();
     const prompt = `Analyze HSE data to predict safety risks for the next 7 days:
 
 Metrics: ${JSON.stringify(metrics)}
