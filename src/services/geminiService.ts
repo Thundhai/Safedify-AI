@@ -16,14 +16,15 @@ if (!apiKey) {
 }
 
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
-const MODEL_NAME = "gemini-pro"; // Stable Gemini model name
+const MODEL_NAME = "gemini-1.5-pro"; // Updated to use latest stable model
 
 /**
  * Helper: Check if AI is available and create a safe wrapper for AI calls
  */
 const checkAIAvailable = () => {
   if (!ai) {
-    throw new Error('AI service not available. Please configure VITE_GEMINI_API_KEY environment variable.');
+    console.warn('AI service not available. VITE_GEMINI_API_KEY environment variable not set.');
+    return false;
   }
   return true;
 };
@@ -51,7 +52,17 @@ const cleanBase64 = (base64: string) => base64.replace(/^data:image\/(png|jpeg|j
  */
 export const classifyIncidentAI = async (description: string) => {
   try {
-    checkAIAvailable();
+    if (!checkAIAvailable()) {
+      // Return safe fallback when AI is not available
+      return {
+        type: 'Safety',
+        severity: 'Medium',
+        confidence: 50,
+        reasoning: 'AI analysis unavailable - manual review required',
+        causes: ['Service temporarily unavailable'],
+        contributingFactors: ['AI service not configured']
+      };
+    }
     const prompt = `Analyze this HSE incident: "${description}". Classify and perform causal analysis.`;
     const response = await ai!.models.generateContent({
       model: MODEL_NAME,
