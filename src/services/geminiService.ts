@@ -757,4 +757,98 @@ Based on the description, suggest:
   }
 };
 
+/**
+ * 17. Certificate Parsing
+ */
+export const parseCertificateAI = async (base64Image: string) => {
+  try {
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: [
+        { inlineData: { mimeType: "image/jpeg", data: cleanBase64(base64Image) } },
+        { text: "Extract training certificate information: course title, completion date, expiry date, issuing authority." }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            courseTitle: { type: Type.STRING },
+            completionDate: { type: Type.STRING },
+            expiryDate: { type: Type.STRING },
+            issuingAuthority: { type: Type.STRING },
+            certificateNumber: { type: Type.STRING }
+          },
+          required: ["courseTitle"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("Certificate Parsing Error:", error);
+    return {
+      courseTitle: "Unable to parse certificate",
+      completionDate: new Date().toISOString().split('T')[0],
+      expiryDate: "",
+      issuingAuthority: "Unknown",
+      certificateNumber: ""
+    };
+  }
+};
+
+/**
+ * 18. Skill Gap Analysis
+ */
+export const analyzeSkillGapAI = async (role: string, trainingTitles: string[], incidents: string[]) => {
+  try {
+    const prompt = `Analyze skill gaps for this worker:
+
+Role: "${role}"
+Current Training: ${trainingTitles.join(', ')}
+Related Incidents: ${incidents.join(' | ')}
+
+Identify missing training requirements and recommend specific modules to address skill gaps and prevent incidents.`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            score: { type: Type.INTEGER },
+            missingModules: { type: Type.ARRAY, items: { type: Type.STRING } },
+            recommendedModules: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  title: { type: Type.STRING },
+                  reason: { type: Type.STRING },
+                  priority: { type: Type.STRING, enum: ["High", "Medium", "Low"] }
+                },
+                required: ["title", "reason"]
+              }
+            },
+            summary: { type: Type.STRING },
+            riskLevel: { type: Type.STRING, enum: ["Low", "Medium", "High", "Critical"] }
+          },
+          required: ["score", "missingModules", "recommendedModules", "summary"]
+        }
+      }
+    });
+    return JSON.parse(response.text || '{}');
+  } catch (error) {
+    console.error("Skill Gap Analysis Error:", error);
+    return {
+      score: 0,
+      missingModules: [],
+      recommendedModules: [],
+      summary: "Skill gap analysis service temporarily unavailable.",
+      riskLevel: "Medium"
+    };
+  }
+};
+
 // ... Remaining logic for analyzeRiskTrendsAI, evaluateContractorComplianceAI etc. follows the MODEL_NAME + JSON schema pattern.
