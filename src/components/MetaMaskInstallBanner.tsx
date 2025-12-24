@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Download, RefreshCw, CheckCircle, AlertTriangle, X } from 'lucide-react';
-import { isMetaMaskAvailable, showWalletInstallPrompt } from '../services/walletService';
+import { isMetaMaskAvailable, showWalletInstallPrompt, isWalletFeatureEnabled } from '../services/walletService';
 
 interface MetaMaskInstallBannerProps {
   onDismiss?: () => void;
@@ -13,6 +13,11 @@ export const MetaMaskInstallBanner: React.FC<MetaMaskInstallBannerProps> = ({
   persistent = false,
   className = ''
 }) => {
+  // Don't show banner if wallet features are disabled
+  if (!isWalletFeatureEnabled()) {
+    return null;
+  }
+
   const [dismissed, setDismissed] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
 

@@ -118,6 +118,12 @@ export const connectWalletSafely = async () => {
  * Initialize wallet detection and suppress automatic connection attempts
  */
 export const initializeWalletService = () => {
+  // Only initialize wallet detection if features are enabled
+  if (!isWalletFeatureEnabled()) {
+    console.log('Wallet features disabled - skipping wallet initialization');
+    return;
+  }
+
   // Start MetaMask installation detection
   if (!isMetaMaskAvailable()) {
     detectMetaMaskInstallation();
