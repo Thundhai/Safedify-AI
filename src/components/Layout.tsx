@@ -354,7 +354,12 @@ export const Layout: React.FC = () => {
              </div>
              <h1 className="text-xl font-bold text-white">Safedify</h1>
           </div>
-          <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-white transition-colors">
+          <button 
+            onClick={() => setIsSidebarOpen(false)} 
+            className="text-slate-400 hover:text-white transition-colors"
+            aria-label="Close sidebar"
+            title="Close sidebar"
+          >
             <X size={24} />
           </button>
         </div>
@@ -463,7 +468,12 @@ export const Layout: React.FC = () => {
                       </div>
                   </div>
                   <div className="flex items-center gap-3">
-                      <button onClick={dismissInstallBanner} className="text-slate-400 hover:text-white">
+                      <button 
+                        onClick={dismissInstallBanner} 
+                        className="text-slate-400 hover:text-white"
+                        aria-label="Dismiss install banner"
+                        title="Dismiss PWA install banner"
+                      >
                           <X size={20} />
                       </button>
                   </div>
