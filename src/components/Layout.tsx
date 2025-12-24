@@ -37,7 +37,8 @@ import {
   Shield,
   Plus,
   Download,
-  Globe
+  Globe,
+  Users
 } from 'lucide-react';
 import { getSyncQueue, processSyncQueue } from '../services/offlineService';
 import { AIChatAssistant } from './AIChatAssistant';
@@ -182,6 +183,7 @@ export const Layout: React.FC = () => {
     {
       title: 'Resources',
       items: [
+        { to: '/workers', icon: Users, label: 'Workers' },
         { to: '/training', icon: GraduationCap, label: 'Training' },
         { to: '/ppe', icon: HardHat, label: 'PPE' },
         { to: '/assets', icon: Wrench, label: 'Assets' },

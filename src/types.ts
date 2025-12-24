@@ -218,6 +218,8 @@ export interface WorkerProfile {
   companyId?: string; // Link to Contractor
   photoUrl?: string;
   joinedDate: string;
+  email?: string;
+  phone?: string;
   // Gamification
   points: number;
   level: string; // e.g. "Safety Novice", "Safety Champion"

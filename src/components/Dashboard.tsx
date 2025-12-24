@@ -8,10 +8,43 @@ import { Incident, ActionItem, IncidentSeverity, SiteSafetyScore, SubscriptionTi
 import { EnvironmentalCard } from './EnvironmentalCard';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { WelcomeScreen } from './WelcomeScreen';
+import { EmptyState } from './EmptyState';
 
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  
+  // Check if user has completed onboarding
+  const [isFirstTimeUser, setIsFirstTimeUser] = useState(() => {
+    return localStorage.getItem('onboardingCompleted') !== 'true';
+  });
+  
+  // Check if user has any data at all
+  const hasAnyData = () => {
+    const incidents = getIncidents() || [];
+    const actions = getActions() || [];
+    const inspections = getInspections() || [];
+    const risks = getRiskAssessments() || [];
+    
+    return incidents.length > 0 || actions.length > 0 || inspections.length > 0 || risks.length > 0;
+  };
+
+  const handleWelcomeComplete = () => {
+    setIsFirstTimeUser(false);
+    localStorage.setItem('onboardingCompleted', 'true');
+  };
+
+  // Show welcome screen for first-time users
+  if (isFirstTimeUser && !hasAnyData()) {
+    return (
+      <WelcomeScreen 
+        onComplete={handleWelcomeComplete}
+        userName={user?.name || user?.email || 'there'}
+        organizationName="Your Organization"
+      />
+    );
+  }
   
   // Data State
   const [stats, setStats] = useState({

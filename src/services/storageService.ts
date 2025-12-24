@@ -94,65 +94,10 @@ const defaultRoles: Role[] = [
     }
 ];
 
-// Seed data
-const initialIncidents: Incident[] = [
-  {
-    id: 'inc-001',
-    description: 'Worker slipped on oil spill near Generator B.',
-    date: '2023-10-25T09:30:00',
-    location: 'Zone B - Power Plant',
-    type: IncidentType.FIRST_AID,
-    severity: IncidentSeverity.LOW,
-    status: 'Closed',
-    images: [],
-    reporter: 'John Doe',
-    investigation: {
-      method: '5-Why',
-      whys: [
-        'Worker slipped',
-        'Oil was on floor',
-        'Generator B leaked oil',
-        'Seal was worn out',
-        'Preventive maintenance schedule missed'
-      ],
-      rootCause: 'Lack of adherence to maintenance schedule',
-      completedBy: 'Safety Officer',
-      completedAt: '2023-10-26T10:00:00'
-    }
-  },
-  {
-    id: 'inc-002',
-    description: 'Scaffolding collapse due to high winds.',
-    date: '2023-10-27T14:15:00',
-    location: 'Site Perimeter',
-    type: IncidentType.PROPERTY_DAMAGE,
-    severity: IncidentSeverity.HIGH,
-    status: 'Investigating',
-    images: [],
-    reporter: 'Jane Smith'
-  }
-];
+// Seed data - empty for fresh app experience
+const initialIncidents: Incident[] = [];
 
-const initialActions: ActionItem[] = [
-  {
-    id: 'act-001',
-    title: 'Clean up oil spill Zone B',
-    assignee: 'Maintenance Team',
-    dueDate: '2023-10-26',
-    priority: 'High',
-    status: 'Done',
-    relatedIncidentId: 'inc-001'
-  },
-  {
-    id: 'act-002',
-    title: 'Inspect all scaffolding anchors',
-    assignee: 'Site Engineer',
-    dueDate: '2023-10-28',
-    priority: 'High',
-    status: 'In Progress',
-    relatedIncidentId: 'inc-002'
-  }
-];
+const initialActions: ActionItem[] = [];
 
 const initialInspectionTemplates: InspectionTemplate[] = [
   {
@@ -229,132 +174,23 @@ const initialInspectionTemplates: InspectionTemplate[] = [
   }
 ];
 
-const initialRiskAssessments: RiskAssessment[] = [
-    {
-        id: 'risk-001',
-        title: 'Confined Space Entry - Tank A',
-        taskDescription: 'Cleaning sludge from bottom of fuel tank A using high pressure water.',
-        type: 'JHA',
-        date: '2023-11-01T08:00:00',
-        author: 'Mike Ross',
-        status: 'Approved',
-        hazards: [
-            {
-                id: 'haz-1',
-                description: 'Toxic gas accumulation',
-                probability: 3,
-                severity: 5,
-                riskScore: 15,
-                controls: [
-                    { id: 'ctrl-1', type: 'Engineering', description: 'Forced ventilation for 2 hours prior to entry' },
-                    { id: 'ctrl-2', type: 'PPE', description: 'SCBA for all entrants' }
-                ]
-            }
-        ]
-    }
-];
+const initialRiskAssessments: RiskAssessment[] = [];
 
-const initialObservations: Observation[] = [
-  {
-    id: 'obs-001',
-    type: 'Unsafe Act',
-    category: 'PPE',
-    description: 'Worker observed welding without a face shield.',
-    location: 'Workshop',
-    date: '2023-10-28T10:00:00',
-    isAnonymous: false,
-    observer: 'Supervisor A',
-    status: 'Closed',
-    images: [],
-    immediateActionTaken: 'Stopped work, instructed worker to wear shield.'
-  },
-  {
-    id: 'obs-002',
-    type: 'Unsafe Condition',
-    category: 'Housekeeping',
-    description: 'Loose cables across the walkway causing trip hazard.',
-    location: 'Corridor B',
-    date: '2023-10-28T11:30:00',
-    isAnonymous: true,
-    status: 'Open',
-    images: []
-  },
-  {
-    id: 'obs-003',
-    type: 'Safe Behavior',
-    category: 'Manual Handling',
-    description: 'Team used proper lifting techniques when moving heavy pipes.',
-    location: 'Loading Bay',
-    date: '2023-10-29T09:00:00',
-    isAnonymous: false,
-    observer: 'Manager X',
-    status: 'Closed',
-    images: []
-  }
-];
+const initialObservations: Observation[] = [];
 
 // --- Training Seed Data ---
 
-const initialContractors: Contractor[] = [
-    {
-        id: 'cont-001',
-        name: 'Apex Construction Ltd',
-        contactPerson: 'Sarah Connor',
-        email: 'sarah@apex.com',
-        phone: '+1 555-0199',
-        status: 'Approved',
-        complianceScore: 92,
-        performanceRating: 'A',
-        documents: [
-            { id: 'cd-1', title: 'Liability Insurance', type: 'Insurance', expiryDate: '2024-12-31', status: 'Valid' },
-            { id: 'cd-2', title: 'HSE Policy Manual', type: 'HSE Policy', expiryDate: '2025-06-30', status: 'Valid' }
-        ]
-    },
-    {
-        id: 'cont-002',
-        name: 'Volt Electrical Services',
-        contactPerson: 'Max Rockatansky',
-        email: 'max@volt.com',
-        phone: '+1 555-0155',
-        status: 'Pending',
-        complianceScore: 65,
-        performanceRating: 'C',
-        documents: [
-            { id: 'cd-3', title: 'Electrical License', type: 'License', expiryDate: '2023-11-15', status: 'Expired' }
-        ]
-    }
-];
+const initialContractors: Contractor[] = [];
 
-const initialWorkers: WorkerProfile[] = [
-  { id: 'w-001', name: 'Robert Fox', role: 'Welder', department: 'Maintenance', joinedDate: '2022-01-15', companyId: 'cont-001', points: 120, level: 'Safety Champ', badges: ['Action Hero'] },
-  { id: 'w-002', name: 'Kristin Watson', role: 'Electrician', department: 'Maintenance', joinedDate: '2021-06-20', companyId: 'cont-002', points: 85, level: 'Safety Pro', badges: [] },
-  { id: 'w-003', name: 'Esther Howard', role: 'Scaffolder', department: 'Construction', joinedDate: '2023-03-10', points: 40, level: 'Novice', badges: ['First Report'] },
-  { id: 'w-004', name: 'Cody Fisher', role: 'General Worker', department: 'Operations', joinedDate: '2022-11-05', companyId: 'cont-001', points: 200, level: 'Safety Legend', badges: ['Top Observer', 'Zero Harm'] },
-];
+const initialWorkers: WorkerProfile[] = [];
 
-const initialModules: TrainingModule[] = [
-  { id: 'mod-1', title: 'Work at Height', description: 'Safety procedures for working above 2m', requiredForRoles: ['Scaffolder', 'General Worker', 'Electrician'], validityMonths: 12 },
-  { id: 'mod-2', title: 'Confined Space Entry', description: 'Entry permits and atmospheric testing', requiredForRoles: ['Welder', 'Electrician'], validityMonths: 24 },
-  { id: 'mod-3', title: 'Hot Work Safety', description: 'Welding, cutting and brazing safety', requiredForRoles: ['Welder'], validityMonths: 12 },
-  { id: 'mod-4', title: 'LOTO (Lockout Tagout)', description: 'Electrical isolation procedures', requiredForRoles: ['Electrician', 'Welder'], validityMonths: 12 },
-  { id: 'mod-5', title: 'First Aid Basic', description: 'Basic life support and CPR', requiredForRoles: ['All'], validityMonths: 36 },
-];
+const initialModules: TrainingModule[] = [];
 
-const initialTrainingRecords: TrainingRecord[] = [
-  { id: 'rec-1', workerId: 'w-001', moduleId: 'mod-3', moduleTitle: 'Hot Work Safety', completionDate: '2023-09-15', expiryDate: '2024-09-15', status: 'Valid' },
-  { id: 'rec-2', workerId: 'w-001', moduleId: 'mod-2', moduleTitle: 'Confined Space Entry', completionDate: '2022-01-20', expiryDate: '2024-01-20', status: 'Expiring Soon' },
-  { id: 'rec-3', workerId: 'w-002', moduleId: 'mod-4', moduleTitle: 'LOTO (Lockout Tagout)', completionDate: '2022-05-10', expiryDate: '2023-05-10', status: 'Expired' },
-];
+const initialTrainingRecords: TrainingRecord[] = [];
 
 // --- PPE Seed Data ---
 
-const initialPPEInventory: PPEItem[] = [
-  { id: 'ppe-1', name: 'Safety Helmet (White)', category: 'Head Protection', stockQuantity: 45, minStockThreshold: 10, description: 'Standard ANSI certified hard hat' },
-  { id: 'ppe-2', name: 'Safety Helmet (Blue)', category: 'Head Protection', stockQuantity: 8, minStockThreshold: 15, description: 'Electrician grade hard hat' },
-  { id: 'ppe-3', name: 'Impact Gloves (L)', category: 'Hand Protection', stockQuantity: 120, minStockThreshold: 50, description: 'Cut level 5 impact gloves' },
-  { id: 'ppe-4', name: 'Safety Boots (Size 10)', category: 'Foot Protection', stockQuantity: 3, minStockThreshold: 5, description: 'Steel toe cap boots' },
-  { id: 'ppe-5', name: 'Full Body Harness', category: 'Fall Protection', stockQuantity: 12, minStockThreshold: 10, description: 'Double lanyard harness' },
-];
+const initialPPEInventory: PPEItem[] = [];
 
 const initialPPECategories = [
     'Head Protection', 
@@ -367,101 +203,21 @@ const initialPPECategories = [
     'Fall Protection'
 ];
 
-const initialPPEIssuance: PPEIssuance[] = [
-  { id: 'iss-1', workerId: 'w-001', workerName: 'Robert Fox', ppeItemId: 'ppe-1', ppeItemName: 'Safety Helmet (White)', issueDate: '2023-01-15', expiryDate: '2024-01-15', status: 'Active' },
-  { id: 'iss-2', workerId: 'w-001', workerName: 'Robert Fox', ppeItemId: 'ppe-3', ppeItemName: 'Impact Gloves (L)', issueDate: '2023-09-01', expiryDate: '2023-12-01', status: 'Active' },
-];
+const initialPPEIssuance: PPEIssuance[] = [];
 
 // --- Permit Seed Data ---
 
-const initialPermits: Permit[] = [
-  {
-    id: 'ptw-001',
-    type: PermitType.HOT_WORK,
-    location: 'Zone B - Generator Room',
-    description: 'Cutting and welding new pipe support brackets.',
-    validFrom: new Date(new Date().setHours(8,0,0,0)).toISOString(),
-    validUntil: new Date(new Date().setHours(17,0,0,0)).toISOString(),
-    requestor: 'Mike Ross',
-    approver: 'John Doe',
-    status: PermitStatus.APPROVED,
-    riskAssessmentId: 'risk-001',
-    controls: [
-      { id: 'c1', label: 'Fire Extinguisher on site', checked: true },
-      { id: 'c2', label: 'Fire Watch assigned', checked: true },
-      { id: 'c3', label: 'Combustibles removed (10m radius)', checked: true }
-    ]
-  },
-  {
-    id: 'ptw-002',
-    type: PermitType.CONFINED_SPACE,
-    location: 'Fuel Tank A',
-    description: 'Sludge cleaning.',
-    validFrom: new Date(new Date().setHours(10,0,0,0)).toISOString(),
-    validUntil: new Date(new Date().setHours(14,0,0,0)).toISOString(),
-    requestor: 'Mike Ross',
-    status: PermitStatus.PENDING,
-    controls: [
-      { id: 'c4', label: 'Gas Test completed', checked: false },
-      { id: 'c5', label: 'Standby Man present', checked: true },
-      { id: 'c6', label: 'Rescue Plan available', checked: true }
-    ]
-  }
-];
+const initialPermits: Permit[] = [];
 
-// --- Asset Seed Data ---
-const initialAssets: Asset[] = [
-    {
-        id: 'ast-001',
-        name: 'Mobile Crane 50T',
-        category: 'Lifting Equipment',
-        modelNumber: 'Liebherr LTM 1050',
-        serialNumber: 'LTM-1050-9988',
-        location: 'Main Yard',
-        status: 'Operational',
-        nextInspectionDate: '2023-11-20',
-        documents: [],
-        maintenanceHistory: []
-    },
-    {
-        id: 'ast-002',
-        name: 'Forklift 3T',
-        category: 'Vehicle',
-        modelNumber: 'Toyota 8F',
-        serialNumber: 'TY-888',
-        location: 'Warehouse B',
-        status: 'Inspection Overdue',
-        nextInspectionDate: '2023-10-15',
-        documents: [],
-        maintenanceHistory: []
-    }
-];
+const initialAssets: Asset[] = [];
 
-const initialDocuments: HSEDocument[] = [
-    {
-        id: 'doc-001',
-        title: 'Work at Height SOP',
-        category: 'SOP',
-        version: 'v2.1',
-        status: 'Approved',
-        uploadDate: '2023-01-10',
-        author: 'HSE Manager',
-        description: 'Standard operating procedure for all work above 1.8m.'
-    }
-];
+const initialDocuments: HSEDocument[] = [];
 
-const initialEmergencyContacts: EmergencyContact[] = [
-    { id: 'ec-2', name: 'John Medic', role: 'Site Nurse', phone: '+1 555 0123', type: 'Site Medic', location: 'Clinic Block A' },
-    { id: 'ec-3', name: 'Sarah Fire', role: 'Fire Warden', phone: '+1 555 0987', type: 'Fire Warden', location: 'Warehouse' }
-];
+const initialEmergencyContacts: EmergencyContact[] = [];
 
-const initialDrills: EmergencyDrill[] = [
-    { id: 'ed-1', type: 'Fire Evacuation', date: '2023-09-15', location: 'Main Office', participantsCount: 45, durationMinutes: 12, outcome: 'Success', notes: 'Evacuation completed within target time.' }
-];
+const initialDrills: EmergencyDrill[] = [];
 
-const initialSafetyZones: SafetyZone[] = [
-    { id: 'z-1', name: 'Chemical Store', type: 'Danger', lat: 34.0522, lng: -118.2437, radius: 50, requiredPPE: ['Respirator', 'Chemical Gloves'] }
-];
+const initialSafetyZones: SafetyZone[] = [];
 
 // --- Local Storage Helpers & Quota ---
 
@@ -612,6 +368,18 @@ export const deleteObservation = (id: string) => {
 // Workers & Training
 export const getWorkers = (): WorkerProfile[] => get(STORAGE_KEYS.WORKERS, initialWorkers);
 export const getWorkerById = (id: string): WorkerProfile | undefined => getWorkers().find(w => w.id === id);
+export const saveWorker = (worker: WorkerProfile) => {
+    const workers = getWorkers();
+    set(STORAGE_KEYS.WORKERS, [worker, ...workers]);
+};
+export const updateWorker = (worker: WorkerProfile) => {
+    const workers = getWorkers();
+    set(STORAGE_KEYS.WORKERS, workers.map(w => w.id === worker.id ? worker : w));
+};
+export const deleteWorker = (id: string) => {
+    const workers = getWorkers();
+    set(STORAGE_KEYS.WORKERS, workers.filter(w => w.id !== id));
+};
 export const getTrainingModules = (): TrainingModule[] => get(STORAGE_KEYS.TRAINING_MODULES, initialModules);
 export const getTrainingRecords = (): TrainingRecord[] => get(STORAGE_KEYS.TRAINING_RECORDS, initialTrainingRecords);
 export const saveTrainingRecord = (record: TrainingRecord) => {
@@ -794,7 +562,7 @@ export const getManHours = (): number => {
     if (logs.length > 0) {
         return logs.reduce((total, log) => total + log.manHours, 0);
     }
-    return get(STORAGE_KEYS.MAN_HOURS, 100000); // Default seed
+    return get(STORAGE_KEYS.MAN_HOURS, 0); // Start with 0 for fresh users
 };
 export const saveManHours = (hours: number) => set(STORAGE_KEYS.MAN_HOURS, hours);
 
@@ -878,7 +646,7 @@ export const calculateSiteSafetyScore = (): SiteSafetyScore => {
             incidents: metrics.ltiCount + metrics.mtcCount + metrics.facCount,
             observations: getObservations().length,
             inspections: getInspections().length,
-            training: 85, // Mock
+            training: 0, // Start with 0 for fresh users
             actions: actions.filter(a => a.status !== 'Done').length
         }
     };

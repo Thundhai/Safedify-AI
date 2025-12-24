@@ -26,6 +26,8 @@ import { ObservationList } from './components/ObservationList';
 import { ObservationForm } from './components/ObservationForm';
 import { TrainingDashboard } from './components/TrainingDashboard';
 import { WorkerDetail } from './components/WorkerDetail';
+import { WorkersList } from './components/WorkersList';
+import { WorkerForm } from './components/WorkerForm';
 import { PPEDashboard } from './components/PPEDashboard';
 import { PermitList } from './components/PermitList';
 import { PermitForm } from './components/PermitForm';
@@ -226,19 +228,60 @@ const IncidentList: React.FC = () => {
                     <input type="text" placeholder="Search incidents..." className="bg-transparent border-none outline-none text-sm w-full dark:text-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                 </div>
                 <div className="divide-y dark:divide-slate-800">
-                    {filteredAndSortedIncidents.map(inc => (
-                        <Link to={`/incidents/${inc.id}`} key={inc.id} className="block p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <p className="font-semibold text-slate-800 dark:text-slate-100">{inc.description}</p>
-                                    <p className="text-xs text-slate-500">{inc.location} • {new Date(inc.date).toLocaleDateString()}</p>
+                    {filteredAndSortedIncidents.length === 0 ? (
+                        incidents.length === 0 ? (
+                            // No incidents at all - show EmptyState
+                            <div className="p-8">
+                                <div className="flex flex-col items-center justify-center text-center">
+                                    <div className="mb-6 opacity-80">
+                                        <AlertTriangle className="w-16 h-16 text-yellow-500" />
+                                    </div>
+                                    <h3 className="text-2xl font-bold text-gray-900 mb-4">No Incidents Reported Yet</h3>
+                                    <p className="text-gray-600 mb-8 max-w-md">
+                                        Start building your safety record by reporting incidents, near misses, and observations. Our AI will help you identify patterns and suggest improvements.
+                                    </p>
+                                    <Link
+                                        to="/incidents/new"
+                                        className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105"
+                                    >
+                                        <Plus className="w-5 h-5" />
+                                        Report First Incident
+                                    </Link>
                                 </div>
-                                <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${inc.severity === 'Critical' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
-                                    {inc.severity}
-                                </span>
                             </div>
-                        </Link>
-                    ))}
+                        ) : (
+                            // Has incidents but filtered results empty
+                            <div className="p-8 text-center">
+                                <p className="text-slate-500">No incidents match your current filters.</p>
+                                <button 
+                                    onClick={() => {
+                                        setSearchTerm('');
+                                        setStatusFilter('All');
+                                        setSeverityFilter('All');
+                                        setTypeFilter('All');
+                                        setDateFilter('All');
+                                    }}
+                                    className="mt-2 text-blue-500 hover:text-blue-600 text-sm"
+                                >
+                                    Clear all filters
+                                </button>
+                            </div>
+                        )
+                    ) : (
+                        filteredAndSortedIncidents.map(inc => (
+                            <Link to={`/incidents/${inc.id}`} key={inc.id} className="block p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="font-semibold text-slate-800 dark:text-slate-100">{inc.description}</p>
+                                        <p className="text-xs text-slate-500">{inc.location} • {new Date(inc.date).toLocaleDateString()}</p>
+                                    </div>
+                                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${inc.severity === 'Critical' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+                                        {inc.severity}
+                                    </span>
+                                </div>
+                            </Link>
+                        ))
+                    )}
                 </div>
             </div>
         </div>
@@ -288,6 +331,9 @@ function App() {
             <Route path="risk-assessments/:id" element={<RiskAssessmentForm />} />
             <Route path="contractors" element={<ContractorList />} />
             <Route path="contractors/:id" element={<ContractorDetail />} />
+            <Route path="workers" element={<WorkersList />} />
+            <Route path="workers/new" element={<WorkerForm />} />
+            <Route path="workers/:id/edit" element={<WorkerForm />} />
             <Route path="training" element={<TrainingDashboard />} />
             <Route path="training/worker/:id" element={<WorkerDetail />} />
             <Route path="ppe" element={<PPEDashboard />} />
