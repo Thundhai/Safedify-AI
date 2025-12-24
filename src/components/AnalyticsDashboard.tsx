@@ -115,14 +115,9 @@ export const AnalyticsDashboard: React.FC = () => {
 
     if (!metrics) return <div className="p-8"><Loader2 className="animate-spin" /></div>;
 
-    // --- Mock Data for Charts (Simulating Historical Data) ---
+    // --- Incident Trend Data (Based on Current Data Only) ---
     const incidentTrendData = [
-        { month: 'Jan', count: 4, lti: 0 },
-        { month: 'Feb', count: 3, lti: 0 },
-        { month: 'Mar', count: 6, lti: 1 },
-        { month: 'Apr', count: 2, lti: 0 },
-        { month: 'May', count: 5, lti: 0 },
-        { month: 'Jun', count: incidents.length, lti: metrics.ltiCount }, // Current
+        { month: 'Current Period', count: incidents.length, lti: metrics.ltiCount },
     ];
 
     const typeData = [
@@ -366,8 +361,7 @@ export const AnalyticsDashboard: React.FC = () => {
                                         { name: 'LTI', count: metrics.ltiCount },
                                         { name: 'Medical', count: metrics.mtcCount },
                                         { name: 'First Aid', count: metrics.facCount },
-                                        { name: 'Near Miss', count: metrics.nmCount },
-                                        { name: 'Property', count: 2 } // Mock
+                                        { name: 'Near Miss', count: metrics.nmCount }
                                     ]}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                         <XAxis dataKey="name" tick={{fontSize: 12}} />
@@ -379,8 +373,7 @@ export const AnalyticsDashboard: React.FC = () => {
                                                     { name: 'LTI', color: '#ef4444' },
                                                     { name: 'Medical', color: '#f97316' },
                                                     { name: 'First Aid', color: '#eab308' },
-                                                    { name: 'Near Miss', color: '#22c55e' },
-                                                    { name: 'Property', color: '#64748b' }
+                                                    { name: 'Near Miss', color: '#22c55e' }
                                                 ].map((entry, index) => (
                                                     <Cell key={`cell-${index}`} fill={entry.color} />
                                                 ))
