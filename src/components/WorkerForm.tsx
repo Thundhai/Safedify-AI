@@ -144,6 +144,8 @@ export const WorkerForm: React.FC = () => {
         <button
           onClick={() => navigate('/workers')}
           className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded"
+          aria-label="Go back to workers list"
+          title="Return to workers list"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>

@@ -154,7 +154,14 @@ const ActionList: React.FC = () => {
                     <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-md p-6 border dark:border-slate-700">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-bold text-slate-800 dark:text-white">Create Action Item</h3>
-                            <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+                            <button 
+                                onClick={() => setShowModal(false)} 
+                                className="text-slate-400 hover:text-slate-600"
+                                aria-label="Close modal"
+                                title="Close action item modal"
+                            >
+                                <X size={20} />
+                            </button>
                         </div>
                         <form onSubmit={handleCreate} className="space-y-4">
                             <div>
@@ -170,7 +177,12 @@ const ActionList: React.FC = () => {
                                 </div>
                                 <div className="col-span-1">
                                     <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Due Date</label>
-                                    <input required type="date" className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm text-slate-900 dark:text-white outline-none"
+                                    <input 
+                                        required 
+                                        type="date" 
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 text-sm text-slate-900 dark:text-white outline-none"
+                                        aria-label="Due date for action item"
+                                        title="Select due date"
                                         value={newItem.dueDate} onChange={e => setNewItem({...newItem, dueDate: e.target.value})} />
                                 </div>
                             </div>

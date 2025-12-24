@@ -181,6 +181,8 @@ export const Dashboard: React.FC = () => {
               <button 
                   onClick={() => setShowOnboarding(false)} 
                   className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+                  aria-label="Close onboarding widget"
+                  title="Dismiss onboarding guide"
               >
                   <X size={20} />
               </button>
