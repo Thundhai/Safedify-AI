@@ -1,0 +1,32 @@
+{
+  "version": 2,
+  "name": "safedify-backend",
+  "builds": [
+    {
+      "src": "src/server.ts",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "src/server.ts"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "DATABASE_URL": "@database-url",
+    "JWT_SECRET": "@jwt-secret",
+    "JWT_EXPIRES_IN": "7d",
+    "UPLOAD_MAX_SIZE": "5242880",
+    "UPLOAD_DIR": "/tmp/uploads",
+    "CORS_ORIGIN": "@cors-origin"
+  },
+  "regions": ["iad1"],
+  "functions": {
+    "src/server.ts": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  }
+}
