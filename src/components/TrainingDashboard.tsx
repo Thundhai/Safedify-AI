@@ -14,9 +14,12 @@ export const TrainingDashboard: React.FC = () => {
     const [modules, setModules] = useState<TrainingModule[]>([]);
 
     useEffect(() => {
-        setWorkers(getWorkers());
-        setRecords(getTrainingRecords());
-        setModules(getTrainingModules());
+        const load = async () => {
+            setWorkers(await getWorkers());
+            setRecords(await getTrainingRecords());
+            setModules(await getTrainingModules());
+        };
+        load();
     }, []);
 
     const getTrainingStatus = (workerId: string, moduleId: string) => {

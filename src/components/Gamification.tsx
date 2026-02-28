@@ -8,10 +8,13 @@ export const Gamification: React.FC = () => {
     const [workers, setWorkers] = useState<WorkerProfile[]>([]);
 
     useEffect(() => {
-        const allWorkers = getWorkers();
-        // Sort by points desc
-        const sorted = [...allWorkers].sort((a, b) => (b.points || 0) - (a.points || 0));
-        setWorkers(sorted);
+        const load = async () => {
+            const allWorkers = await getWorkers();
+            // Sort by points desc
+            const sorted = [...allWorkers].sort((a, b) => (b.points || 0) - (a.points || 0));
+            setWorkers(sorted);
+        };
+        load();
     }, []);
 
     const getRankIcon = (index: number) => {

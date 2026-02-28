@@ -1,0 +1,14 @@
+node_modules
+dist
+dist-ssr
+*.local
+.env
+.env.local
+server/.env
+server/node_modules
+server/safedify.db
+server/safedify.db-shm
+server/safedify.db-wal
+.git
+.vscode
+*.log

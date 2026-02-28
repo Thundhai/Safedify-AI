@@ -1,11 +1,16 @@
 {
   "name": "safedify-ai-platform",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "cd server && node --experimental-sqlite --import tsx index.ts",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "build": "vite build",
+    "build:all": "npm run build && cd server && npm install --production",
+    "start": "cd server && NODE_ENV=production node --experimental-sqlite --import tsx index.ts",
+    "start:win": "cd server && set NODE_ENV=production && node --experimental-sqlite --import tsx index.ts",
     "preview": "vite preview"
   },
   "dependencies": {

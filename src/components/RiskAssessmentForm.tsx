@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { getRiskAssessmentById, saveRiskAssessment } from '../services/storageService';
 import { identifyHazardsAI, suggestControlsAI, explainRiskScoreAI, reviewRiskAssessmentAI } from '../services/geminiService';
+import { SmartTextArea } from './SmartTextInput';
 import { RiskAssessment, RiskHazard, RiskControl, RiskControlType, SubscriptionTier } from '../types';
 import { useAuth } from '../context/AuthContext';
 
@@ -37,10 +38,13 @@ export const RiskAssessmentForm: React.FC = () => {
   const [loadingReview, setLoadingReview] = useState(false);
 
   useEffect(() => {
-    if (!isNew && id) {
-      const existing = getRiskAssessmentById(id);
-      if (existing) setFormData(existing);
-    }
+    const load = async () => {
+      if (!isNew && id) {
+        const existing = await getRiskAssessmentById(id);
+        if (existing) setFormData(existing);
+      }
+    };
+    load();
   }, [id, isNew]);
 
   const handleSuggestHazards = async () => {
@@ -181,9 +185,9 @@ export const RiskAssessmentForm: React.FC = () => {
       setFormData({...formData, hazards: updatedHazards});
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.title) return alert("Title is required");
-    saveRiskAssessment(formData);
+    await saveRiskAssessment(formData);
     alert("Risk Assessment Saved!");
     navigate('/risk-assessments');
   };
@@ -262,9 +266,10 @@ export const RiskAssessmentForm: React.FC = () => {
             <div className="md:col-span-2 space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Task Description</label>
                 <div className="relative">
-                    <textarea 
+                    <SmartTextArea 
                         value={formData.taskDescription}
                         onChange={(e) => setFormData({...formData, taskDescription: e.target.value})}
+                        onValueChange={(v) => setFormData(d => ({...d, taskDescription: v}))}
                         className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[100px] print:border-0 print:p-0 print:resize-none"
                         placeholder="Describe the steps involved in the task..."
                     />

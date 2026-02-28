@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getDocumentById, saveDocument } from '../services/storageService';
 import { summarizeDocumentAI } from '../services/geminiService';
+import { SmartTextInput, SmartTextArea } from './SmartTextInput';
 import { HSEDocument, DocumentCategory } from '../types';
 import { 
     ArrowLeft, Save, Upload, QrCode, Sparkles, Loader2, CheckCircle, 
@@ -29,8 +30,11 @@ export const DocumentForm: React.FC = () => {
 
     useEffect(() => {
         if (!isNew && id) {
-            const existing = getDocumentById(id);
-            if (existing) setDoc(existing);
+            const load = async () => {
+                const existing = await getDocumentById(id);
+                if (existing) setDoc(existing);
+            };
+            load();
         }
     }, [id, isNew]);
 
@@ -61,14 +65,14 @@ export const DocumentForm: React.FC = () => {
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!doc.title) return alert("Title required");
-        saveDocument(doc);
+        await saveDocument(doc);
         alert("Document Saved.");
         navigate('/documents');
     };
 
-    const handleApprove = () => {
+    const handleApprove = async () => {
         const updated = { 
             ...doc, 
             status: 'Approved' as const, 
@@ -76,7 +80,7 @@ export const DocumentForm: React.FC = () => {
             approvalDate: new Date().toISOString().split('T')[0] 
         };
         setDoc(updated);
-        saveDocument(updated);
+        await saveDocument(updated);
     };
 
     const categories: DocumentCategory[] = ['Policy', 'SOP', 'MSDS', 'Work Instruction', 'Report', 'Training Material'];
@@ -109,10 +113,10 @@ export const DocumentForm: React.FC = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                              <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-1">Title</label>
-                                <input 
-                                    type="text" 
+                                <SmartTextInput 
                                     value={doc.title}
                                     onChange={(e) => setDoc({...doc, title: e.target.value})}
+                                    onValueChange={(v) => setDoc(d => ({...d, title: v}))}
                                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
                                     placeholder="e.g. Work at Height SOP"
                                 />
@@ -148,10 +152,11 @@ export const DocumentForm: React.FC = () => {
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">Description</label>
-                            <textarea 
+                            <SmartTextArea 
                                 rows={3}
                                 value={doc.description}
                                 onChange={(e) => setDoc({...doc, description: e.target.value})}
+                                onValueChange={(v) => setDoc(d => ({...d, description: v}))}
                                 className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
                             />
                         </div>

@@ -10,7 +10,10 @@ export const PermitList: React.FC = () => {
     const [filter, setFilter] = useState<string>('All');
 
     useEffect(() => {
-        setPermits(getPermits());
+        const load = async () => {
+            setPermits(await getPermits());
+        };
+        load();
     }, []);
 
     const getStatusColor = (status: PermitStatus) => {

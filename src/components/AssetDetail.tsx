@@ -19,7 +19,10 @@ export const AssetDetail: React.FC = () => {
 
     useEffect(() => {
         if (id) {
-            setAsset(getAssetById(id));
+            const load = async () => {
+                setAsset(await getAssetById(id));
+            };
+            load();
         }
     }, [id]);
 
@@ -49,7 +52,7 @@ export const AssetDetail: React.FC = () => {
                         nextInspectionDate: extracted.expiryDate || asset.nextInspectionDate
                     };
                     
-                    saveAsset(updatedAsset);
+                    await saveAsset(updatedAsset);
                     setAsset(updatedAsset);
                     alert("Certificate uploaded and analyzed!");
 

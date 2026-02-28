@@ -1,6 +1,6 @@
-import { GoogleGenAI, Type, Modality } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { 
-  IncidentType, IncidentSeverity, Incident, ActionItem, 
+  IncidentType, IncidentSeverity, IncidentCategory, Incident, ActionItem, 
   Observation, PPEItem, Contractor, HSEMetrics, EnvironmentalData 
 } from "../types";
 
@@ -16,7 +16,12 @@ if (!apiKey) {
 }
 
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
-const MODEL_NAME = "gemini-1.5-pro"; // Updated to use latest stable model
+const MODEL_NAME = "gemini-2.5-flash";
+
+/**
+ * Default config to disable thinking for faster responses
+ */
+const NO_THINK = { thinkingConfig: { thinkingBudget: 0 } } as any;
 
 /**
  * Helper: Check if AI is available and create a safe wrapper for AI calls
@@ -57,29 +62,32 @@ export const classifyIncidentAI = async (description: string) => {
       return {
         type: 'Safety',
         severity: 'Medium',
+        category: 'Near Miss',
         confidence: 50,
         reasoning: 'AI analysis unavailable - manual review required',
         causes: ['Service temporarily unavailable'],
         contributingFactors: ['AI service not configured']
       };
     }
-    const prompt = `Analyze this HSE incident: "${description}". Classify and perform causal analysis.`;
+    const prompt = `Analyze this HSE incident: "${description}". Classify by type and OSHA category (Near Miss, First Aid Case, Medical Treatment Case, Restricted Work Case, Lost Time Injury, Fatality). Perform causal analysis.`;
     const response = await ai!.models.generateContent({
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             type: { type: Type.STRING, enum: Object.values(IncidentType) },
+            category: { type: Type.STRING, enum: Object.values(IncidentCategory) },
             severity: { type: Type.STRING, enum: Object.values(IncidentSeverity) },
             confidence: { type: Type.NUMBER },
             reasoning: { type: Type.STRING },
             causes: { type: Type.ARRAY, items: { type: Type.STRING } },
             contributingFactors: { type: Type.ARRAY, items: { type: Type.STRING } }
           },
-          required: ["type", "severity", "confidence", "reasoning", "causes", "contributingFactors"]
+          required: ["type", "category", "severity", "confidence", "reasoning", "causes", "contributingFactors"]
         }
       }
     });
@@ -90,6 +98,7 @@ export const classifyIncidentAI = async (description: string) => {
     return {
       type: 'Safety',
       severity: 'Low',
+      category: 'Near Miss',
       confidence: 50,
       reasoning: 'Unable to analyze - API unavailable',
       causes: ['Service temporarily unavailable'],
@@ -107,6 +116,7 @@ export const getCorrectiveActionsAI = async (description: string, type: string, 
       model: MODEL_NAME,
       contents: `Suggest 3 actions for: "${description}" (Type: ${type}, Severity: ${severity})`,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -135,6 +145,7 @@ export const analyzeRootCauseAI = async (description: string, type: string, meth
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -173,6 +184,7 @@ export const detectPPEAI = async (base64Image: string) => {
         { text: "Analyze for PPE compliance: Hard Hats, Vests, Glasses, Boots. Return JSON." }
       ],
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -205,6 +217,7 @@ export const extractDocumentDataAI = async (base64Image: string) => {
         { text: "Extract: Document Type, Date, Permit Holder, Hazards." }
       ],
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -236,6 +249,7 @@ export const detectSiteHazardsAI = async (base64Image: string) => {
         { text: "Detect construction site hazards: trip risks, height risks, PPE violations." }
       ],
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -276,6 +290,7 @@ export const chatSafetyAssistant = async (
             model: MODEL_NAME,
             history: history.map(h => ({ role: h.role, parts: [{ text: h.text }] })),
             config: {
+                ...NO_THINK,
                 systemInstruction: `You are Safedify AI, an HSE expert. Context: ${systemContext}`
             }
         });
@@ -302,6 +317,7 @@ export const fetchRegulatoryNewsAI = async (country: string) => {
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         tools: [{ googleSearch: {} }] as any
       }
     });
@@ -314,40 +330,52 @@ export const fetchRegulatoryNewsAI = async (country: string) => {
 };
 
 /**
- * 9. Audio / TTS Logic
+ * 9. Audio / TTS Logic (Browser SpeechSynthesis — reliable, no API calls)
  */
-export const generateSpeechAI = async (text: string) => {
-    try {
-        const response = await ai.models.generateContent({
-            model: MODEL_NAME,
-            contents: [{ parts: [{ text: text }] }],
-            config: {
-                // @ts-ignore
-                responseModalities: [Modality.AUDIO],
-            },
-        });
-        return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    } catch (error) {
+export const generateSpeechAI = async (text: string): Promise<string | null> => {
+    // Check browser support for SpeechSynthesis
+    if (!('speechSynthesis' in window)) {
+        console.warn('SpeechSynthesis not supported in this browser.');
         return null;
     }
+    // Return the cleaned text — actual playback happens in playGeneratedAudio
+    return text;
 };
 
-export const playGeneratedAudio = async (base64Audio: string) => {
-    try {
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 24000});
-        const binaryString = atob(base64Audio);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-        const dataInt16 = new Int16Array(bytes.buffer);
-        const buffer = audioContext.createBuffer(1, dataInt16.length, 24000);
-        const channelData = buffer.getChannelData(0);
-        for (let i = 0; i < dataInt16.length; i++) channelData[i] = dataInt16[i] / 32768.0;
-        const source = audioContext.createBufferSource();
-        source.buffer = buffer;
-        source.connect(audioContext.destination);
-        source.start();
-    } catch (e) {
-        console.error("Audio Error:", e);
+export const playGeneratedAudio = async (text: string): Promise<void> => {
+    return new Promise((resolve) => {
+        if (!('speechSynthesis' in window)) {
+            console.warn('SpeechSynthesis not supported.');
+            resolve();
+            return;
+        }
+        // Cancel any ongoing speech
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        utterance.lang = 'en-US';
+
+        // Pick a good English voice if available
+        const voices = window.speechSynthesis.getVoices();
+        const englishVoice = voices.find(v => v.lang.startsWith('en') && v.localService) 
+                          || voices.find(v => v.lang.startsWith('en'));
+        if (englishVoice) utterance.voice = englishVoice;
+
+        utterance.onend = () => resolve();
+        utterance.onerror = (e) => {
+            console.error("SpeechSynthesis error:", e);
+            resolve(); // Don't break the caller flow
+        };
+
+        window.speechSynthesis.speak(utterance);
+    });
+};
+
+export const stopSpeech = () => {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
     }
 };
 
@@ -357,7 +385,7 @@ export const playGeneratedAudio = async (base64Audio: string) => {
 export const analyzeWeatherRisksAI = async (weatherData: EnvironmentalData) => {
   try {
     const prompt = `Analyze weather conditions for construction safety risks:
-Temperature: ${weatherData.temperature}°C
+Temperature: ${weatherData.temperature}Â°C
 Humidity: ${weatherData.humidity}%
 Wind Speed: ${weatherData.windSpeed} km/h
 Weather Condition: ${weatherData.condition}
@@ -370,6 +398,7 @@ Provide safety recommendations and risk assessment.`;
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -416,6 +445,7 @@ Based on patterns, trends, and seasonality, predict potential safety issues and 
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -467,6 +497,7 @@ Provide a comprehensive executive summary highlighting key performance indicator
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -529,6 +560,7 @@ Give a concise, actionable recommendation to address this issue and pass the ins
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -567,6 +599,7 @@ Provide a comprehensive list of potential hazards that could occur during this t
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -598,6 +631,7 @@ Provide specific control measures using the hierarchy of controls (Elimination, 
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -638,6 +672,7 @@ Provide a clear explanation of why this risk score was calculated and what it me
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -672,6 +707,7 @@ Provide feedback on the risk assessment quality, missing hazards, and improvemen
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -720,6 +756,7 @@ Identify key themes, recurring patterns, and actionable insights to improve safe
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -774,6 +811,7 @@ Based on the description, suggest:
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -819,6 +857,7 @@ export const parseCertificateAI = async (base64Image: string) => {
         { text: "Extract training certificate information: course title, completion date, expiry date, issuing authority." }
       ],
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -863,6 +902,7 @@ Identify missing training requirements and recommend specific modules to address
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -919,6 +959,7 @@ Assess the safety impact and provide specific action recommendations for restock
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -970,6 +1011,7 @@ Review for completeness, adequacy of controls, and compliance with safety standa
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -1011,6 +1053,7 @@ export const extractCertificateDataAI = async (base64Image: string) => {
         { text: "Extract certificate/document information for asset management: document title, expiry date, certificate number, type." }
       ],
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -1060,6 +1103,7 @@ Assess contractor compliance, identify issues, and provide performance rating ba
       model: MODEL_NAME,
       contents: prompt,
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
@@ -1110,6 +1154,7 @@ Provide a concise summary highlighting key safety requirements, procedures, and 
         { text: prompt }
       ],
       config: {
+        ...NO_THINK,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,

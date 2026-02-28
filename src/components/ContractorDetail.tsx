@@ -31,18 +31,21 @@ export const ContractorDetail: React.FC = () => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
     useEffect(() => {
-        if (!isNew && id) {
-            const existing = getContractorById(id);
-            if (existing) setContractor(existing);
-            // Fetch associated workers
-            const allWorkers = getWorkers();
-            setWorkers(allWorkers.filter(w => w.companyId === id));
-        }
+        const load = async () => {
+            if (!isNew && id) {
+                const existing = await getContractorById(id);
+                if (existing) setContractor(existing);
+                // Fetch associated workers
+                const allWorkers = await getWorkers();
+                setWorkers(allWorkers.filter(w => w.companyId === id));
+            }
+        };
+        load();
     }, [id, isNew]);
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!contractor.name) return alert("Company Name is required");
-        saveContractor(contractor);
+        await saveContractor(contractor);
         alert("Contractor Saved Successfully");
         navigate('/contractors');
     };

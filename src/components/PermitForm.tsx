@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { getPermitById, savePermit, getRiskAssessments } from '../services/storageService';
 import { auditPermitAI } from '../services/geminiService';
+import { SmartTextInput, SmartTextArea } from './SmartTextInput';
 import { Permit, PermitType, PermitStatus, RiskAssessment } from '../types';
 
 export const PermitForm: React.FC = () => {
@@ -42,19 +43,22 @@ export const PermitForm: React.FC = () => {
   const [loadingAudit, setLoadingAudit] = useState(false);
   
   useEffect(() => {
-    // Load Risks
-    setRiskAssessments(getRiskAssessments());
+    const load = async () => {
+      // Load Risks
+      setRiskAssessments(await getRiskAssessments());
 
-    if (!isNew && id) {
-      const existing = getPermitById(id);
-      if (existing) setFormData(existing);
-    } else {
-        // Initialize default checklist for new
-        setFormData(prev => ({
-            ...prev,
-            controls: checklistTemplates[PermitType.HOT_WORK].map((l, i) => ({ id: `c-${i}`, label: l, checked: false }))
-        }));
-    }
+      if (!isNew && id) {
+        const existing = await getPermitById(id);
+        if (existing) setFormData(existing);
+      } else {
+          // Initialize default checklist for new
+          setFormData(prev => ({
+              ...prev,
+              controls: checklistTemplates[PermitType.HOT_WORK].map((l, i) => ({ id: `c-${i}`, label: l, checked: false }))
+          }));
+      }
+    };
+    load();
   }, [id, isNew]);
 
   const handleTypeChange = (newType: PermitType) => {
@@ -162,15 +166,15 @@ export const PermitForm: React.FC = () => {
       }
 
       const updated = { ...formData, status };
-      savePermit(updated);
+      await savePermit(updated);
       alert(`Permit ${status === PermitStatus.PENDING ? 'submitted for approval' : 'saved'}.`);
       navigate('/permits');
   };
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
       // Simulation
       const updated = { ...formData, status: PermitStatus.APPROVED, approver: 'Current User' };
-      savePermit(updated);
+      await savePermit(updated);
       setFormData(updated);
       alert("Permit Approved and Active.");
   };
@@ -271,11 +275,11 @@ export const PermitForm: React.FC = () => {
 
                   <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-1">Location</label>
-                      <input 
-                         type="text"
+                      <SmartTextInput 
                          disabled={isReadOnly}
                          value={formData.location}
                          onChange={(e) => setFormData({...formData, location: e.target.value})}
+                         onValueChange={(v) => setFormData(d => ({...d, location: v}))}
                          className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
                          placeholder="Specific location of work..."
                       />
@@ -283,11 +287,12 @@ export const PermitForm: React.FC = () => {
 
                   <div>
                       <label className="block text-sm font-semibold text-slate-700 mb-1">Description of Work</label>
-                      <textarea 
+                      <SmartTextArea 
                          rows={3}
                          disabled={isReadOnly}
                          value={formData.description}
                          onChange={(e) => setFormData({...formData, description: e.target.value})}
+                         onValueChange={(v) => setFormData(d => ({...d, description: v}))}
                          className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
                          placeholder="Describe tasks, tools used, etc..."
                       />

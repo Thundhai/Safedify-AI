@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef, ReactNode } from 'react';
 import { AuthUser, UserRole, Permission, UserRoles } from '../types';
 import { getCurrentUser, login as authLogin, logout as authLogout, register as authRegister } from '../services/authService';
 import { getRoles } from '../services/storageService';
@@ -19,20 +19,35 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const cachedRoles = useRef<any[]>([]);
+
+  // Load roles from backend and cache them for synchronous permission checks
+  const loadRoles = async () => {
+    try {
+      const roles = await getRoles();
+      cachedRoles.current = roles;
+    } catch (e) {
+      console.error('Failed to load roles', e);
+    }
+  };
 
   useEffect(() => {
-    // Check for existing session
-    const storedUser = getCurrentUser();
-    if (storedUser) {
-      setUser(storedUser);
-    }
-    setLoading(false);
+    const init = async () => {
+      const storedUser = getCurrentUser();
+      if (storedUser) {
+        setUser(storedUser);
+        await loadRoles();
+      }
+      setLoading(false);
+    };
+    init();
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     const loggedUser = await authLogin(email, password);
     if (loggedUser) {
       setUser(loggedUser);
+      await loadRoles();
       return true;
     }
     return false;
@@ -43,6 +58,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const registeredUser = await authRegister(name, email, password, role);
           if (registeredUser) {
               setUser(registeredUser);
+              await loadRoles();
               return true;
           }
           return false;
@@ -55,6 +71,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = () => {
     authLogout();
     setUser(null);
+    cachedRoles.current = [];
   };
 
   const checkPermission = (permission: Permission): boolean => {
@@ -62,13 +79,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Admin bypass for legacy/simplicity
       if (user.role === UserRoles.ADMIN) return true;
 
-      // Dynamic check
-      const roles = getRoles();
-      const userRole = roles.find(r => r.name === user.role);
+      // Use cached roles for synchronous permission check
+      const userRole = cachedRoles.current.find((r: any) => r.name === user.role);
       
       if (!userRole) {
-          // Fallback if role missing in DB (e.g. migration issue)
-          return true; // Or strictly false depending on security policy
+          // Fallback if role missing in cache (e.g. not loaded yet)
+          return true;
       }
 
       return userRole.permissions.includes(permission);

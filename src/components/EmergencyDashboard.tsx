@@ -137,14 +137,17 @@ export const EmergencyDashboard: React.FC = () => {
     const [isUploading, setIsUploading] = useState(false);
 
     useEffect(() => {
-        refreshContacts();
-        setDrills(getEmergencyDrills());
-        // Set initial regional contacts
-        setRegionalContacts(GLOBAL_EMERGENCY_DATA['United States']);
+        const load = async () => {
+            await refreshContacts();
+            setDrills(await getEmergencyDrills());
+            // Set initial regional contacts
+            setRegionalContacts(GLOBAL_EMERGENCY_DATA['United States']);
+        };
+        load();
     }, []);
 
-    const refreshContacts = () => {
-        const all = getEmergencyContacts();
+    const refreshContacts = async () => {
+        const all = await getEmergencyContacts();
         // Filter out 'External Service' from storage as we handle them dynamically via region
         setOrgContacts(all.filter(c => c.type !== 'External Service'));
     };
@@ -155,7 +158,7 @@ export const EmergencyDashboard: React.FC = () => {
         setRegionalContacts(GLOBAL_EMERGENCY_DATA[country] || []);
     };
 
-    const handleAddContact = (e: React.FormEvent) => {
+    const handleAddContact = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newContact.name || !newContact.phone) return;
 
@@ -168,16 +171,16 @@ export const EmergencyDashboard: React.FC = () => {
             location: newContact.location
         };
 
-        saveEmergencyContact(contact);
-        refreshContacts();
+        await saveEmergencyContact(contact);
+        await refreshContacts();
         setShowAddContact(false);
         setNewContact({ name: '', role: '', phone: '', type: 'Site Medic' });
     };
 
-    const handleDeleteContact = (id: string) => {
+    const handleDeleteContact = async (id: string) => {
         if (confirm("Remove this contact?")) {
-            deleteEmergencyContact(id);
-            refreshContacts();
+            await deleteEmergencyContact(id);
+            await refreshContacts();
         }
     };
 
@@ -228,7 +231,7 @@ export const EmergencyDashboard: React.FC = () => {
         }
     };
 
-    const handleSaveDrill = (e: React.FormEvent) => {
+    const handleSaveDrill = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newDrill.location) return alert("Location is required");
         
@@ -253,7 +256,7 @@ export const EmergencyDashboard: React.FC = () => {
             attendanceFile: attendanceFile || undefined
         };
 
-        saveEmergencyDrill(drill);
+        await saveEmergencyDrill(drill);
         setDrills(prev => [drill, ...prev]);
         setShowDrillModal(false);
         setNewDrill({

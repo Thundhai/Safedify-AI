@@ -9,7 +9,10 @@ export const ContractorList: React.FC = () => {
     const [contractors, setContractors] = useState<Contractor[]>([]);
 
     useEffect(() => {
-        setContractors(getContractors());
+        const load = async () => {
+            setContractors(await getContractors());
+        };
+        load();
     }, []);
 
     const getStatusColor = (status: string) => {

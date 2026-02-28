@@ -23,7 +23,10 @@ export const ObservationList: React.FC = () => {
     const [editForm, setEditForm] = useState<Partial<Observation>>({});
 
     useEffect(() => {
-        setObservations(getObservations());
+        const load = async () => {
+            setObservations(await getObservations());
+        };
+        load();
     }, []);
 
     const handleAnalyzeTrends = async () => {
@@ -41,10 +44,10 @@ export const ObservationList: React.FC = () => {
         }
     };
 
-    const handleDelete = (id: string, e: React.MouseEvent) => {
+    const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
         if (confirm('Are you sure you want to permanently delete this observation?')) {
-            deleteObservation(id);
+            await deleteObservation(id);
             addToSyncQueue('DELETE_OBSERVATION', `Deleted Obs: ${id}`);
             setObservations(prev => prev.filter(o => o.id !== id));
         }
@@ -62,12 +65,12 @@ export const ObservationList: React.FC = () => {
         setIsEditMode(true);
     };
 
-    const handleSaveEdit = (e: React.FormEvent) => {
+    const handleSaveEdit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedObs) return;
         
         const updatedObs = { ...selectedObs, ...editForm } as Observation;
-        updateObservation(updatedObs);
+        await updateObservation(updatedObs);
         addToSyncQueue('UPDATE_OBSERVATION', `Updated Obs: ${updatedObs.id}`);
         
         setObservations(prev => prev.map(o => o.id === updatedObs.id ? updatedObs : o));

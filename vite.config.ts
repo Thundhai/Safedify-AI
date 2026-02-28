@@ -6,14 +6,30 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
-    host: '0.0.0.0',
+    host: 'localhost',
+    proxy: {
+      '/api': {
+        target: 'http://localhost:4500',
+        changeOrigin: true,
+      },
+    },
+  },
+  build: {
+    outDir: 'dist',
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          charts: ['recharts'],
+          ai: ['@google/genai'],
+        },
+      },
+    },
   },
   resolve: {
     alias: {
-      // This allows you to use '@' to refer to your 'src' folder
       '@': path.resolve(__dirname, './src'),
     },
   },
-  // We removed the 'define' section because we are now using 
-  // import.meta.env.VITE_GEMINI_API_KEY which is the standard Vite way.
 });

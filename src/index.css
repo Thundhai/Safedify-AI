@@ -2,6 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Dark mode form inputs – ensure text is visible when typing */
+@layer base {
+  .dark input:not([type="checkbox"]):not([type="radio"]),
+  .dark textarea,
+  .dark select {
+    color: #f1f5f9;              /* slate-100 */
+    background-color: #1e293b;   /* slate-800 */
+    border-color: #475569;       /* slate-600 */
+  }
+  .dark input::placeholder,
+  .dark textarea::placeholder {
+    color: #94a3b8;              /* slate-400 */
+  }
+  .dark select option {
+    background-color: #1e293b;
+    color: #f1f5f9;
+  }
+}
+
 /* Custom scrollbar for cleaner look */
 ::-webkit-scrollbar {
   width: 8px;

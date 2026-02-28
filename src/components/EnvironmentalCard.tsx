@@ -54,7 +54,7 @@ export const EnvironmentalCard: React.FC = () => {
         setLoadingAnalysis(true);
         try {
             // Get active permits to see what work is happening
-            const activePermits = getPermits().filter(p => p.status === PermitStatus.APPROVED);
+            const activePermits = (await getPermits()).filter(p => p.status === PermitStatus.APPROVED);
             const activeTypes = Array.from(new Set(activePermits.map(p => p.type))) as string[];
             
             // Fallback if no permits
@@ -214,7 +214,7 @@ export const EnvironmentalCard: React.FC = () => {
                             </div>
                             
                             <div className="space-y-2">
-                                {riskAnalysis.recommendations.slice(0, 3).map((rec, idx) => (
+                                {(riskAnalysis.recommendations || []).slice(0, 3).map((rec, idx) => (
                                     <div key={idx} className="flex items-start gap-2 text-xs text-slate-700 bg-white p-2 rounded border border-slate-100 shadow-sm">
                                         {riskAnalysis.riskLevel === 'High' ? <AlertTriangle size={12} className="text-red-500 mt-0.5 shrink-0" /> : <CheckCircle2 size={12} className="text-blue-500 mt-0.5 shrink-0" />}
                                         <span className="leading-snug">{rec}</span>
@@ -222,9 +222,9 @@ export const EnvironmentalCard: React.FC = () => {
                                 ))}
                             </div>
 
-                            {riskAnalysis.affectedActivities.length > 0 && (
+                            {(riskAnalysis.affectedActivities || []).length > 0 && (
                                 <div className="text-[10px] text-slate-500 mt-auto pt-2">
-                                    <span className="font-bold">Impacted:</span> {riskAnalysis.affectedActivities.slice(0, 2).join(', ')}
+                                    <span className="font-bold">Impacted:</span> {(riskAnalysis.affectedActivities || []).slice(0, 2).join(', ')}
                                 </div>
                             )}
                         </div>

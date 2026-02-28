@@ -48,12 +48,12 @@ export const PPEDashboard: React.FC = () => {
     refreshData();
   }, []);
 
-  const refreshData = () => {
-    const inv = getPPEInventory();
+  const refreshData = async () => {
+    const inv = await getPPEInventory();
     setInventory(inv);
-    setLogs(getPPEIssuanceLogs());
-    setWorkers(getWorkers());
-    setCategories(getPPECategories());
+    setLogs(await getPPEIssuanceLogs());
+    setWorkers(await getWorkers());
+    setCategories(await getPPECategories());
     
     // Check for low stock and trigger AI
     const lowStockItems = inv.filter(i => i.stockQuantity <= i.minStockThreshold);
@@ -68,7 +68,7 @@ export const PPEDashboard: React.FC = () => {
     }
   };
 
-  const handleIssuePPE = (e: React.FormEvent) => {
+  const handleIssuePPE = async (e: React.FormEvent) => {
     e.preventDefault();
     const worker = workers.find(w => w.id === selectedWorkerId);
     const item = inventory.find(i => i.id === selectedPPEId);
@@ -92,14 +92,14 @@ export const PPEDashboard: React.FC = () => {
         signatureUrl: signatureImage || undefined
     };
 
-    savePPEIssuance(newIssuance);
+    await savePPEIssuance(newIssuance);
     setShowIssueModal(false);
     // Reset Form
     setSelectedWorkerId('');
     setSelectedPPEId('');
     setExpiryDate('');
     setSignatureImage(null);
-    refreshData();
+    await refreshData();
     alert("PPE Issued Successfully");
   };
 
@@ -112,43 +112,43 @@ export const PPEDashboard: React.FC = () => {
     }
   };
 
-  const handleStockUpdate = (item: PPEItem, newQty: number) => {
+  const handleStockUpdate = async (item: PPEItem, newQty: number) => {
       if (newQty < 0) return;
-      updatePPEStock(item.id, newQty);
-      refreshData();
+      await updatePPEStock(item.id, newQty);
+      await refreshData();
   };
 
-  const handleReturnItem = (issuanceId: string) => {
+  const handleReturnItem = async (issuanceId: string) => {
       if(confirm("Mark this item as Returned and add back to stock?")) {
-          returnPPEItem(issuanceId);
-          refreshData();
+          await returnPPEItem(issuanceId);
+          await refreshData();
       }
   };
 
-  const handleMarkExpired = (log: PPEIssuance) => {
+  const handleMarkExpired = async (log: PPEIssuance) => {
       if(confirm("Mark this issued item as Expired/Disposed?")) {
           const updated = { ...log, status: 'Expired' as const };
-          updatePPEIssuance(updated);
-          refreshData();
+          await updatePPEIssuance(updated);
+          await refreshData();
       }
   };
 
-  const handleAddCategory = (e: React.FormEvent) => {
+  const handleAddCategory = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newCategory.trim()) return;
-      savePPECategory(newCategory.trim());
+      await savePPECategory(newCategory.trim());
       setNewCategory('');
-      refreshData();
+      await refreshData();
   };
 
-  const handleDeleteCategory = (cat: string) => {
+  const handleDeleteCategory = async (cat: string) => {
       if (confirm(`Delete category "${cat}"?`)) {
-          deletePPECategory(cat);
-          refreshData();
+          await deletePPECategory(cat);
+          await refreshData();
       }
   };
 
-  const handleAddItem = (e: React.FormEvent) => {
+  const handleAddItem = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!newItem.category) return alert("Please select a category");
       const item: PPEItem = {
@@ -159,10 +159,10 @@ export const PPEDashboard: React.FC = () => {
           minStockThreshold: Number(newItem.minStockThreshold),
           description: newItem.description
       };
-      savePPEItem(item);
+      await savePPEItem(item);
       setShowAddItemModal(false);
       setNewItem({ name: '', category: '', stockQuantity: 0, minStockThreshold: 5, description: '' });
-      refreshData();
+      await refreshData();
       alert("New PPE Item Added to Inventory");
   };
 

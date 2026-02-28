@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  safedify:
+    build:
+      context: .
+      args:
+        VITE_GEMINI_API_KEY: ${VITE_GEMINI_API_KEY}
+    container_name: safedify-ai
+    restart: unless-stopped
+    ports:
+      - "${PORT:-4000}:4000"
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - JWT_SECRET=${JWT_SECRET:-change-me-to-a-long-random-string}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - DATA_DIR=/data
+    volumes:
+      - safedify-data:/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4000/api/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  safedify-data:
+    driver: local

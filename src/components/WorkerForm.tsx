@@ -29,19 +29,22 @@ export const WorkerForm: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    setContractors(getContractors());
-    
-    if (isEdit && id) {
-      const worker = getWorkerById(id);
-      if (worker) {
-        setFormData({
-          ...worker,
-          joinedDate: worker.joinedDate.split('T')[0] // Format for date input
-        });
-      } else {
-        navigate('/workers');
+    const load = async () => {
+      setContractors(await getContractors());
+      
+      if (isEdit && id) {
+        const worker = await getWorkerById(id);
+        if (worker) {
+          setFormData({
+            ...worker,
+            joinedDate: worker.joinedDate.split('T')[0] // Format for date input
+          });
+        } else {
+          navigate('/workers');
+        }
       }
-    }
+    };
+    load();
   }, [id, isEdit, navigate]);
 
   const handleInputChange = (field: keyof WorkerProfile, value: any) => {
@@ -74,7 +77,7 @@ export const WorkerForm: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) return;
@@ -95,9 +98,9 @@ export const WorkerForm: React.FC = () => {
 
     try {
       if (isEdit) {
-        updateWorker(worker);
+        await updateWorker(worker);
       } else {
-        saveWorker(worker);
+        await saveWorker(worker);
       }
       
       navigate('/workers');

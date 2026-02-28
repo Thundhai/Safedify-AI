@@ -22,7 +22,10 @@ export const AssetList: React.FC = () => {
     });
 
     useEffect(() => {
-        setAssets(getAssets());
+        const load = async () => {
+            setAssets(await getAssets());
+        };
+        load();
     }, []);
 
     const filteredAssets = assets.filter(a => {
@@ -51,7 +54,7 @@ export const AssetList: React.FC = () => {
         }
     };
 
-    const handleSaveAsset = (e: React.FormEvent) => {
+    const handleSaveAsset = async (e: React.FormEvent) => {
         e.preventDefault();
         const asset: Asset = {
             id: `ast-${Date.now()}`,
@@ -66,8 +69,8 @@ export const AssetList: React.FC = () => {
             maintenanceHistory: []
         };
         
-        saveAsset(asset);
-        setAssets(getAssets()); // Refresh list
+        await saveAsset(asset);
+        setAssets(await getAssets()); // Refresh list
         setShowModal(false);
         setNewAsset({
             name: '',

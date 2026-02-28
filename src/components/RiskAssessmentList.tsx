@@ -1,15 +1,22 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getRiskAssessments } from '../services/storageService';
 import { RiskAssessment } from '../types';
 import { ShieldAlert, Plus, Calendar, FileText, Search, Filter, Printer } from 'lucide-react';
 
 export const RiskAssessmentList: React.FC = () => {
-    const [assessments] = useState<RiskAssessment[]>(getRiskAssessments());
+    const [assessments, setAssessments] = useState<RiskAssessment[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>('All');
     const [statusFilter, setStatusFilter] = useState<string>('All');
+
+    useEffect(() => {
+        const load = async () => {
+            setAssessments(await getRiskAssessments());
+        };
+        load();
+    }, []);
 
     const filtered = assessments.filter(a => {
         const matchesSearch = a.title.toLowerCase().includes(searchTerm.toLowerCase()) || 

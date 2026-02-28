@@ -51,13 +51,13 @@ export const AnalyticsDashboard: React.FC = () => {
         setStatsEntry(prev => ({ ...prev, manHours: total }));
     }, [statsEntry.activeWorkers, hoursPerDay, daysWorked]);
 
-    const refreshData = () => {
-        const calculated = calculateHSEMetrics();
+    const refreshData = async () => {
+        const calculated = await calculateHSEMetrics();
         setMetrics(calculated);
-        setIncidents(getIncidents());
+        setIncidents(await getIncidents());
     };
 
-    const handleSaveStats = (e: React.FormEvent) => {
+    const handleSaveStats = async (e: React.FormEvent) => {
         e.preventDefault();
         
         const newLog: HSEStatsLog = {
@@ -69,8 +69,8 @@ export const AnalyticsDashboard: React.FC = () => {
             remarks: statsEntry.remarks
         };
         
-        saveStatsLog(newLog);
-        refreshData();
+        await saveStatsLog(newLog);
+        await refreshData();
         setShowInputModal(false);
         
         // Reset form

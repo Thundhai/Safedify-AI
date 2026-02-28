@@ -23,8 +23,11 @@ export const WorkerDetail: React.FC = () => {
 
     useEffect(() => {
         if (id) {
-            setWorker(getWorkerById(id));
-            setRecords((getTrainingRecords() || []).filter(r => r.workerId === id));
+            const load = async () => {
+                setWorker(await getWorkerById(id));
+                setRecords(((await getTrainingRecords()) || []).filter(r => r.workerId === id));
+            };
+            load();
         }
     }, [id]);
 
@@ -53,7 +56,7 @@ export const WorkerDetail: React.FC = () => {
                             certificateUrl: base64,
                             status: 'Valid'
                         };
-                        saveTrainingRecord(newRecord);
+                        await saveTrainingRecord(newRecord);
                         setRecords(prev => [newRecord, ...prev]);
                     }
                 } catch (err) {
@@ -73,7 +76,7 @@ export const WorkerDetail: React.FC = () => {
         setIsAnalyzing(true);
         try {
             // Context: Find incidents where the worker was the reporter OR mentioned in the description
-            const relevantIncidents = (getIncidents() || [])
+            const relevantIncidents = ((await getIncidents()) || [])
                 .filter(i => i.reporter === worker.name || i.description.includes(worker.name))
                 .map(i => `${i.type} (${i.severity}): ${i.description}`);
             

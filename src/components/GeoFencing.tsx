@@ -17,7 +17,10 @@ export const GeoFencing: React.FC = () => {
     });
 
     useEffect(() => {
-        setZones(getSafetyZones());
+        const load = async () => {
+            setZones(await getSafetyZones());
+        };
+        load();
     }, []);
 
     const handleLocateUser = () => {
@@ -74,7 +77,7 @@ export const GeoFencing: React.FC = () => {
         setActiveZone(found || null);
     };
 
-    const handleAddZone = (e: React.FormEvent) => {
+    const handleAddZone = async (e: React.FormEvent) => {
         e.preventDefault();
         const zone: SafetyZone = {
             id: `zone-${Date.now()}`,
@@ -85,14 +88,14 @@ export const GeoFencing: React.FC = () => {
             radius: newZone.radius!,
             requiredPPE: newZone.requiredPPE || []
         };
-        saveSafetyZone(zone);
+        await saveSafetyZone(zone);
         setZones(prev => [...prev, zone]);
         setShowForm(false);
     };
 
-    const handleDeleteZone = (id: string) => {
+    const handleDeleteZone = async (id: string) => {
         if(confirm("Delete this zone?")) {
-            deleteSafetyZone(id);
+            await deleteSafetyZone(id);
             setZones(prev => prev.filter(z => z.id !== id));
         }
     };

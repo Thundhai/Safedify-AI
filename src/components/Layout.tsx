@@ -516,9 +516,6 @@ export const Layout: React.FC = () => {
 
           {/* AI Chatbot Overlay */}
           <AIChatAssistant />
-          
-          {/* MetaMask Floating Prompt */}
-          <MetaMaskFloatingPrompt />
         </main>
       </div>
     </div>

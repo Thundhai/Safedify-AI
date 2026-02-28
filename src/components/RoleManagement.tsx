@@ -32,8 +32,8 @@ export const RoleManagement: React.FC = () => {
         loadRoles();
     }, []);
 
-    const loadRoles = () => {
-        setRoles(getRoles());
+    const loadRoles = async () => {
+        setRoles(await getRoles());
     };
 
     const handleCreateNew = () => {
@@ -52,14 +52,14 @@ export const RoleManagement: React.FC = () => {
         setShowModal(true);
     };
 
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string) => {
         if (confirm("Are you sure you want to delete this role? Users assigned to this role may lose access.")) {
-            deleteRole(id);
-            loadRoles();
+            await deleteRole(id);
+            await loadRoles();
         }
     };
 
-    const handleSave = (e: React.FormEvent) => {
+    const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingRole.name) return alert("Role name is required");
 
@@ -71,9 +71,9 @@ export const RoleManagement: React.FC = () => {
             isSystem: editingRole.isSystem || false
         };
 
-        saveRole(role);
+        await saveRole(role);
         setShowModal(false);
-        loadRoles();
+        await loadRoles();
     };
 
     const togglePermission = (key: Permission) => {

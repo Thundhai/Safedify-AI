@@ -18,13 +18,13 @@ export const WorkersList: React.FC = () => {
     loadWorkers();
   }, []);
 
-  const loadWorkers = () => {
-    setWorkers(getWorkers());
+  const loadWorkers = async () => {
+    setWorkers(await getWorkers());
   };
 
-  const handleDeleteWorker = (id: string, name: string) => {
+  const handleDeleteWorker = async (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete ${name}? This action cannot be undone.`)) {
-      deleteWorker(id);
+      await deleteWorker(id);
       loadWorkers();
     }
   };

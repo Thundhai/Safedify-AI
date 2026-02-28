@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { saveInspection, getInspectionTemplates, getInspections, saveInspectionTemplate } from '../services/storageService';
 import { suggestInspectionFixAI } from '../services/geminiService';
+import { SmartTextInput } from './SmartTextInput';
 import { compressImage, addToSyncQueue } from '../services/offlineService';
 import { Inspection, InspectionItem, InspectionTemplate } from '../types';
 
@@ -35,8 +36,11 @@ export const InspectionForm: React.FC = () => {
   const [uploadingItem, setUploadingItem] = useState<string | null>(null);
 
   useEffect(() => {
-    setInspections(getInspections());
-    setTemplates(getInspectionTemplates());
+    const load = async () => {
+      setInspections(await getInspections());
+      setTemplates(await getInspectionTemplates());
+    };
+    load();
   }, [view]);
 
   // --- Handlers ---
@@ -66,7 +70,7 @@ export const InspectionForm: React.FC = () => {
       setNewTemplateItems(newTemplateItems.filter((_, i) => i !== index));
   };
 
-  const handleSaveTemplate = () => {
+  const handleSaveTemplate = async () => {
       if (!newTemplateName.trim()) return alert("Template Name is required");
       if (newTemplateItems.length === 0) return alert("Add at least one inspection item");
 
@@ -78,7 +82,7 @@ export const InspectionForm: React.FC = () => {
           items: newTemplateItems
       };
 
-      saveInspectionTemplate(template);
+      await saveInspectionTemplate(template);
       alert("Template Created Successfully!");
       setView('select-template'); // Go back to selection
   };
@@ -160,7 +164,7 @@ export const InspectionForm: React.FC = () => {
       return Math.round((passed / totalApplicable) * 100);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!location) {
         alert("Please enter a location.");
         return;
@@ -174,7 +178,7 @@ export const InspectionForm: React.FC = () => {
         score: score,
         completed: true
     };
-    saveInspection(finalInspection);
+    await saveInspection(finalInspection);
     addToSyncQueue('SAVE_INSPECTION', `Inspection: ${finalInspection.title}`);
     
     setCurrentInspection(finalInspection); // Set for report view
@@ -283,10 +287,10 @@ export const InspectionForm: React.FC = () => {
               </div>
               <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-1">Description</label>
-                  <input 
-                      type="text" 
+                  <SmartTextInput 
                       value={newTemplateDesc}
                       onChange={(e) => setNewTemplateDesc(e.target.value)}
+                      onValueChange={setNewTemplateDesc}
                       className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
                       placeholder="Brief description of this inspection..."
                   />
@@ -295,10 +299,10 @@ export const InspectionForm: React.FC = () => {
               <div className="pt-4 border-t border-slate-100">
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Checklist Items</label>
                   <div className="flex gap-2 mb-3">
-                      <input 
-                          type="text" 
+                      <SmartTextInput 
                           value={newItemInput}
                           onChange={(e) => setNewItemInput(e.target.value)}
+                          onValueChange={setNewItemInput}
                           onKeyDown={(e) => e.key === 'Enter' && handleAddItemToTemplate()}
                           className="flex-1 border border-slate-300 rounded-lg p-2.5 text-sm"
                           placeholder="Add a new question..."
@@ -400,10 +404,10 @@ export const InspectionForm: React.FC = () => {
                  <div>
                      <label className="block text-sm font-semibold text-slate-700 mb-1">Inspection Location / Asset ID</label>
                      <div className="relative">
-                        <input 
-                            type="text" 
+                        <SmartTextInput 
                             value={location}
                             onChange={(e) => setLocation(e.target.value)}
+                            onValueChange={setLocation}
                             placeholder="e.g. Building 4, Truck #55, West Gate..."
                             className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                         />

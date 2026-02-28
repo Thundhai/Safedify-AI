@@ -20,33 +20,7 @@ export const Dashboard: React.FC = () => {
     return localStorage.getItem('onboardingCompleted') !== 'true';
   });
   
-  // Check if user has any data at all
-  const hasAnyData = () => {
-    const incidents = getIncidents() || [];
-    const actions = getActions() || [];
-    const inspections = getInspections() || [];
-    const risks = getRiskAssessments() || [];
-    
-    return incidents.length > 0 || actions.length > 0 || inspections.length > 0 || risks.length > 0;
-  };
-
-  const handleWelcomeComplete = () => {
-    setIsFirstTimeUser(false);
-    localStorage.setItem('onboardingCompleted', 'true');
-  };
-
-  // Show welcome screen for first-time users
-  if (isFirstTimeUser && !hasAnyData()) {
-    return (
-      <WelcomeScreen 
-        onComplete={handleWelcomeComplete}
-        userName={user?.name || user?.email || 'there'}
-        organizationName="Your Organization"
-      />
-    );
-  }
-  
-  // Data State
+  // Data State — ALL hooks must be declared before any early return
   const [stats, setStats] = useState({
     totalIncidents: 0,
     openActions: 0,
@@ -56,6 +30,7 @@ export const Dashboard: React.FC = () => {
   const [siteScore, setSiteScore] = useState<SiteSafetyScore | null>(null);
   const [predictiveAlerts, setPredictiveAlerts] = useState<any[]>([]);
   const [loadingPredictions, setLoadingPredictions] = useState(false);
+  const [hasData, setHasData] = useState(false);
 
   // Onboarding State
   const [showOnboarding, setShowOnboarding] = useState(true);
@@ -66,95 +41,109 @@ export const Dashboard: React.FC = () => {
       risks: false
   });
 
+  const handleWelcomeComplete = () => {
+    setIsFirstTimeUser(false);
+    localStorage.setItem('onboardingCompleted', 'true');
+  };
+
   useEffect(() => {
-    try {
-      const incidents = getIncidents() || [];
-      const actions = getActions() || [];
-      const inspections = getInspections() || [];
-      const risks = getRiskAssessments() || [];
-    
-    // Calculate Onboarding
-    const hasIncidents = incidents.length > 0;
-    const hasInspections = inspections.length > 0;
-    const hasRisks = risks.length > 0;
-    
-    let completedCount = 0;
-    if (hasIncidents) completedCount++;
-    if (hasInspections) completedCount++;
-    if (hasRisks) completedCount++;
-    
-    setTasksCompleted({ incidents: hasIncidents, inspections: hasInspections, risks: hasRisks });
-    setOnboardingProgress(Math.round((completedCount / 3) * 100));
-    
-    // Hide onboarding if complete
-    if (completedCount === 3) setShowOnboarding(false);
+    const load = async () => {
+      try {
+        const incidents = (await getIncidents()) || [];
+        const actions = (await getActions()) || [];
+        const inspections = (await getInspections()) || [];
+        const risks = (await getRiskAssessments()) || [];
 
-    // Calculate Site Score
-    setSiteScore(calculateSiteSafetyScore());
+        const anyData = incidents.length > 0 || actions.length > 0 || inspections.length > 0 || risks.length > 0;
+        setHasData(anyData);
 
-    // Calculate Severity Breakdown
-    const severityCounts: Record<string, number> = {};
-    Object.values(IncidentSeverity).forEach(s => severityCounts[s] = 0);
-    incidents.forEach(inc => {
-      severityCounts[inc.severity] = (severityCounts[inc.severity] || 0) + 1;
-    });
-    
-    const severityData = Object.keys(severityCounts).map(key => ({
-      name: key,
-      value: severityCounts[key]
-    }));
+        // Skip further processing if showing welcome screen
+        if (isFirstTimeUser && !anyData) return;
 
-    // Mock Monthly Trends
-    const monthlyData = [
-      { name: 'Jan', incidents: 4 },
-      { name: 'Feb', incidents: 2 },
-      { name: 'Mar', incidents: 5 },
-      { name: 'Apr', incidents: incidents.length } 
-    ];
+        // Calculate Onboarding
+        const hasIncidents = incidents.length > 0;
+        const hasInspections = inspections.length > 0;
+        const hasRisks = risks.length > 0;
 
-    setStats({
-      totalIncidents: incidents.length,
-      openActions: (actions || []).filter(a => a.status !== 'Done').length,
-      severityBreakdown: severityData,
-      monthlyTrends: monthlyData
-    });
+        let completedCount = 0;
+        if (hasIncidents) completedCount++;
+        if (hasInspections) completedCount++;
+        if (hasRisks) completedCount++;
 
-    // Run Predictive Analysis (Only if Pro or higher AND there is data)
-    if (user?.tier !== SubscriptionTier.FREE && incidents.length > 0) {
-        setLoadingPredictions(true);
-        const metrics = calculateHSEMetrics();
-        predictiveSafetyAlertsAI(metrics, incidents)
-            .then(res => {
+        setTasksCompleted({ incidents: hasIncidents, inspections: hasInspections, risks: hasRisks });
+        setOnboardingProgress(Math.round((completedCount / 3) * 100));
+
+        // Hide onboarding if complete
+        if (completedCount === 3) setShowOnboarding(false);
+
+        // Calculate Site Score
+        setSiteScore(await calculateSiteSafetyScore());
+
+        // Calculate Severity Breakdown
+        const severityCounts: Record<string, number> = {};
+        Object.values(IncidentSeverity).forEach(s => severityCounts[s] = 0);
+        incidents.forEach(inc => {
+          severityCounts[inc.severity] = (severityCounts[inc.severity] || 0) + 1;
+        });
+
+        const severityData = Object.keys(severityCounts).map(key => ({
+          name: key,
+          value: severityCounts[key]
+        }));
+
+        // Mock Monthly Trends
+        const monthlyData = [
+          { name: 'Jan', incidents: 4 },
+          { name: 'Feb', incidents: 2 },
+          { name: 'Mar', incidents: 5 },
+          { name: 'Apr', incidents: incidents.length }
+        ];
+
+        setStats({
+          totalIncidents: incidents.length,
+          openActions: (actions || []).filter(a => a.status !== 'Done').length,
+          severityBreakdown: severityData,
+          monthlyTrends: monthlyData
+        });
+
+        // Run Predictive Analysis (Only if Pro or higher AND there is data)
+        if (user?.tier !== SubscriptionTier.FREE && incidents.length > 0) {
+            setLoadingPredictions(true);
+            const metrics = await calculateHSEMetrics();
+            try {
+                const res = await predictiveSafetyAlertsAI(metrics, incidents);
                 if (res && Array.isArray(res.predictions)) {
                     setPredictiveAlerts(res.predictions);
                 } else {
                     setPredictiveAlerts([]);
                 }
-            })
-            .catch(err => {
+            } catch (err) {
                 console.error("Predictive Alert Error:", err);
                 setPredictiveAlerts([]);
-            })
-            .finally(() => setLoadingPredictions(false));
-    }
+            } finally {
+                setLoadingPredictions(false);
+            }
+        }
 
-    } catch (error) {
-      console.error('Dashboard data loading error:', error);
-      // Set safe defaults to prevent crashes
-      setStats({
-        totalIncidents: 0,
-        openActions: 0,
-        severityBreakdown: [],
-        monthlyTrends: []
-      });
-      setSiteScore({ 
-        score: 0, 
-        rating: 'Poor', 
-        breakdown: { incidents: 0, observations: 0, inspections: 0, training: 0, actions: 0 }
-      });
-      setOnboardingProgress(0);
-    }
-  }, [user]);
+      } catch (error) {
+        console.error('Dashboard data loading error:', error);
+        // Set safe defaults to prevent crashes
+        setStats({
+          totalIncidents: 0,
+          openActions: 0,
+          severityBreakdown: [],
+          monthlyTrends: []
+        });
+        setSiteScore({
+          score: 0,
+          rating: 'Poor',
+          breakdown: { incidents: 0, observations: 0, inspections: 0, training: 0, actions: 0 }
+        });
+        setOnboardingProgress(0);
+      }
+    };
+    load();
+  }, [user, isFirstTimeUser]);
 
   const COLORS = ['#22c55e', '#eab308', '#f97316', '#ef4444'];
 
@@ -171,6 +160,17 @@ export const Dashboard: React.FC = () => {
     { name: 'Good', value: 15, fill: '#3b82f6' },      // 75-90
     { name: 'Excellent', value: 10, fill: '#22c55e' }, // 90-100
   ];
+
+  // Show welcome screen for first-time users (AFTER all hooks)
+  if (isFirstTimeUser && !hasData) {
+    return (
+      <WelcomeScreen 
+        onComplete={handleWelcomeComplete}
+        userName={user?.name || user?.email || 'there'}
+        organizationName="Your Organization"
+      />
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in">

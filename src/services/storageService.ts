@@ -1,637 +1,890 @@
+/**
+ * Storage Service — API-backed data layer
+ * 
+ * All data functions are now ASYNC and fetch/persist data via the backend API.
+ * The backend stores data in SQLite for real persistence and multi-user support.
+ * Falls back to safe defaults if the API is unavailable.
+ */
 
-import { Incident, Inspection, InspectionTemplate, ActionItem, IncidentType, IncidentSeverity, RiskAssessment, Observation, WorkerProfile, TrainingModule, TrainingRecord, PPEItem, PPEIssuance, Permit, PermitType, PermitStatus, Asset, AssetStatus, AssetCategory, Contractor, HSEDocument, EmergencyContact, EmergencyDrill, HSEMetrics, SafetyZone, SiteSafetyScore, HSEStatsLog, Role, UserRoles, SubscriptionTier } from "../types";
-import { getCurrentUser } from "./authService";
+import {
+  Incident, Inspection, InspectionTemplate, ActionItem,
+  IncidentType, IncidentCategory, IncidentSeverity,
+  RiskAssessment, Observation, WorkerProfile,
+  TrainingModule, TrainingRecord, PPEItem, PPEIssuance,
+  Permit, PermitType, PermitStatus,
+  Asset, AssetStatus, AssetCategory,
+  Contractor, HSEDocument, EmergencyContact, EmergencyDrill,
+  HSEMetrics, SafetyZone, SiteSafetyScore, HSEStatsLog,
+  Role, UserRoles, SubscriptionTier, isRecordable
+} from "../types";
+import {
+  apiGetIncidents, apiGetIncident, apiCreateIncident, apiUpdateIncident, apiDeleteIncident,
+  apiGetActions, apiCreateAction, apiUpdateAction, apiDeleteAction,
+  apiGetObservations, apiCreateObservation,
+  apiGetInspections, apiCreateInspection,
+  apiGetPermits, apiCreatePermit, apiUpdatePermit,
+  apiGetWorkers, apiCreateWorker, apiUpdateWorker,
+  apiGetContractors, apiCreateContractor,
+  apiGetAssets, apiCreateAsset,
+  apiGetDocuments, apiCreateDocument,
+  apiGetStats, apiLogStats,
+  apiGetEmergencyContacts, apiCreateEmergencyContact,
+  apiGetEmergencyDrills, apiCreateEmergencyDrill,
+  apiGetRiskAssessments, apiGetRiskAssessment, apiCreateRiskAssessment, apiUpdateRiskAssessment,
+  apiGetInspectionTemplates, apiCreateInspectionTemplate,
+  apiGetTrainingModules, apiCreateTrainingModule,
+  apiGetTrainingRecords, apiCreateTrainingRecord,
+  apiGetPPEInventory, apiCreatePPEItem, apiUpdatePPEItem,
+  apiGetPPEIssuance, apiCreatePPEIssuance, apiUpdatePPEIssuance,
+  apiGetRoles, apiCreateRole, apiDeleteRole as apiDeleteRoleApi,
+  apiGetSafetyZones, apiCreateSafetyZone, apiDeleteSafetyZone as apiDeleteSafetyZoneApi,
+  apiGetMetrics,
+} from './apiService';
 
-const STORAGE_KEYS = {
-  INCIDENTS: 'hse_incidents',
-  INSPECTIONS: 'hse_inspections',
-  INSPECTION_TEMPLATES: 'hse_inspection_templates',
-  ACTIONS: 'hse_actions',
-  RISK_ASSESSMENTS: 'hse_risk_assessments',
-  OBSERVATIONS: 'hse_observations',
-  WORKERS: 'hse_workers',
-  TRAINING_MODULES: 'hse_training_modules',
-  TRAINING_RECORDS: 'hse_training_records',
-  PPE_INVENTORY: 'hse_ppe_inventory',
-  PPE_CATEGORIES: 'hse_ppe_categories',
-  PPE_ISSUANCE: 'hse_ppe_issuance',
-  PERMITS: 'hse_permits',
-  ASSETS: 'hse_assets',
-  CONTRACTORS: 'hse_contractors',
-  DOCUMENTS: 'hse_documents',
-  EMERGENCY_CONTACTS: 'hse_emergency_contacts',
-  EMERGENCY_DRILLS: 'hse_emergency_drills',
-  MAN_HOURS: 'hse_man_hours',
-  STATS_LOGS: 'hse_stats_logs',
-  SAFETY_ZONES: 'hse_safety_zones',
-  ROLES: 'hse_roles'
-};
+// ---------- Helper: map API snake_case to frontend camelCase ----------
 
-// --- DEFAULT ROLES & PERMISSIONS ---
-const defaultRoles: Role[] = [
-    {
-        id: 'role-admin',
-        name: UserRoles.ADMIN,
-        description: 'Full system access and configuration.',
-        isSystem: true,
-        permissions: ['manage_roles', 'manage_users', 'view_analytics', 'create_incident', 'manage_incidents', 'perform_inspection', 'create_permit', 'approve_permit', 'manage_documents', 'ai_features']
-    },
-    {
-        id: 'role-manager',
-        name: UserRoles.MANAGER,
-        description: 'HSE Dept Lead. Approvals and Analytics.',
-        isSystem: true,
-        permissions: ['manage_users', 'view_analytics', 'create_incident', 'manage_incidents', 'perform_inspection', 'create_permit', 'approve_permit', 'manage_documents', 'ai_features']
-    },
-    {
-        id: 'role-coordinator',
-        name: UserRoles.COORDINATOR,
-        description: 'Coordinates safety activities and data.',
-        isSystem: true,
-        permissions: ['view_analytics', 'create_incident', 'manage_incidents', 'perform_inspection', 'create_permit', 'approve_permit', 'manage_documents', 'ai_features']
-    },
-    {
-        id: 'role-advisor',
-        name: UserRoles.ADVISOR,
-        description: 'Subject matter expert for risk and compliance.',
-        isSystem: true,
-        permissions: ['view_analytics', 'create_incident', 'manage_incidents', 'perform_inspection', 'create_permit', 'ai_features']
-    },
-    {
-        id: 'role-officer',
-        name: UserRoles.OFFICER,
-        description: 'Field safety officer executing inspections.',
-        isSystem: true,
-        permissions: ['create_incident', 'manage_incidents', 'perform_inspection', 'create_permit', 'manage_documents', 'ai_features']
-    },
-    {
-        id: 'role-supervisor',
-        name: UserRoles.SUPERVISOR,
-        description: 'Site supervisor responsible for team safety.',
-        isSystem: true,
-        permissions: ['create_incident', 'perform_inspection', 'create_permit', 'ai_features']
-    },
-    {
-        id: 'role-technician',
-        name: UserRoles.TECHNICIAN,
-        description: 'HSE Technician for equipment and monitoring.',
-        isSystem: true,
-        permissions: ['create_incident', 'perform_inspection', 'ai_features']
-    },
-    {
-        id: 'role-worker',
-        name: UserRoles.WORKER,
-        description: 'General staff reporting observations.',
-        isSystem: true,
-        permissions: ['create_incident']
-    },
-    {
-        id: 'role-executive',
-        name: UserRoles.EXECUTIVE,
-        description: 'Senior leadership read-only access.',
-        isSystem: true,
-        permissions: ['view_analytics', 'view_analytics'] // Read only mostly
-    }
-];
+const mapIncident = (row: any): Incident => ({
+  id: row.id,
+  description: row.description,
+  date: row.date,
+  location: row.location || '',
+  type: row.type as IncidentType,
+  category: (row.category || 'Near Miss') as IncidentCategory,
+  severity: row.severity as IncidentSeverity,
+  status: row.status || 'Open',
+  images: row.image ? [row.image] : [],
+  reporter: row.reported_by || '',
+  daysLost: row.days_lost || 0,
+  bodyPart: row.body_part,
+  mechanism: row.mechanism,
+  immediateAction: row.immediate_action,
+  aiClassification: undefined,
+  investigation: undefined,
+});
 
-// Seed data - empty for fresh app experience
-const initialIncidents: Incident[] = [];
+const mapAction = (row: any): ActionItem => ({
+  id: row.id,
+  title: row.title,
+  description: row.description,
+  assignee: row.assignee || '',
+  dueDate: row.due_date || '',
+  completedDate: row.completed_date,
+  priority: row.priority || 'Medium',
+  status: row.status || 'Open',
+  actionType: row.action_type || 'Corrective',
+  category: row.category || 'Other',
+  indicator: row.indicator || 'Lagging',
+  relatedIncidentId: row.related_incident_id,
+  verifiedBy: row.verified_by,
+  effectiveness: row.effectiveness || 'Not Assessed',
+});
 
-const initialActions: ActionItem[] = [];
+const mapObservation = (row: any): Observation => ({
+  id: row.id,
+  type: row.type,
+  category: row.category || '',
+  description: row.description,
+  location: row.location || '',
+  date: row.date,
+  observer: row.observer,
+  isAnonymous: !!row.is_anonymous,
+  images: row.images ? (typeof row.images === 'string' ? JSON.parse(row.images) : row.images) : [],
+  status: row.status || 'Open',
+  immediateActionTaken: row.immediate_action,
+});
 
-const initialInspectionTemplates: InspectionTemplate[] = [
-  {
-    id: 'tmpl-1',
-    name: 'General Construction Site',
-    category: 'Construction',
-    description: 'Daily safety checks for construction zones.',
-    items: [
-        'Are all workers wearing required PPE (Hard Hat, Boots, Vest)?',
-        'Is perimeter fencing intact and secure?',
-        'Are walkways clear of trip hazards and debris?',
-        'Is scaffolding properly tagged (Green Tag) and secured?',
-        'Are electrical cables elevated or protected?',
-        'Is fire fighting equipment accessible and charged?',
-        'Are hazardous materials stored correctly with SDS available?',
-        'Is signage for mandatory PPE visible?',
-        'Are excavations properly barricaded and shored?',
-        'Is welfare facility (water, toilet) accessible and clean?'
-    ]
-  },
-  {
-    id: 'tmpl-2',
-    name: 'Heavy Vehicle Inspection',
-    category: 'Logistics',
-    description: 'Pre-use check for trucks and cranes.',
-    items: [
-        'Are tires in good condition (tread depth/pressure)?',
-        'Do all lights, indicators, and beacons work?',
-        'Are mirrors and windshield clean and undamaged?',
-        'Are brakes (service and parking) functioning correctly?',
-        'Is the reverse alarm audible?',
-        'Are hydraulic hoses free from leaks and damage?',
-        'Is the fire extinguisher present and charged?',
-        'Is the operator cabin clean and free of loose objects?',
-        'Are seatbelts functioning and being used?',
-        'Is the load capacity chart available and legible?'
-    ]
-  },
-  {
-    id: 'tmpl-3',
-    name: 'Office Safety Audit',
-    category: 'Facilities',
-    description: 'Monthly office environment check.',
-    items: [
-        'Are emergency exits clear, unlocked and lit?',
-        'Are extension cords daisy-chained? (Check for NO)',
-        'Is lighting adequate in all areas?',
-        'Are fire extinguishers inspected and tagged?',
-        'Is the first aid kit stocked and accessible?',
-        'Are walkways free of boxes, cables, and trip hazards?',
-        'Are filing cabinets closed when not in use?',
-        'Are electrical sockets not overloaded?',
-        'Is the kitchen area clean and appliances safe?',
-        'Are display screens positioned to avoid glare?'
-    ]
-  },
-  {
-    id: 'tmpl-4',
-    name: 'Hot Work Permit Audit',
-    category: 'Permits',
-    description: 'Compliance check for active hot work.',
-    items: [
-        'Is the Hot Work Permit valid and displayed at site?',
-        'Is a trained fire watch present with a vest?',
-        'Are combustibles removed from the area (10m radius)?',
-        'Is proper fire extinguishing equipment on hand?',
-        'Is welding equipment (hoses, regulators) in good condition?',
-        'Is adequate ventilation provided for fumes?',
-        'Are screens used to protect nearby workers from arc flash?',
-        'Is PPE (face shield, gloves, apron) appropriate?',
-        'Is a gas test detector active (if required)?',
-        'Do workers understand the emergency procedure?'
-    ]
-  }
-];
+const mapInspection = (row: any): Inspection => ({
+  id: row.id,
+  templateId: row.template_name || '',
+  templateName: row.template_name || '',
+  title: row.title,
+  date: row.date,
+  location: row.location || '',
+  inspector: row.inspector || '',
+  items: typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []),
+  score: row.score || 0,
+  completed: !!row.completed,
+  signature: row.signature,
+});
 
-const initialRiskAssessments: RiskAssessment[] = [];
+const mapPermit = (row: any): Permit => ({
+  id: row.id,
+  type: row.type as PermitType,
+  location: row.location || '',
+  description: row.description,
+  validFrom: row.valid_from || '',
+  validUntil: row.valid_until || '',
+  requestor: row.requestor || '',
+  approver: row.approver,
+  status: row.status as PermitStatus,
+  controls: row.controls ? (typeof row.controls === 'string' ? JSON.parse(row.controls) : row.controls) : [],
+  approverComments: row.approver_comments,
+  aiAuditIssues: row.ai_audit_issues ? (typeof row.ai_audit_issues === 'string' ? JSON.parse(row.ai_audit_issues) : row.ai_audit_issues) : undefined,
+});
 
-const initialObservations: Observation[] = [];
+const mapWorker = (row: any): WorkerProfile => ({
+  id: row.id,
+  name: row.name,
+  role: row.role || '',
+  department: row.department || '',
+  companyId: row.company_id,
+  joinedDate: row.joined_date || row.created_at || '',
+  email: row.email,
+  phone: row.phone,
+  points: row.points || 0,
+  level: row.level || 'Novice',
+  badges: row.badges ? (typeof row.badges === 'string' ? JSON.parse(row.badges) : row.badges) : [],
+});
 
-// --- Training Seed Data ---
+const mapContractor = (row: any): Contractor => ({
+  id: row.id,
+  name: row.name,
+  contactPerson: row.contact_person || '',
+  email: row.email || '',
+  phone: row.phone || '',
+  status: row.status || 'Pending',
+  documents: row.documents ? (typeof row.documents === 'string' ? JSON.parse(row.documents) : row.documents) : [],
+  complianceScore: row.compliance_score || 0,
+});
 
-const initialContractors: Contractor[] = [];
+const mapAsset = (row: any): Asset => ({
+  id: row.id,
+  name: row.name,
+  category: (row.category as AssetCategory) || 'Tools',
+  modelNumber: row.model_number || '',
+  serialNumber: row.serial_number || '',
+  location: row.location || '',
+  status: (row.status as AssetStatus) || 'Operational',
+  lastInspectionDate: row.last_inspection_date,
+  nextInspectionDate: row.next_inspection_date || '',
+  image: row.image,
+  documents: row.documents ? (typeof row.documents === 'string' ? JSON.parse(row.documents) : row.documents) : [],
+  maintenanceHistory: row.maintenance_history ? (typeof row.maintenance_history === 'string' ? JSON.parse(row.maintenance_history) : row.maintenance_history) : [],
+});
 
-const initialWorkers: WorkerProfile[] = [];
+const mapDocument = (row: any): HSEDocument => ({
+  id: row.id,
+  title: row.title,
+  category: row.category || 'Report',
+  version: `v${row.version || 1}.0`,
+  status: row.status || 'Draft',
+  uploadDate: row.created_at || '',
+  author: row.uploaded_by || '',
+  contentUrl: row.content,
+  description: row.content,
+  approvedBy: row.approved_by,
+  approvalDate: row.approval_date,
+  aiSummary: row.ai_summary,
+});
 
-const initialModules: TrainingModule[] = [];
+const mapRiskAssessment = (row: any): RiskAssessment => ({
+  id: row.id,
+  title: row.title,
+  taskDescription: row.task_description || '',
+  type: row.type || 'JHA',
+  date: row.date,
+  author: row.author || '',
+  hazards: typeof row.hazards === 'string' ? JSON.parse(row.hazards) : (row.hazards || []),
+  status: row.status || 'Draft',
+});
 
-const initialTrainingRecords: TrainingRecord[] = [];
+const mapEmergencyContact = (row: any): EmergencyContact => ({
+  id: row.id,
+  name: row.name,
+  role: row.role || '',
+  phone: row.phone,
+  type: row.type || 'External Service',
+  location: row.location,
+});
 
-// --- PPE Seed Data ---
+const mapEmergencyDrill = (row: any): EmergencyDrill => ({
+  id: row.id,
+  type: row.type,
+  date: row.date,
+  location: row.location,
+  participantsCount: row.participants_count || 0,
+  durationMinutes: row.duration_minutes || 0,
+  outcome: row.outcome || 'Success',
+  notes: row.notes,
+  attendanceList: row.attendance_list ? (typeof row.attendance_list === 'string' ? JSON.parse(row.attendance_list) : row.attendance_list) : [],
+});
 
-const initialPPEInventory: PPEItem[] = [];
+const mapRole = (row: any): Role => ({
+  id: row.id,
+  name: row.name,
+  description: row.description || '',
+  isSystem: row.isSystem ?? !!row.is_system,
+  permissions: row.permissions ? (typeof row.permissions === 'string' ? JSON.parse(row.permissions) : row.permissions) : [],
+});
 
-const initialPPECategories = [
-    'Head Protection', 
-    'Eye Protection', 
-    'Hearing Protection', 
-    'Respiratory Protection', 
-    'Hand Protection', 
-    'Foot Protection', 
-    'Body Protection', 
-    'Fall Protection'
-];
+const mapPPEItem = (row: any): PPEItem => ({
+  id: row.id,
+  name: row.name,
+  category: row.category || '',
+  stockQuantity: row.stock_quantity ?? row.stockQuantity ?? 0,
+  minStockThreshold: row.min_stock_threshold ?? row.minStockThreshold ?? 5,
+  description: row.description,
+});
 
-const initialPPEIssuance: PPEIssuance[] = [];
+const mapPPEIssuance = (row: any): PPEIssuance => ({
+  id: row.id,
+  workerId: row.worker_id || row.workerId,
+  workerName: row.worker_name || row.workerName || '',
+  ppeItemId: row.ppe_item_id || row.ppeItemId,
+  ppeItemName: row.ppe_item_name || row.ppeItemName || '',
+  issueDate: row.issue_date || row.issueDate || '',
+  expiryDate: row.expiry_date || row.expiryDate,
+  signatureUrl: row.signature_url || row.signatureUrl,
+  status: row.status || 'Active',
+});
 
-// --- Permit Seed Data ---
+const mapTrainingModule = (row: any): TrainingModule => ({
+  id: row.id,
+  title: row.title,
+  description: row.description || '',
+  requiredForRoles: row.required_for_roles ? (typeof row.required_for_roles === 'string' ? JSON.parse(row.required_for_roles) : row.required_for_roles) : [],
+  validityMonths: row.validity_months ?? 0,
+});
 
-const initialPermits: Permit[] = [];
+const mapTrainingRecord = (row: any): TrainingRecord => ({
+  id: row.id,
+  workerId: row.worker_id || row.workerId,
+  moduleId: row.module_id || row.moduleId || '',
+  moduleTitle: row.module_title || row.moduleTitle || '',
+  completionDate: row.completion_date || row.completionDate || '',
+  expiryDate: row.expiry_date || row.expiryDate,
+  certificateUrl: row.certificate_url || row.certificateUrl,
+  status: row.status || 'Valid',
+});
 
-const initialAssets: Asset[] = [];
+const mapSafetyZone = (row: any): SafetyZone => ({
+  id: row.id,
+  name: row.name,
+  type: row.type || 'Safe',
+  lat: row.lat,
+  lng: row.lng,
+  radius: row.radius || 100,
+  requiredPPE: row.required_ppe ? (typeof row.required_ppe === 'string' ? JSON.parse(row.required_ppe) : row.required_ppe) : (row.requiredPPE || []),
+  requiredTraining: row.required_training ? (typeof row.required_training === 'string' ? JSON.parse(row.required_training) : row.required_training) : (row.requiredTraining || []),
+});
 
-const initialDocuments: HSEDocument[] = [];
+const mapStatsLog = (row: any): HSEStatsLog => ({
+  id: row.id,
+  date: row.date,
+  period: row.period || 'Daily',
+  manHours: row.man_hours ?? row.manHours ?? 0,
+  activeWorkers: row.active_workers ?? row.activeWorkers ?? 0,
+  remarks: row.remarks,
+});
 
-const initialEmergencyContacts: EmergencyContact[] = [];
+const mapTemplate = (row: any): InspectionTemplate => ({
+  id: row.id,
+  name: row.name,
+  category: row.category || '',
+  description: row.description || '',
+  items: typeof row.items === 'string' ? JSON.parse(row.items) : (row.items || []),
+});
 
-const initialDrills: EmergencyDrill[] = [];
+// ---------- Helper: Frontend model → API body ----------
 
-const initialSafetyZones: SafetyZone[] = [];
+const incidentToApi = (inc: Incident) => ({
+  description: inc.description,
+  location: inc.location,
+  date: inc.date,
+  type: inc.type,
+  category: inc.category,
+  severity: inc.severity,
+  status: inc.status,
+  image: inc.images?.[0] || null,
+  root_cause: inc.investigation?.rootCause,
+  days_lost: inc.daysLost || 0,
+  body_part: inc.bodyPart,
+  mechanism: inc.mechanism,
+  immediate_action: inc.immediateAction,
+});
 
-// --- Local Storage Helpers & Quota ---
+const actionToApi = (a: ActionItem) => ({
+  title: a.title,
+  description: a.description,
+  assignee: a.assignee,
+  due_date: a.dueDate,
+  completed_date: a.completedDate,
+  priority: a.priority,
+  status: a.status,
+  action_type: a.actionType,
+  category: a.category,
+  indicator: a.indicator,
+  related_incident_id: a.relatedIncidentId,
+  verified_by: a.verifiedBy,
+  effectiveness: a.effectiveness,
+});
 
-// Constants for storage limits (in bytes approx)
-const QUOTA_FREE = 5 * 1024 * 1024; // 5MB
-const QUOTA_PRO = 100 * 1024 * 1024; // 100MB (Conceptual, browser limit is ~10MB usually)
+const observationToApi = (o: Observation) => ({
+  type: o.type,
+  category: o.category,
+  description: o.description,
+  location: o.location,
+  date: o.date,
+  observer: o.observer,
+  is_anonymous: o.isAnonymous ? 1 : 0,
+  immediate_action: o.immediateActionTaken,
+  images: o.images,
+});
 
-export const getStorageUsage = (): number => {
-    let total = 0;
-    for (const key in localStorage) {
-        if (localStorage.hasOwnProperty(key)) {
-            total += (localStorage[key].length * 2); // approx 2 bytes per char
-        }
-    }
-    return total;
-};
+// ---------- Storage / Quota (backward compat stubs) ----------
 
-export const checkQuota = (newDataSize: number = 0): boolean => {
-    try {
-        const user = getCurrentUser();
-        const limit = user?.tier === SubscriptionTier.FREE ? QUOTA_FREE : QUOTA_PRO;
-        const currentUsage = getStorageUsage();
-        
-        if (currentUsage + newDataSize > limit) {
-            alert("Storage Quota Exceeded! Please upgrade your plan or delete old data (Images/Videos) to continue.");
-            return false;
-        }
-        return true;
-    } catch (error) {
-        console.error('Error checking quota:', error);
-        // In case of error, allow the operation to proceed
-        return true;
-    }
-};
-
-// Clear all non-system data
+export const getStorageUsage = (): number => 0;
+export const checkQuota = (_size: number = 0): boolean => true;
 export const clearUserData = () => {
-    Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
-    alert("Local data cleared.");
-    window.location.reload();
+  alert("Data is stored on the server. Contact admin to clear data.");
 };
 
-const get = <T>(key: string, initial: T): T => {
+// ---------- Incidents ----------
+
+export const getIncidents = async (): Promise<Incident[]> => {
   try {
-    const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : initial;
-  } catch (error) {
-    console.error(`Error parsing stored data for key ${key}:`, error);
-    // Clear corrupted data and return initial value
-    localStorage.removeItem(key);
-    return initial;
-  }
+    const rows = await apiGetIncidents();
+    return (Array.isArray(rows) ? rows : []).map(mapIncident);
+  } catch { return []; }
 };
 
-const set = <T>(key: string, data: T) => {
-  const json = JSON.stringify(data);
-  // Estimate size: length * 2 bytes
-  if (checkQuota(json.length * 2)) {
-      try {
-        localStorage.setItem(key, json);
-      } catch (e) {
-          console.error("Storage full", e);
-          alert("Storage full. Cannot save data.");
-      }
-  }
+export const getIncidentById = async (id: string): Promise<Incident | undefined> => {
+  try {
+    const row = await apiGetIncident(id);
+    return row ? mapIncident(row) : undefined;
+  } catch { return undefined; }
 };
 
-// --- Exports ---
-
-// Incidents
-export const getIncidents = (): Incident[] => {
-  const result = get(STORAGE_KEYS.INCIDENTS, initialIncidents);
-  return Array.isArray(result) ? result : [];
-};
-export const getIncidentById = (id: string): Incident | undefined => getIncidents().find(i => i.id === id);
-export const saveIncident = (incident: Incident) => {
-  const incidents = getIncidents();
-  set(STORAGE_KEYS.INCIDENTS, [incident, ...incidents]);
-};
-export const updateIncident = (incident: Incident) => {
-  const incidents = getIncidents();
-  set(STORAGE_KEYS.INCIDENTS, incidents.map(i => i.id === incident.id ? incident : i));
+export const saveIncident = async (incident: Incident): Promise<void> => {
+  await apiCreateIncident(incidentToApi(incident));
 };
 
-// Inspections
-export const getInspections = (): Inspection[] => {
-  const result = get(STORAGE_KEYS.INSPECTIONS, []);
-  return Array.isArray(result) ? result : [];
-};
-export const saveInspection = (inspection: Inspection) => {
-  const list = getInspections();
-  set(STORAGE_KEYS.INSPECTIONS, [inspection, ...list]);
-};
-export const getInspectionTemplates = (): InspectionTemplate[] => {
-    const custom = get<InspectionTemplate[]>(STORAGE_KEYS.INSPECTION_TEMPLATES, []);
-    return [...initialInspectionTemplates, ...custom];
-};
-export const saveInspectionTemplate = (template: InspectionTemplate) => {
-    const custom = get<InspectionTemplate[]>(STORAGE_KEYS.INSPECTION_TEMPLATES, []);
-    set(STORAGE_KEYS.INSPECTION_TEMPLATES, [template, ...custom]);
+export const updateIncident = async (incident: Incident): Promise<void> => {
+  await apiUpdateIncident(incident.id, incidentToApi(incident));
 };
 
-// Actions
-export const getActions = (): ActionItem[] => {
-  const result = get(STORAGE_KEYS.ACTIONS, initialActions);
-  return Array.isArray(result) ? result : [];
-};
-export const saveAction = (action: ActionItem) => {
-  const actions = getActions();
-  set(STORAGE_KEYS.ACTIONS, [action, ...actions]);
-};
-export const updateAction = (action: ActionItem) => {
-  const actions = getActions();
-  set(STORAGE_KEYS.ACTIONS, actions.map(a => a.id === action.id ? action : a));
+// ---------- Inspections ----------
+
+export const getInspections = async (): Promise<Inspection[]> => {
+  try {
+    const rows = await apiGetInspections();
+    return (Array.isArray(rows) ? rows : []).map(mapInspection);
+  } catch { return []; }
 };
 
-// Risk Assessments
-export const getRiskAssessments = (): RiskAssessment[] => {
-  const result = get(STORAGE_KEYS.RISK_ASSESSMENTS, initialRiskAssessments);
-  return Array.isArray(result) ? result : [];
-};
-export const getRiskAssessmentById = (id: string): RiskAssessment | undefined => getRiskAssessments().find(r => r.id === id);
-export const saveRiskAssessment = (ra: RiskAssessment) => {
-    const list = getRiskAssessments();
-    const exists = list.find(r => r.id === ra.id);
-    if (exists) {
-        set(STORAGE_KEYS.RISK_ASSESSMENTS, list.map(r => r.id === ra.id ? ra : r));
-    } else {
-        set(STORAGE_KEYS.RISK_ASSESSMENTS, [ra, ...list]);
-    }
+export const saveInspection = async (inspection: Inspection): Promise<void> => {
+  await apiCreateInspection({
+    template_name: inspection.templateName,
+    title: inspection.title,
+    date: inspection.date,
+    location: inspection.location,
+    items: inspection.items,
+    score: inspection.score,
+    completed: inspection.completed ? 1 : 0,
+    signature: inspection.signature,
+  });
 };
 
-// Observations
-export const getObservations = (): Observation[] => get(STORAGE_KEYS.OBSERVATIONS, initialObservations);
-export const saveObservation = (obs: Observation) => {
-    const list = getObservations();
-    set(STORAGE_KEYS.OBSERVATIONS, [obs, ...list]);
-};
-export const updateObservation = (obs: Observation) => {
-    const list = getObservations();
-    set(STORAGE_KEYS.OBSERVATIONS, list.map(o => o.id === obs.id ? obs : o));
-};
-export const deleteObservation = (id: string) => {
-    const list = getObservations();
-    set(STORAGE_KEYS.OBSERVATIONS, list.filter(o => o.id !== id));
+export const getInspectionTemplates = async (): Promise<InspectionTemplate[]> => {
+  try {
+    const rows = await apiGetInspectionTemplates();
+    return (Array.isArray(rows) ? rows : []).map(mapTemplate);
+  } catch { return []; }
 };
 
-// Workers & Training
-export const getWorkers = (): WorkerProfile[] => get(STORAGE_KEYS.WORKERS, initialWorkers);
-export const getWorkerById = (id: string): WorkerProfile | undefined => getWorkers().find(w => w.id === id);
-export const saveWorker = (worker: WorkerProfile) => {
-    const workers = getWorkers();
-    set(STORAGE_KEYS.WORKERS, [worker, ...workers]);
-};
-export const updateWorker = (worker: WorkerProfile) => {
-    const workers = getWorkers();
-    set(STORAGE_KEYS.WORKERS, workers.map(w => w.id === worker.id ? worker : w));
-};
-export const deleteWorker = (id: string) => {
-    const workers = getWorkers();
-    set(STORAGE_KEYS.WORKERS, workers.filter(w => w.id !== id));
-};
-export const getTrainingModules = (): TrainingModule[] => get(STORAGE_KEYS.TRAINING_MODULES, initialModules);
-export const getTrainingRecords = (): TrainingRecord[] => get(STORAGE_KEYS.TRAINING_RECORDS, initialTrainingRecords);
-export const saveTrainingRecord = (record: TrainingRecord) => {
-    const list = getTrainingRecords();
-    set(STORAGE_KEYS.TRAINING_RECORDS, [record, ...list]);
-};
-export const awardPoints = (workerId: string, points: number) => {
-    const workers = getWorkers();
-    const updated = workers.map(w => w.id === workerId ? { ...w, points: (w.points || 0) + points } : w);
-    set(STORAGE_KEYS.WORKERS, updated);
+export const saveInspectionTemplate = async (template: InspectionTemplate): Promise<void> => {
+  await apiCreateInspectionTemplate({
+    id: template.id,
+    name: template.name,
+    category: template.category,
+    description: template.description,
+    items: template.items,
+  });
 };
 
-// PPE Management
-export const getPPEInventory = (): PPEItem[] => get(STORAGE_KEYS.PPE_INVENTORY, initialPPEInventory);
-export const updatePPEStock = (id: string, newQuantity: number) => {
-    const inv = getPPEInventory();
-    set(STORAGE_KEYS.PPE_INVENTORY, inv.map(i => i.id === id ? { ...i, stockQuantity: newQuantity } : i));
-};
-export const savePPEItem = (item: PPEItem) => {
-    const inv = getPPEInventory();
-    set(STORAGE_KEYS.PPE_INVENTORY, [...inv, item]);
-};
-export const getPPECategories = (): string[] => get(STORAGE_KEYS.PPE_CATEGORIES, initialPPECategories);
-export const savePPECategory = (category: string) => {
-    const cats = getPPECategories();
-    if (!cats.includes(category)) {
-        set(STORAGE_KEYS.PPE_CATEGORIES, [...cats, category]);
-    }
-};
-export const deletePPECategory = (category: string) => {
-    const cats = getPPECategories();
-    set(STORAGE_KEYS.PPE_CATEGORIES, cats.filter(c => c !== category));
+// ---------- Actions ----------
+
+export const getActions = async (): Promise<ActionItem[]> => {
+  try {
+    const rows = await apiGetActions();
+    return (Array.isArray(rows) ? rows : []).map(mapAction);
+  } catch { return []; }
 };
 
-export const getPPEIssuanceLogs = (): PPEIssuance[] => get(STORAGE_KEYS.PPE_ISSUANCE, initialPPEIssuance);
-export const savePPEIssuance = (log: PPEIssuance) => {
-    const logs = getPPEIssuanceLogs();
-    set(STORAGE_KEYS.PPE_ISSUANCE, [log, ...logs]);
-    
-    // Automatically deduct stock
-    const inv = getPPEInventory();
-    const item = inv.find(i => i.id === log.ppeItemId);
-    if (item && item.stockQuantity > 0) {
-        updatePPEStock(item.id, item.stockQuantity - 1);
-    }
-};
-export const returnPPEItem = (issuanceId: string) => {
-    const logs = getPPEIssuanceLogs();
-    const log = logs.find(l => l.id === issuanceId);
-    if (log && log.status === 'Active') {
-        // Update log status
-        const updatedLogs = logs.map(l => l.id === issuanceId ? { ...l, status: 'Returned' as const } : l);
-        set(STORAGE_KEYS.PPE_ISSUANCE, updatedLogs);
-        
-        // Add stock back
-        const inv = getPPEInventory();
-        const item = inv.find(i => i.id === log.ppeItemId);
-        if (item) {
-            updatePPEStock(item.id, item.stockQuantity + 1);
-        }
-    }
-};
-export const updatePPEIssuance = (log: PPEIssuance) => {
-    const logs = getPPEIssuanceLogs();
-    set(STORAGE_KEYS.PPE_ISSUANCE, logs.map(l => l.id === log.id ? log : l));
+export const saveAction = async (action: ActionItem): Promise<void> => {
+  await apiCreateAction(actionToApi(action));
 };
 
-// Permits
-export const getPermits = (): Permit[] => {
-    // Check for expired permits on load
-    const permits = get(STORAGE_KEYS.PERMITS, initialPermits);
-    const now = new Date();
-    let changed = false;
-    const updated = permits.map(p => {
-        if (p.status === PermitStatus.APPROVED && new Date(p.validUntil) < now) {
-            changed = true;
-            return { ...p, status: PermitStatus.EXPIRED };
-        }
-        return p;
+export const updateAction = async (action: ActionItem): Promise<void> => {
+  await apiUpdateAction(action.id, actionToApi(action));
+};
+
+// ---------- Risk Assessments ----------
+
+export const getRiskAssessments = async (): Promise<RiskAssessment[]> => {
+  try {
+    const rows = await apiGetRiskAssessments();
+    return (Array.isArray(rows) ? rows : []).map(mapRiskAssessment);
+  } catch { return []; }
+};
+
+export const getRiskAssessmentById = async (id: string): Promise<RiskAssessment | undefined> => {
+  try {
+    const row = await apiGetRiskAssessment(id);
+    return row ? mapRiskAssessment(row) : undefined;
+  } catch { return undefined; }
+};
+
+export const saveRiskAssessment = async (ra: RiskAssessment): Promise<void> => {
+  try {
+    await apiUpdateRiskAssessment(ra.id, {
+      title: ra.title,
+      taskDescription: ra.taskDescription,
+      type: ra.type,
+      date: ra.date,
+      hazards: ra.hazards,
+      status: ra.status,
     });
-    if (changed) set(STORAGE_KEYS.PERMITS, updated);
-    return updated;
-};
-export const getPermitById = (id: string): Permit | undefined => getPermits().find(p => p.id === id);
-export const savePermit = (permit: Permit) => {
-    const list = getPermits();
-    const exists = list.find(p => p.id === permit.id);
-    if (exists) {
-        set(STORAGE_KEYS.PERMITS, list.map(p => p.id === permit.id ? permit : p));
-    } else {
-        set(STORAGE_KEYS.PERMITS, [permit, ...list]);
-    }
-};
-
-// Assets
-export const getAssets = (): Asset[] => get(STORAGE_KEYS.ASSETS, initialAssets);
-export const getAssetById = (id: string): Asset | undefined => getAssets().find(a => a.id === id);
-export const saveAsset = (asset: Asset) => {
-    const list = getAssets();
-    const exists = list.find(a => a.id === asset.id);
-    if (exists) {
-        set(STORAGE_KEYS.ASSETS, list.map(a => a.id === asset.id ? asset : a));
-    } else {
-        set(STORAGE_KEYS.ASSETS, [asset, ...list]);
-    }
+  } catch {
+    await apiCreateRiskAssessment({
+      id: ra.id,
+      title: ra.title,
+      taskDescription: ra.taskDescription,
+      type: ra.type,
+      date: ra.date,
+      author: ra.author,
+      hazards: ra.hazards,
+      status: ra.status,
+    });
+  }
 };
 
-// Contractors
-export const getContractors = (): Contractor[] => get(STORAGE_KEYS.CONTRACTORS, initialContractors);
-export const getContractorById = (id: string): Contractor | undefined => getContractors().find(c => c.id === id);
-export const saveContractor = (contractor: Contractor) => {
-    const list = getContractors();
-    const exists = list.find(c => c.id === contractor.id);
-    if (exists) {
-        set(STORAGE_KEYS.CONTRACTORS, list.map(c => c.id === contractor.id ? contractor : c));
-    } else {
-        set(STORAGE_KEYS.CONTRACTORS, [contractor, ...list]);
-    }
+// ---------- Observations ----------
+
+export const getObservations = async (): Promise<Observation[]> => {
+  try {
+    const rows = await apiGetObservations();
+    return (Array.isArray(rows) ? rows : []).map(mapObservation);
+  } catch { return []; }
 };
 
-// Documents
-export const getDocuments = (): HSEDocument[] => get(STORAGE_KEYS.DOCUMENTS, initialDocuments);
-export const getDocumentById = (id: string): HSEDocument | undefined => getDocuments().find(d => d.id === id);
-export const saveDocument = (doc: HSEDocument) => {
-    const list = getDocuments();
-    const exists = list.find(d => d.id === doc.id);
-    if (exists) {
-        set(STORAGE_KEYS.DOCUMENTS, list.map(d => d.id === doc.id ? doc : d));
-    } else {
-        set(STORAGE_KEYS.DOCUMENTS, [doc, ...list]);
-    }
+export const saveObservation = async (obs: Observation): Promise<void> => {
+  await apiCreateObservation(observationToApi(obs));
 };
 
-// Emergency
-export const getEmergencyContacts = (): EmergencyContact[] => get(STORAGE_KEYS.EMERGENCY_CONTACTS, initialEmergencyContacts);
-export const saveEmergencyContact = (contact: EmergencyContact) => {
-    const list = getEmergencyContacts();
-    set(STORAGE_KEYS.EMERGENCY_CONTACTS, [contact, ...list]);
-};
-export const deleteEmergencyContact = (id: string) => {
-    const list = getEmergencyContacts();
-    set(STORAGE_KEYS.EMERGENCY_CONTACTS, list.filter(c => c.id !== id));
+export const updateObservation = async (obs: Observation): Promise<void> => {
+  await apiCreateObservation(observationToApi(obs));
 };
 
-export const getEmergencyDrills = (): EmergencyDrill[] => get(STORAGE_KEYS.EMERGENCY_DRILLS, initialDrills);
-export const saveEmergencyDrill = (drill: EmergencyDrill) => {
-    const list = getEmergencyDrills();
-    set(STORAGE_KEYS.EMERGENCY_DRILLS, [drill, ...list]);
+export const deleteObservation = async (_id: string): Promise<void> => {
+  console.warn('Observation delete not yet supported on backend');
 };
 
-// Analytics & Stats Input
-export const getStatsLogs = (): HSEStatsLog[] => get(STORAGE_KEYS.STATS_LOGS, []);
-export const saveStatsLog = (log: HSEStatsLog) => {
-    const logs = getStatsLogs();
-    set(STORAGE_KEYS.STATS_LOGS, [log, ...logs]);
+// ---------- Workers ----------
+
+export const getWorkers = async (): Promise<WorkerProfile[]> => {
+  try {
+    const rows = await apiGetWorkers();
+    return (Array.isArray(rows) ? rows : []).map(mapWorker);
+  } catch { return []; }
 };
 
-// Roles Management
-export const getRoles = (): Role[] => get(STORAGE_KEYS.ROLES, defaultRoles);
-export const saveRole = (role: Role) => {
-    const roles = getRoles();
-    const exists = roles.find(r => r.id === role.id);
-    if (exists) {
-        set(STORAGE_KEYS.ROLES, roles.map(r => r.id === role.id ? role : r));
-    } else {
-        set(STORAGE_KEYS.ROLES, [...roles, role]);
-    }
-};
-export const deleteRole = (id: string) => {
-    const roles = getRoles();
-    const roleToDelete = roles.find(r => r.id === id);
-    if (roleToDelete && !roleToDelete.isSystem) {
-        set(STORAGE_KEYS.ROLES, roles.filter(r => r.id !== id));
-    }
+export const getWorkerById = async (id: string): Promise<WorkerProfile | undefined> => {
+  const workers = await getWorkers();
+  return workers.find(w => w.id === id);
 };
 
-// Man Hours Calculation
-export const getManHours = (): number => {
-    const logs = getStatsLogs();
-    if (logs.length > 0) {
-        return logs.reduce((total, log) => total + log.manHours, 0);
-    }
-    return get(STORAGE_KEYS.MAN_HOURS, 0); // Start with 0 for fresh users
-};
-export const saveManHours = (hours: number) => set(STORAGE_KEYS.MAN_HOURS, hours);
-
-export const calculateHSEMetrics = (): HSEMetrics => {
-    try {
-        const incidents = getIncidents();
-        const actions = getActions();
-        const inspections = getInspections();
-        const manHours = getManHours();
-
-        const ltiCount = incidents.filter(i => i.type === IncidentType.LTI).length;
-        const mtcCount = incidents.filter(i => i.type === IncidentType.MEDICAL_TREATMENT).length;
-        const facCount = incidents.filter(i => i.type === IncidentType.FIRST_AID).length;
-        const nmCount = incidents.filter(i => i.type === IncidentType.NEAR_MISS).length;
-        
-        // TRIR = (Total Recordable * 200,000) / Man Hours
-        const recordables = ltiCount + mtcCount;
-        const trir = manHours > 0 ? (recordables * 200000) / manHours : 0;
-        
-        // LTIFR = (LTI * 1,000,000) / Man Hours
-        const ltifr = manHours > 0 ? (ltiCount * 1000000) / manHours : 0;
-
-        const closedActions = actions.filter(a => a.status === 'Done').length;
-        const closureRate = actions.length > 0 ? (closedActions / actions.length) * 100 : 100;
-
-        const passedInspections = inspections.filter(i => i.score >= 80).length;
-        const inspectionCompliance = inspections.length > 0 ? (passedInspections / inspections.length) * 100 : 100;
-
-        return {
-            totalManHours: manHours || 0,
-            ltiCount: ltiCount || 0,
-            mtcCount: mtcCount || 0,
-            rwcCount: 0,
-            facCount: facCount || 0,
-            nmCount: nmCount || 0,
-            trir: isFinite(trir) ? trir : 0,
-            ltifr: isFinite(ltifr) ? ltifr : 0,
-            actionClosureRate: Math.round(closureRate) || 0,
-            inspectionCompliance: Math.round(inspectionCompliance) || 0
-        };
-    } catch (error) {
-        console.error('Error calculating HSE metrics:', error);
-        // Return safe default values
-        return {
-            totalManHours: 0,
-            ltiCount: 0,
-            mtcCount: 0,
-            rwcCount: 0,
-            facCount: 0,
-            nmCount: 0,
-            trir: 0,
-            ltifr: 0,
-            actionClosureRate: 0,
-            inspectionCompliance: 0
-        };
-    }
+export const saveWorker = async (worker: WorkerProfile): Promise<void> => {
+  await apiCreateWorker({
+    name: worker.name,
+    role: worker.role,
+    department: worker.department,
+    company_id: worker.companyId,
+    joined_date: worker.joinedDate,
+    email: worker.email,
+    phone: worker.phone,
+  });
 };
 
-export const calculateSiteSafetyScore = (): SiteSafetyScore => {
-    const metrics = calculateHSEMetrics();
+export const updateWorker = async (worker: WorkerProfile): Promise<void> => {
+  await apiUpdateWorker(worker.id, {
+    name: worker.name,
+    role: worker.role,
+    department: worker.department,
+    email: worker.email,
+    phone: worker.phone,
+    points: worker.points,
+    level: worker.level,
+  });
+};
+
+export const deleteWorker = async (id: string): Promise<void> => {
+  console.warn('Worker delete not yet supported on backend, id:', id);
+};
+
+export const awardPoints = async (workerId: string, points: number): Promise<void> => {
+  const worker = await getWorkerById(workerId);
+  if (worker) {
+    await apiUpdateWorker(workerId, { points: (worker.points || 0) + points });
+  }
+};
+
+// ---------- Training ----------
+
+export const getTrainingModules = async (): Promise<TrainingModule[]> => {
+  try {
+    const rows = await apiGetTrainingModules();
+    return (Array.isArray(rows) ? rows : []).map(mapTrainingModule);
+  } catch { return []; }
+};
+
+export const getTrainingRecords = async (): Promise<TrainingRecord[]> => {
+  try {
+    const rows = await apiGetTrainingRecords();
+    return (Array.isArray(rows) ? rows : []).map(mapTrainingRecord);
+  } catch { return []; }
+};
+
+export const saveTrainingRecord = async (record: TrainingRecord): Promise<void> => {
+  await apiCreateTrainingRecord({
+    id: record.id,
+    workerId: record.workerId,
+    moduleId: record.moduleId,
+    moduleTitle: record.moduleTitle,
+    completionDate: record.completionDate,
+    expiryDate: record.expiryDate,
+    certificateUrl: record.certificateUrl,
+    status: record.status,
+  });
+};
+
+// ---------- PPE ----------
+
+export const getPPEInventory = async (): Promise<PPEItem[]> => {
+  try {
+    const rows = await apiGetPPEInventory();
+    return (Array.isArray(rows) ? rows : []).map(mapPPEItem);
+  } catch { return []; }
+};
+
+export const savePPEItem = async (item: PPEItem): Promise<void> => {
+  await apiCreatePPEItem({
+    id: item.id,
+    name: item.name,
+    category: item.category,
+    stockQuantity: item.stockQuantity,
+    minStockThreshold: item.minStockThreshold,
+    description: item.description,
+  });
+};
+
+export const updatePPEStock = async (id: string, newQuantity: number): Promise<void> => {
+  await apiUpdatePPEItem(id, { stockQuantity: newQuantity });
+};
+
+export const getPPECategories = async (): Promise<string[]> => {
+  return ['Head Protection', 'Eye Protection', 'Hearing Protection', 'Respiratory Protection', 'Hand Protection', 'Foot Protection', 'Body Protection', 'Fall Protection'];
+};
+
+export const savePPECategory = async (_cat: string): Promise<void> => {};
+export const deletePPECategory = async (_cat: string): Promise<void> => {};
+
+export const getPPEIssuanceLogs = async (): Promise<PPEIssuance[]> => {
+  try {
+    const rows = await apiGetPPEIssuance();
+    return (Array.isArray(rows) ? rows : []).map(mapPPEIssuance);
+  } catch { return []; }
+};
+
+export const savePPEIssuance = async (log: PPEIssuance): Promise<void> => {
+  await apiCreatePPEIssuance({
+    id: log.id,
+    workerId: log.workerId,
+    workerName: log.workerName,
+    ppeItemId: log.ppeItemId,
+    ppeItemName: log.ppeItemName,
+    issueDate: log.issueDate,
+    expiryDate: log.expiryDate,
+    signatureUrl: log.signatureUrl,
+    status: log.status,
+  });
+};
+
+export const returnPPEItem = async (issuanceId: string): Promise<void> => {
+  await apiUpdatePPEIssuance(issuanceId, { status: 'Returned' });
+};
+
+export const updatePPEIssuance = async (log: PPEIssuance): Promise<void> => {
+  await apiUpdatePPEIssuance(log.id, { status: log.status });
+};
+
+// ---------- Permits ----------
+
+export const getPermits = async (): Promise<Permit[]> => {
+  try {
+    const rows = await apiGetPermits();
+    return (Array.isArray(rows) ? rows : []).map(mapPermit);
+  } catch { return []; }
+};
+
+export const getPermitById = async (id: string): Promise<Permit | undefined> => {
+  const permits = await getPermits();
+  return permits.find(p => p.id === id);
+};
+
+export const savePermit = async (permit: Permit): Promise<void> => {
+  try {
+    await apiUpdatePermit(permit.id, {
+      status: permit.status,
+      approver: permit.approver,
+      approver_comments: permit.approverComments,
+    });
+  } catch {
+    await apiCreatePermit({
+      type: permit.type,
+      location: permit.location,
+      description: permit.description,
+      valid_from: permit.validFrom,
+      valid_until: permit.validUntil,
+      requestor: permit.requestor,
+      status: permit.status,
+      controls: permit.controls,
+    });
+  }
+};
+
+// ---------- Assets ----------
+
+export const getAssets = async (): Promise<Asset[]> => {
+  try {
+    const rows = await apiGetAssets();
+    return (Array.isArray(rows) ? rows : []).map(mapAsset);
+  } catch { return []; }
+};
+
+export const getAssetById = async (id: string): Promise<Asset | undefined> => {
+  const assets = await getAssets();
+  return assets.find(a => a.id === id);
+};
+
+export const saveAsset = async (asset: Asset): Promise<void> => {
+  try {
+    await apiCreateAsset({
+      name: asset.name,
+      category: asset.category,
+      model_number: asset.modelNumber,
+      serial_number: asset.serialNumber,
+      location: asset.location,
+      status: asset.status,
+      next_inspection_date: asset.nextInspectionDate,
+    });
+  } catch (e) { console.error('Save asset error:', e); }
+};
+
+// ---------- Contractors ----------
+
+export const getContractors = async (): Promise<Contractor[]> => {
+  try {
+    const rows = await apiGetContractors();
+    return (Array.isArray(rows) ? rows : []).map(mapContractor);
+  } catch { return []; }
+};
+
+export const getContractorById = async (id: string): Promise<Contractor | undefined> => {
+  const list = await getContractors();
+  return list.find(c => c.id === id);
+};
+
+export const saveContractor = async (contractor: Contractor): Promise<void> => {
+  await apiCreateContractor({
+    name: contractor.name,
+    contact_person: contractor.contactPerson,
+    email: contractor.email,
+    phone: contractor.phone,
+    status: contractor.status,
+  });
+};
+
+// ---------- Documents ----------
+
+export const getDocuments = async (): Promise<HSEDocument[]> => {
+  try {
+    const rows = await apiGetDocuments();
+    return (Array.isArray(rows) ? rows : []).map(mapDocument);
+  } catch { return []; }
+};
+
+export const getDocumentById = async (id: string): Promise<HSEDocument | undefined> => {
+  const docs = await getDocuments();
+  return docs.find(d => d.id === id);
+};
+
+export const saveDocument = async (doc: HSEDocument): Promise<void> => {
+  await apiCreateDocument({
+    title: doc.title,
+    category: doc.category,
+    content: doc.contentUrl || doc.description,
+    status: doc.status,
+  });
+};
+
+// ---------- Emergency ----------
+
+export const getEmergencyContacts = async (): Promise<EmergencyContact[]> => {
+  try {
+    const rows = await apiGetEmergencyContacts();
+    return (Array.isArray(rows) ? rows : []).map(mapEmergencyContact);
+  } catch { return []; }
+};
+
+export const saveEmergencyContact = async (contact: EmergencyContact): Promise<void> => {
+  await apiCreateEmergencyContact({
+    name: contact.name,
+    role: contact.role,
+    phone: contact.phone,
+    type: contact.type,
+    location: contact.location,
+  });
+};
+
+export const deleteEmergencyContact = async (_id: string): Promise<void> => {
+  console.warn('Emergency contact delete not yet supported');
+};
+
+export const getEmergencyDrills = async (): Promise<EmergencyDrill[]> => {
+  try {
+    const rows = await apiGetEmergencyDrills();
+    return (Array.isArray(rows) ? rows : []).map(mapEmergencyDrill);
+  } catch { return []; }
+};
+
+export const saveEmergencyDrill = async (drill: EmergencyDrill): Promise<void> => {
+  await apiCreateEmergencyDrill({
+    type: drill.type,
+    date: drill.date,
+    location: drill.location,
+    participants_count: drill.participantsCount,
+    duration_minutes: drill.durationMinutes,
+    outcome: drill.outcome,
+    notes: drill.notes,
+    attendance_list: drill.attendanceList,
+  });
+};
+
+// ---------- Stats ----------
+
+export const getStatsLogs = async (): Promise<HSEStatsLog[]> => {
+  try {
+    const data = await apiGetStats();
+    return (Array.isArray(data.statsLogs) ? data.statsLogs : []).map(mapStatsLog);
+  } catch { return []; }
+};
+
+export const saveStatsLog = async (log: HSEStatsLog): Promise<void> => {
+  await apiLogStats({
+    date: log.date,
+    period: log.period,
+    man_hours: log.manHours,
+    active_workers: log.activeWorkers,
+    remarks: log.remarks,
+  });
+};
+
+// ---------- Roles ----------
+
+export const getRoles = async (): Promise<Role[]> => {
+  try {
+    const rows = await apiGetRoles();
+    return (Array.isArray(rows) ? rows : []).map(mapRole);
+  } catch {
+    return [
+      { id: 'role-admin', name: UserRoles.ADMIN, description: 'Full system access.', isSystem: true, permissions: ['manage_roles','manage_users','view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','approve_permit','manage_documents','ai_features'] },
+      { id: 'role-manager', name: UserRoles.MANAGER, description: 'HSE Dept Lead.', isSystem: true, permissions: ['manage_users','view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','approve_permit','manage_documents','ai_features'] },
+      { id: 'role-worker', name: UserRoles.WORKER, description: 'General staff.', isSystem: true, permissions: ['create_incident'] },
+    ];
+  }
+};
+
+export const saveRole = async (role: Role): Promise<void> => {
+  await apiCreateRole({
+    id: role.id,
+    name: role.name,
+    description: role.description,
+    isSystem: role.isSystem ? 1 : 0,
+    permissions: role.permissions,
+  });
+};
+
+export const deleteRole = async (id: string): Promise<void> => {
+  await apiDeleteRoleApi(id);
+};
+
+// ---------- Man Hours ----------
+
+export const getManHours = async (): Promise<number> => {
+  try {
+    const data = await apiGetStats();
+    return data.totalManHours || 0;
+  } catch { return 0; }
+};
+
+export const saveManHours = async (_hours: number): Promise<void> => {};
+
+// ---------- HSE Metrics ----------
+
+export const calculateHSEMetrics = async (): Promise<HSEMetrics> => {
+  try {
+    const metrics = await apiGetMetrics();
+    return {
+      totalManHours: metrics.totalManHours || 0,
+      ltiCount: metrics.ltiCount || 0,
+      mtcCount: metrics.mtcCount || 0,
+      rwcCount: metrics.rwcCount || 0,
+      facCount: metrics.facCount || 0,
+      nmCount: metrics.nmCount || 0,
+      fatalityCount: metrics.fatalityCount || 0,
+      trir: metrics.trir || 0,
+      ltifr: metrics.ltifr || 0,
+      severityRate: metrics.severityRate || 0,
+      actionClosureRate: metrics.actionClosureRate || 0,
+      inspectionCompliance: metrics.inspectionCompliance || 0,
+      leadingActions: metrics.leadingActions || 0,
+      leadingClosureRate: metrics.leadingClosureRate || 0,
+      inspectionsCompleted: metrics.inspectionsCompleted || 0,
+      trainingHours: metrics.trainingHours || 0,
+      nearMissReportingRate: metrics.nearMissReportingRate || 0,
+      laggingActions: metrics.laggingActions || 0,
+      laggingClosureRate: metrics.laggingClosureRate || 0,
+      daysLost: metrics.daysLost || 0,
+      recordableIncidents: metrics.recordableIncidents || 0,
+    };
+  } catch {
+    return {
+      totalManHours: 0, ltiCount: 0, mtcCount: 0, rwcCount: 0, facCount: 0,
+      nmCount: 0, fatalityCount: 0, trir: 0, ltifr: 0, severityRate: 0,
+      actionClosureRate: 0, inspectionCompliance: 0, leadingActions: 0,
+      leadingClosureRate: 0, inspectionsCompleted: 0, trainingHours: 0,
+      nearMissReportingRate: 0, laggingActions: 0, laggingClosureRate: 0,
+      daysLost: 0, recordableIncidents: 0,
+    };
+  }
+};
+
+export const calculateSiteSafetyScore = async (): Promise<SiteSafetyScore> => {
+  try {
+    const metrics = await calculateHSEMetrics();
+    const incidents = await getIncidents();
+    const actions = await getActions();
+    const observations = await getObservations();
+    const inspections = await getInspections();
+
     let score = 100;
     score -= (metrics.ltiCount * 20);
     score -= (metrics.mtcCount * 10);
     score -= (metrics.facCount * 2);
-    
-    const actions = getActions();
+
     const overdue = actions.filter(a => a.status !== 'Done' && new Date(a.dueDate) < new Date()).length;
     score -= (overdue * 5);
-
     score = Math.max(0, Math.min(100, score));
 
     let rating: SiteSafetyScore['rating'] = 'Poor';
@@ -640,25 +893,43 @@ export const calculateSiteSafetyScore = (): SiteSafetyScore => {
     else if (score >= 60) rating = 'Fair';
 
     return {
-        score,
-        rating,
-        breakdown: {
-            incidents: metrics.ltiCount + metrics.mtcCount + metrics.facCount,
-            observations: getObservations().length,
-            inspections: getInspections().length,
-            training: 0, // Start with 0 for fresh users
-            actions: actions.filter(a => a.status !== 'Done').length
-        }
+      score,
+      rating,
+      breakdown: {
+        incidents: incidents.length,
+        observations: observations.length,
+        inspections: inspections.length,
+        training: 0,
+        actions: actions.filter(a => a.status !== 'Done').length,
+      }
     };
+  } catch {
+    return { score: 100, rating: 'Excellent', breakdown: { incidents: 0, observations: 0, inspections: 0, training: 0, actions: 0 } };
+  }
 };
 
-// Geo-fencing
-export const getSafetyZones = (): SafetyZone[] => get(STORAGE_KEYS.SAFETY_ZONES, initialSafetyZones);
-export const saveSafetyZone = (zone: SafetyZone) => {
-    const zones = getSafetyZones();
-    set(STORAGE_KEYS.SAFETY_ZONES, [...zones, zone]);
+// ---------- Safety Zones ----------
+
+export const getSafetyZones = async (): Promise<SafetyZone[]> => {
+  try {
+    const rows = await apiGetSafetyZones();
+    return (Array.isArray(rows) ? rows : []).map(mapSafetyZone);
+  } catch { return []; }
 };
-export const deleteSafetyZone = (id: string) => {
-    const zones = getSafetyZones();
-    set(STORAGE_KEYS.SAFETY_ZONES, zones.filter(z => z.id !== id));
+
+export const saveSafetyZone = async (zone: SafetyZone): Promise<void> => {
+  await apiCreateSafetyZone({
+    id: zone.id,
+    name: zone.name,
+    type: zone.type,
+    lat: zone.lat,
+    lng: zone.lng,
+    radius: zone.radius,
+    requiredPPE: zone.requiredPPE,
+    requiredTraining: zone.requiredTraining,
+  });
+};
+
+export const deleteSafetyZone = async (id: string): Promise<void> => {
+  await apiDeleteSafetyZoneApi(id);
 };

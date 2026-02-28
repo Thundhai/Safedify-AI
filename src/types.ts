@@ -63,10 +63,35 @@ export enum IncidentType {
   NEAR_MISS = 'Near Miss',
   FIRST_AID = 'First Aid',
   MEDICAL_TREATMENT = 'Medical Treatment',
+  RESTRICTED_WORK = 'Restricted Work Case',
   LTI = 'Lost Time Injury',
+  FATALITY = 'Fatality',
   ENVIRONMENTAL = 'Environmental',
-  PROPERTY_DAMAGE = 'Property Damage'
+  PROPERTY_DAMAGE = 'Property Damage',
+  FIRE = 'Fire',
+  SECURITY = 'Security',
+  VEHICLE = 'Vehicle Incident'
 }
+
+// OSHA Incident Classification (pyramid hierarchy)
+export enum IncidentCategory {
+  NEAR_MISS = 'Near Miss',
+  FIRST_AID_CASE = 'First Aid Case',
+  MEDICAL_TREATMENT_CASE = 'Medical Treatment Case',
+  RESTRICTED_WORK_CASE = 'Restricted Work Case',
+  LOST_TIME_INJURY = 'Lost Time Injury',
+  FATALITY = 'Fatality'
+}
+
+// Whether an incident is recordable under OSHA
+export const isRecordable = (category: IncidentCategory): boolean => {
+  return [
+    IncidentCategory.MEDICAL_TREATMENT_CASE,
+    IncidentCategory.RESTRICTED_WORK_CASE,
+    IncidentCategory.LOST_TIME_INJURY,
+    IncidentCategory.FATALITY
+  ].includes(category);
+};
 
 export interface FishboneCategories {
   man: string;
@@ -92,10 +117,15 @@ export interface Incident {
   date: string;
   location: string;
   type: IncidentType;
+  category: IncidentCategory;
   severity: IncidentSeverity;
   status: 'Open' | 'Investigating' | 'Closed';
   images: string[];
   reporter: string;
+  daysLost?: number;         // For LTI tracking
+  bodyPart?: string;         // Affected body part
+  mechanism?: string;        // How injury occurred (e.g., Struck by, Fall from height)
+  immediateAction?: string;  // What was done immediately
   aiClassification?: {
     confidence: number;
     reasoning: string;
@@ -135,14 +165,64 @@ export interface Inspection {
   signature?: string; // Base64
 }
 
+// Action Types
+export type ActionType = 'Corrective' | 'Preventive' | 'Improvement';
+
+// Leading vs Lagging indicator classification
+export type IndicatorType = 'Leading' | 'Lagging';
+
+// Action categories aligned with HSE leading/lagging framework
+export type ActionCategory =
+  // Leading (proactive) categories
+  | 'Training & Competency'
+  | 'Inspection & Audit'
+  | 'Risk Assessment'
+  | 'Safety Campaign'
+  | 'Procedure Update'
+  | 'PPE & Equipment'
+  | 'Emergency Preparedness'
+  | 'Behavioral Safety'
+  // Lagging (reactive) categories
+  | 'Incident Corrective'
+  | 'Incident Preventive'
+  | 'Regulatory Compliance'
+  | 'Investigation Finding'
+  | 'Audit Non-Conformance'
+  | 'Other';
+
+// Map each category to its indicator type
+export const ACTION_INDICATOR_MAP: Record<ActionCategory, IndicatorType> = {
+  'Training & Competency': 'Leading',
+  'Inspection & Audit': 'Leading',
+  'Risk Assessment': 'Leading',
+  'Safety Campaign': 'Leading',
+  'Procedure Update': 'Leading',
+  'PPE & Equipment': 'Leading',
+  'Emergency Preparedness': 'Leading',
+  'Behavioral Safety': 'Leading',
+  'Incident Corrective': 'Lagging',
+  'Incident Preventive': 'Lagging',
+  'Regulatory Compliance': 'Lagging',
+  'Investigation Finding': 'Lagging',
+  'Audit Non-Conformance': 'Lagging',
+  'Other': 'Lagging',
+};
+
 export interface ActionItem {
   id: string;
   title: string;
+  description?: string;
   assignee: string;
   dueDate: string;
-  priority: 'Low' | 'Medium' | 'High';
-  status: 'Open' | 'In Progress' | 'Done';
+  completedDate?: string;
+  priority: 'Low' | 'Medium' | 'High' | 'Critical';
+  status: 'Open' | 'In Progress' | 'Overdue' | 'Done' | 'Verified';
+  actionType: ActionType;
+  category: ActionCategory;
+  indicator: IndicatorType;
   relatedIncidentId?: string;
+  verifiedBy?: string;
+  effectiveness?: 'Effective' | 'Partially Effective' | 'Ineffective' | 'Not Assessed';
 }
 
 export interface DashboardStats {
@@ -422,12 +502,27 @@ export interface HSEMetrics {
   mtcCount: number; // Medical Treatment Cases
   facCount: number; // First Aid Cases
   nmCount: number; // Near Misses
+  fatalityCount: number; // Fatalities
   
   trir: number; // Total Recordable Incident Rate
   ltifr: number; // Lost Time Injury Frequency Rate
+  severityRate: number; // Days lost per 200,000 man-hours
   
   actionClosureRate: number; // %
   inspectionCompliance: number; // %
+
+  // Leading Indicators
+  leadingActions: number;       // Total leading (proactive) actions
+  leadingClosureRate: number;   // % of closed leading actions
+  inspectionsCompleted: number; // Total inspections done
+  trainingHours: number;        // Placeholder for training tracking
+  nearMissReportingRate: number; // Near misses per 200,000 man-hours
+  
+  // Lagging Indicators
+  laggingActions: number;       // Total lagging (reactive) actions
+  laggingClosureRate: number;   // % of closed lagging actions
+  daysLost: number;             // Total days lost due to incidents
+  recordableIncidents: number;  // MTC + RWC + LTI + Fatality
 }
 
 // --- Stats Input Types ---

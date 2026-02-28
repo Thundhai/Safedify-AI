@@ -1,8 +1,9 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { MessageSquare, X, Send, Image, Loader2, Sparkles, HardHat, FileText, Volume2, Lock } from 'lucide-react';
+import { MessageSquare, X, Send, Image, Loader2, Sparkles, HardHat, FileText, Volume2, Lock, Wrench, Database } from 'lucide-react';
 import { chatSafetyAssistant, detectPPEAI, generateSpeechAI, playGeneratedAudio } from '../services/geminiService';
+import { apiAgentChat, apiHealthCheck } from '../services/apiService';
 import { calculateHSEMetrics } from '../services/storageService';
 import { useAuth } from '../context/AuthContext';
 import { SubscriptionTier } from '../types';
@@ -12,16 +13,24 @@ export const AIChatAssistant: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<{role: 'user' | 'model', text: string, image?: string}[]>([
-    { role: 'model', text: 'Hello! I am your AI Safety Assistant. How can I help you today? \n\nI can assist with risk assessments, toolbox talks, or checking safety regulations.' }
+  const [messages, setMessages] = useState<{role: 'user' | 'model', text: string, image?: string, toolCalls?: any[]}[]>([
+    { role: 'model', text: 'Hello! I am your **Safedify AI Agent**. I have access to the backend database and can:\n\n- **Query** incidents, observations, actions, permits, and workers\n- **Calculate** safety metrics (TRIR, LTIFR, safety score)\n- **Create** new incidents and corrective actions\n- **Analyze** safety trends with custom SQL queries\n\nHow can I help you today?' }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isReading, setIsReading] = useState<number | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [backendAvailable, setBackendAvailable] = useState<boolean | null>(null);
+  const [showToolCalls, setShowToolCalls] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const isFree = user?.tier === SubscriptionTier.FREE;
+
+  // Check backend health on mount
+  useEffect(() => {
+    apiHealthCheck().then(ok => setBackendAvailable(ok)).catch(() => setBackendAvailable(false));
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -45,26 +54,34 @@ export const AIChatAssistant: React.FC = () => {
 
     const userMsg = { role: 'user' as const, text: inputValue, image: selectedImage || undefined };
     setMessages(prev => [...prev, userMsg]);
+    const currentInput = inputValue;
     setInputValue('');
     setSelectedImage(null);
     setIsLoading(true);
 
     try {
-      // Inject context if relevant
-      let systemContext = '';
-      if (inputValue.toLowerCase().includes('stats') || inputValue.toLowerCase().includes('performance')) {
-          const metrics = calculateHSEMetrics();
+      if (backendAvailable) {
+        // Use the backend AI Agent (with tools & database access)
+        const result = await apiAgentChat(currentInput, conversationId || undefined);
+        setConversationId(result.conversationId);
+        setMessages(prev => [...prev, { 
+          role: 'model', 
+          text: result.response,
+          toolCalls: result.toolCalls?.length > 0 ? result.toolCalls : undefined
+        }]);
+      } else {
+        // Fallback to direct Gemini calls (old behavior)
+        let systemContext = '';
+        if (currentInput.toLowerCase().includes('stats') || currentInput.toLowerCase().includes('performance')) {
+          const metrics = await calculateHSEMetrics();
           systemContext = `Current Safety Stats: TRIR=${metrics.trir.toFixed(2)}, LTIFR=${metrics.ltifr.toFixed(2)}, LTI Count=${metrics.ltiCount}.`;
+        }
+        const response = await chatSafetyAssistant(currentInput, messages, selectedImage || undefined, systemContext);
+        setMessages(prev => [...prev, { role: 'model', text: response }]);
       }
-
-      // If image is present and text implies check, maybe call PPE detection directly or just chat
-      // For this chatbot, we'll route image + text to the generic chat function which handles multimodal
-      const response = await chatSafetyAssistant(inputValue, messages, selectedImage || undefined, systemContext);
-      
-      setMessages(prev => [...prev, { role: 'model', text: response }]);
     } catch (e) {
       console.error(e);
-      setMessages(prev => [...prev, { role: 'model', text: "I'm having trouble connecting to the safety database. Please try again." }]);
+      setMessages(prev => [...prev, { role: 'model', text: "I'm having trouble connecting. Please try again." }]);
     } finally {
       setIsLoading(false);
     }
@@ -122,7 +139,9 @@ export const AIChatAssistant: React.FC = () => {
       <div className="bg-brand-navy text-white p-4 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-2">
            <Sparkles size={20} className="text-brand-orange" />
-           <h3 className="font-bold">Safety Assistant</h3>
+           <h3 className="font-bold">AI Agent</h3>
+           {backendAvailable && <span className="text-xs bg-green-500/20 text-green-300 px-2 py-0.5 rounded-full">Live</span>}
+           {backendAvailable === false && <span className="text-xs bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-full">Offline</span>}
         </div>
         <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white">
           <X size={20} />
@@ -144,6 +163,29 @@ export const AIChatAssistant: React.FC = () => {
               <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1">
                  <ReactMarkdown>{msg.text}</ReactMarkdown>
               </div>
+
+              {/* Tool Calls Indicator */}
+              {msg.toolCalls && msg.toolCalls.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-slate-100">
+                  <button 
+                    onClick={() => setShowToolCalls(showToolCalls === idx ? null : idx)}
+                    className="flex items-center gap-1.5 text-xs text-blue-500 hover:text-blue-700 font-medium"
+                  >
+                    <Database size={12} />
+                    {msg.toolCalls.length} tool{msg.toolCalls.length > 1 ? 's' : ''} used
+                  </button>
+                  {showToolCalls === idx && (
+                    <div className="mt-1.5 space-y-1">
+                      {msg.toolCalls.map((tc: any, tcIdx: number) => (
+                        <div key={tcIdx} className="text-xs bg-slate-50 border border-slate-200 rounded p-1.5">
+                          <span className="font-mono font-bold text-blue-600">{tc.tool}</span>
+                          <span className="text-slate-400 ml-1">{tc.resultPreview?.slice(0, 150)}...</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               
               {/* TTS Button for Model Messages */}
               {msg.role === 'model' && (
@@ -185,9 +227,9 @@ export const AIChatAssistant: React.FC = () => {
                 {/* Quick Prompts (only if empty history or last was model) */}
                 {messages.length < 3 && (
                     <div className="flex gap-2 overflow-x-auto pb-3 mb-1 no-scrollbar">
-                        <button onClick={() => handleQuickPrompt("Generate a generic toolbox talk for working at height")} className="whitespace-nowrap px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs hover:bg-slate-200 transition-colors">Toolbox Talk</button>
-                        <button onClick={() => handleQuickPrompt("What are the key risks of confined space entry?")} className="whitespace-nowrap px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs hover:bg-slate-200 transition-colors">Risk Assessment</button>
-                        <button onClick={() => handleQuickPrompt("How is our safety performance this month?")} className="whitespace-nowrap px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs hover:bg-slate-200 transition-colors">Stats Check</button>
+                        <button onClick={() => handleQuickPrompt("Show me all open incidents and their severity")} className="whitespace-nowrap px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs hover:bg-slate-200 transition-colors">Open Incidents</button>
+                        <button onClick={() => handleQuickPrompt("Calculate our current safety metrics (TRIR, LTIFR)")} className="whitespace-nowrap px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs hover:bg-slate-200 transition-colors">Safety Metrics</button>
+                        <button onClick={() => handleQuickPrompt("Are there any overdue corrective actions?")} className="whitespace-nowrap px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-xs hover:bg-slate-200 transition-colors">Overdue Actions</button>
                     </div>
                 )}
 

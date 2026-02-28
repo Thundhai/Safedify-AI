@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Camera, MapPin, Send, UserX, User, AlertOctagon, ShieldCheck, AlertTriangle, Sparkles, Loader2, ArrowLeft } from 'lucide-react';
 import { saveObservation } from '../services/storageService';
 import { analyzeObservationAI } from '../services/geminiService';
+import { SmartTextInput, SmartTextArea } from './SmartTextInput';
 import { compressImage, addToSyncQueue } from '../services/offlineService';
 import { Observation, ObservationType } from '../types';
 
@@ -62,7 +63,7 @@ export const ObservationForm: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newObs: Observation = {
       id: `obs-${Date.now()}`,
@@ -78,7 +79,7 @@ export const ObservationForm: React.FC = () => {
       images: image ? [image] : []
     };
 
-    saveObservation(newObs);
+    await saveObservation(newObs);
     addToSyncQueue('SAVE_OBSERVATION', `Observation: ${newObs.type}`);
     
     alert("Observation Submitted! (Saved Offline & Queued)");
@@ -150,10 +151,10 @@ export const ObservationForm: React.FC = () => {
         <div>
            <label className="block text-sm font-semibold text-slate-700 mb-1">Location</label>
            <div className="relative">
-             <input 
-               type="text" 
+             <SmartTextInput 
                value={location}
                onChange={(e) => setLocation(e.target.value)}
+               onValueChange={setLocation}
                placeholder="e.g. Workshop Area 2"
                className="w-full border border-slate-300 rounded-lg pl-10 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                required
@@ -165,9 +166,10 @@ export const ObservationForm: React.FC = () => {
         {/* Description */}
         <div>
            <label className="block text-sm font-semibold text-slate-700 mb-1">Description</label>
-           <textarea 
+           <SmartTextArea 
              value={description}
              onChange={(e) => setDescription(e.target.value)}
+             onValueChange={setDescription}
              placeholder="Describe what you observed..."
              rows={3}
              className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
@@ -189,9 +191,10 @@ export const ObservationForm: React.FC = () => {
         {/* Immediate Action */}
         <div>
            <label className="block text-sm font-semibold text-slate-700 mb-1">Immediate Action Taken</label>
-           <textarea 
+           <SmartTextArea 
              value={immediateAction}
              onChange={(e) => setImmediateAction(e.target.value)}
+             onValueChange={setImmediateAction}
              placeholder="What did you do to correct it? (e.g. stopped work, removed hazard)"
              rows={2}
              className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"

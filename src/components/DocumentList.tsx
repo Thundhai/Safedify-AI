@@ -11,7 +11,10 @@ export const DocumentList: React.FC = () => {
     const [search, setSearch] = useState('');
 
     useEffect(() => {
-        setDocuments(getDocuments());
+        const load = async () => {
+            setDocuments(await getDocuments());
+        };
+        load();
     }, []);
 
     const filteredDocs = documents.filter(d => {

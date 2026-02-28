@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { classifyIncidentAI, getCorrectiveActionsAI } from '../services/geminiService';
 import { saveIncident } from '../services/storageService';
+import { SmartTextInput, SmartTextArea } from './SmartTextInput';
 import { compressImage, addToSyncQueue } from '../services/offlineService';
 import { IncidentSeverity, IncidentType, Incident, SubscriptionTier } from '../types';
 import { useNavigate } from 'react-router-dom';
@@ -51,18 +52,31 @@ export const IncidentReport: React.FC = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       const recognitionInstance = new SpeechRecognition();
-      recognitionInstance.continuous = false;
-      recognitionInstance.interimResults = false;
+      recognitionInstance.continuous = true;
+      recognitionInstance.interimResults = true;
       recognitionInstance.lang = 'en-US';
       
       recognitionInstance.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setDescription(prev => prev ? `${prev} ${transcript}` : transcript);
-        setIsListening(false);
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript) {
+          setDescription(prev => prev ? `${prev} ${finalTranscript}` : finalTranscript);
+        }
       };
 
       recognitionInstance.onerror = (event: any) => {
-        console.error("Speech recognition error", event.error);
+        console.error("Speech recognition error:", event.error);
+        if (event.error === 'not-allowed') {
+          alert("Microphone access denied. Please allow microphone permission in your browser settings.");
+        } else if (event.error === 'no-speech') {
+          // Silently ignore no-speech — user just didn't speak yet
+        } else if (event.error === 'network') {
+          alert("Network error — speech recognition requires an internet connection in most browsers.");
+        }
         setIsListening(false);
       };
 
@@ -76,15 +90,30 @@ export const IncidentReport: React.FC = () => {
 
   const toggleListening = () => {
     if (!recognition) {
-      alert("Voice input is not supported in this browser.");
+      alert("Voice input is not supported in this browser. Please use Chrome or Edge.");
       return;
     }
     
     if (isListening) {
       recognition.stop();
+      setIsListening(false);
     } else {
-      setIsListening(true);
-      recognition.start();
+      try {
+        setIsListening(true);
+        recognition.start();
+      } catch (e: any) {
+        // Handle "already started" error
+        if (e.message?.includes('already started')) {
+          recognition.stop();
+          setTimeout(() => {
+            setIsListening(true);
+            recognition.start();
+          }, 100);
+        } else {
+          console.error("Failed to start speech recognition:", e);
+          setIsListening(false);
+        }
+      }
     }
   };
 
@@ -137,7 +166,7 @@ export const IncidentReport: React.FC = () => {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!location) {
@@ -167,7 +196,7 @@ export const IncidentReport: React.FC = () => {
       } : undefined
     };
 
-    saveIncident(newIncident);
+    await saveIncident(newIncident);
     addToSyncQueue('SAVE_INCIDENT', `New Incident: ${finalType} at ${location}`);
     
     alert("Incident Reported Successfully! (Saved locally & queued)");
@@ -198,9 +227,10 @@ export const IncidentReport: React.FC = () => {
         <div className="space-y-2">
           <label className="text-sm font-bold text-slate-700">What happened?</label>
           <div className="relative">
-            <textarea
+            <SmartTextArea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+              onValueChange={setDescription}
               className="w-full p-3 border border-slate-300 rounded-xl h-32 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all pr-12 text-slate-800 shadow-inner"
               placeholder="Describe the incident in detail (e.g. 'Worker fell from ladder due to slippery rungs...')"
             />
@@ -329,10 +359,10 @@ export const IncidentReport: React.FC = () => {
             <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Exact Location</label>
                 <div className="relative">
-                    <input 
-                        type="text" 
+                    <SmartTextInput 
                         value={location}
                         onChange={(e) => setLocation(e.target.value)}
+                        onValueChange={setLocation}
                         placeholder="e.g. Zone B - Generator Room"
                         className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     />

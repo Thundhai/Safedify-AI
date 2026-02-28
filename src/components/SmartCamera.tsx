@@ -54,7 +54,7 @@ export const SmartCamera: React.FC = () => {
       setObservationDetails({ location: det.location || '', immediateAction: det.recommendation || '' });
   };
 
-  const confirmLogObservation = () => {
+  const confirmLogObservation = async () => {
       if (!loggingHazard) return;
 
       const newObs: Observation = {
@@ -71,7 +71,7 @@ export const SmartCamera: React.FC = () => {
           images: image ? [image] : []
       };
 
-      saveObservation(newObs);
+      await saveObservation(newObs);
       addToSyncQueue('SAVE_OBSERVATION', `AI Observation: ${newObs.description}`);
       
       alert("Hazard logged to Observations successfully.");

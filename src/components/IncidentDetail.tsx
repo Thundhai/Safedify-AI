@@ -47,42 +47,45 @@ export const IncidentDetail: React.FC = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      const inc = getIncidentById(id);
-      setIncident(inc);
-      const allActions = getActions();
-      setActions(allActions.filter(a => a.relatedIncidentId === id));
+    const load = async () => {
+      if (id) {
+        const inc = await getIncidentById(id);
+        setIncident(inc);
+        const allActions = await getActions();
+        setActions(allActions.filter(a => a.relatedIncidentId === id));
 
-      if (inc?.investigation) {
-        setInvestigationMethod(inc.investigation.method);
-        setRootCause(inc.investigation.rootCause);
+        if (inc?.investigation) {
+          setInvestigationMethod(inc.investigation.method);
+          setRootCause(inc.investigation.rootCause);
 
-        if (inc.investigation.method === '5-Why' && inc.investigation.whys) {
-          const loadedWhys = inc.investigation.whys;
-          const paddedWhys = [...loadedWhys, '', '', '', '', ''].slice(0, 5);
-          setWhys(paddedWhys);
-        }
-        
-        if (inc.investigation.method === 'Fishbone' && inc.investigation.categories) {
-          setFishbone({
-            man: inc.investigation.categories.man || '',
-            machine: inc.investigation.categories.machine || '',
-            method: inc.investigation.categories.method || '',
-            material: inc.investigation.categories.material || '',
-            environment: inc.investigation.categories.environment || ''
-          });
-        }
+          if (inc.investigation.method === '5-Why' && inc.investigation.whys) {
+            const loadedWhys = inc.investigation.whys;
+            const paddedWhys = [...loadedWhys, '', '', '', '', ''].slice(0, 5);
+            setWhys(paddedWhys);
+          }
+          
+          if (inc.investigation.method === 'Fishbone' && inc.investigation.categories) {
+            setFishbone({
+              man: inc.investigation.categories.man || '',
+              machine: inc.investigation.categories.machine || '',
+              method: inc.investigation.categories.method || '',
+              material: inc.investigation.categories.material || '',
+              environment: inc.investigation.categories.environment || ''
+            });
+          }
 
-        if (inc.investigation.evidence) {
-          setEvidence(inc.investigation.evidence);
-        } else {
-          setEvidence([]);
+          if (inc.investigation.evidence) {
+            setEvidence(inc.investigation.evidence);
+          } else {
+            setEvidence([]);
+          }
+          
+          // If investigation exists, default markAsClosed based on current status
+          setMarkAsClosed(inc.status === 'Closed');
         }
-        
-        // If investigation exists, default markAsClosed based on current status
-        setMarkAsClosed(inc.status === 'Closed');
       }
-    }
+    };
+    load();
   }, [id]);
 
   const handleReadAloud = async () => {
@@ -182,7 +185,7 @@ export const IncidentDetail: React.FC = () => {
       }
     };
     
-    updateIncident(updatedIncident);
+    await updateIncident(updatedIncident);
     addToSyncQueue('UPDATE_INCIDENT', `Updated Investigation: ${incident.id}`);
     
     setIncident(updatedIncident);
@@ -190,7 +193,7 @@ export const IncidentDetail: React.FC = () => {
     alert(`Investigation saved.${markAsClosed ? ' Incident marked as Closed.' : ''}`);
   };
 
-  const handleAddAction = (e: React.FormEvent) => {
+  const handleAddAction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!incident) return;
     
@@ -204,7 +207,7 @@ export const IncidentDetail: React.FC = () => {
       relatedIncidentId: incident.id
     };
 
-    saveAction(action);
+    await saveAction(action);
     addToSyncQueue('SAVE_ACTION', `New Action: ${action.title}`);
     
     setActions([...actions, action]);
@@ -217,27 +220,27 @@ export const IncidentDetail: React.FC = () => {
     });
   };
 
-  const handleActionStatusChange = (action: ActionItem, newStatus: 'Open' | 'In Progress' | 'Done') => {
+  const handleActionStatusChange = async (action: ActionItem, newStatus: 'Open' | 'In Progress' | 'Done') => {
     const updatedAction: ActionItem = { ...action, status: newStatus };
-    updateAction(updatedAction);
+    await updateAction(updatedAction);
     addToSyncQueue('UPDATE_ACTION', `Updated Action Status: ${action.title} -> ${newStatus}`);
     
     setActions(prev => prev.map(a => a.id === action.id ? updatedAction : a));
   };
 
-  const fetchAvailableActions = () => {
-    const all = getActions();
+  const fetchAvailableActions = async () => {
+    const all = await getActions();
     setAvailableActions(all.filter(a => !a.relatedIncidentId));
     setShowLinkModal(true);
     setShowActionForm(false);
   };
 
-  const handleLinkAction = (actionId: string) => {
+  const handleLinkAction = async (actionId: string) => {
     if (!incident) return;
     const actionToLink = availableActions.find(a => a.id === actionId);
     if (actionToLink) {
       const updated = { ...actionToLink, relatedIncidentId: incident.id };
-      updateAction(updated);
+      await updateAction(updated);
       addToSyncQueue('UPDATE_ACTION', `Linked Action: ${updated.title}`);
       
       setActions(prev => [...prev, updated]);
