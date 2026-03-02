@@ -323,6 +323,20 @@ migrate('incidents', 'days_lost', 'INTEGER DEFAULT 0');
 migrate('incidents', 'body_part', 'TEXT');
 migrate('incidents', 'mechanism', 'TEXT');
 migrate('incidents', 'immediate_action', 'TEXT');
+migrate('incidents', 'date_reported', 'TEXT');
+migrate('incidents', 'department', 'TEXT');
+migrate('incidents', 'shift', 'TEXT');
+migrate('incidents', 'weather_conditions', 'TEXT');
+migrate('incidents', 'task_being_performed', 'TEXT');
+migrate('incidents', 'injured_persons', 'TEXT');      // JSON array
+migrate('incidents', 'witnesses', 'TEXT');              // JSON array
+migrate('incidents', 'ppe_worn', 'TEXT');               // JSON array
+migrate('incidents', 'ppe_adequate', 'INTEGER');        // 0/1/null
+migrate('incidents', 'environmental_impact', 'TEXT');
+migrate('incidents', 'immediate_actions_taken', 'TEXT');
+migrate('incidents', 'area_secured', 'INTEGER DEFAULT 0');
+migrate('incidents', 'emergency_services_notified', 'INTEGER DEFAULT 0');
+migrate('incidents', 'regulatory_notification', 'INTEGER DEFAULT 0');
 
 // Action migrations
 migrate('actions', 'description', 'TEXT');

@@ -43,21 +43,47 @@ import {
 
 // ---------- Helper: map API snake_case to frontend camelCase ----------
 
+const parseJson = (val: any, fallback: any = []) => {
+  if (!val) return fallback;
+  if (typeof val === 'string') { try { return JSON.parse(val); } catch { return fallback; } }
+  return val;
+};
+
 const mapIncident = (row: any): Incident => ({
   id: row.id,
   description: row.description,
   date: row.date,
+  dateReported: row.date_reported || row.date,
   location: row.location || '',
+  department: row.department || '',
   type: row.type as IncidentType,
   category: (row.category || 'Near Miss') as IncidentCategory,
   severity: row.severity as IncidentSeverity,
   status: row.status || 'Open',
   images: row.image ? [row.image] : [],
   reporter: row.reported_by || '',
+  // Context
+  shift: row.shift || '',
+  weatherConditions: row.weather_conditions || '',
+  taskBeingPerformed: row.task_being_performed || '',
+  // People
+  injuredPersons: parseJson(row.injured_persons, []),
+  witnesses: parseJson(row.witnesses, []),
+  // Legacy
   daysLost: row.days_lost || 0,
   bodyPart: row.body_part,
   mechanism: row.mechanism,
   immediateAction: row.immediate_action,
+  // PPE & Environmental
+  ppeWorn: parseJson(row.ppe_worn, []),
+  ppeAdequate: row.ppe_adequate != null ? !!row.ppe_adequate : null,
+  environmentalImpact: row.environmental_impact || '',
+  // Immediate response
+  immediateActionsTaken: row.immediate_actions_taken || '',
+  areaSecured: !!row.area_secured,
+  emergencyServicesNotified: !!row.emergency_services_notified,
+  regulatoryNotification: !!row.regulatory_notification,
+  // AI
   aiClassification: undefined,
   investigation: undefined,
 });
@@ -291,6 +317,8 @@ const incidentToApi = (inc: Incident) => ({
   description: inc.description,
   location: inc.location,
   date: inc.date,
+  date_reported: inc.dateReported || new Date().toISOString(),
+  department: inc.department,
   type: inc.type,
   category: inc.category,
   severity: inc.severity,
@@ -301,6 +329,18 @@ const incidentToApi = (inc: Incident) => ({
   body_part: inc.bodyPart,
   mechanism: inc.mechanism,
   immediate_action: inc.immediateAction,
+  shift: inc.shift,
+  weather_conditions: inc.weatherConditions,
+  task_being_performed: inc.taskBeingPerformed,
+  injured_persons: inc.injuredPersons,
+  witnesses: inc.witnesses,
+  ppe_worn: inc.ppeWorn,
+  ppe_adequate: inc.ppeAdequate,
+  environmental_impact: inc.environmentalImpact,
+  immediate_actions_taken: inc.immediateActionsTaken,
+  area_secured: inc.areaSecured,
+  emergency_services_notified: inc.emergencyServicesNotified,
+  regulatory_notification: inc.regulatoryNotification,
 });
 
 const actionToApi = (a: ActionItem) => ({

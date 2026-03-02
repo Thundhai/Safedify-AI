@@ -22,25 +22,59 @@ router.get('/incidents/:id', (req: AuthRequest, res: Response) => {
 });
 
 router.post('/incidents', (req: AuthRequest, res: Response) => {
-  const { description, location, date, type, category, severity, status, image, root_cause, corrective_actions, days_lost, body_part, mechanism, immediate_action } = req.body;
+  const b = req.body;
   const id = uuid();
   db.prepare(
-    `INSERT INTO incidents (id, description, location, date, type, category, severity, status, reported_by, image, root_cause, corrective_actions, days_lost, body_part, mechanism, immediate_action)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, description, location, date || new Date().toISOString(), type, category || 'Near Miss', severity, status || 'Open', req.user?.id, image, root_cause, corrective_actions, days_lost || 0, body_part, mechanism, immediate_action);
+    `INSERT INTO incidents (id, description, location, date, type, category, severity, status, reported_by, image,
+      root_cause, corrective_actions, days_lost, body_part, mechanism, immediate_action,
+      date_reported, department, shift, weather_conditions, task_being_performed,
+      injured_persons, witnesses, ppe_worn, ppe_adequate, environmental_impact,
+      immediate_actions_taken, area_secured, emergency_services_notified, regulatory_notification)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, b.description, b.location, b.date || new Date().toISOString(), b.type, b.category || 'Near Miss',
+    b.severity, b.status || 'Open', req.user?.id, b.image, b.root_cause, b.corrective_actions, b.days_lost || 0,
+    b.body_part, b.mechanism, b.immediate_action,
+    b.date_reported || new Date().toISOString(), b.department, b.shift, b.weather_conditions, b.task_being_performed,
+    b.injured_persons ? JSON.stringify(b.injured_persons) : null,
+    b.witnesses ? JSON.stringify(b.witnesses) : null,
+    b.ppe_worn ? JSON.stringify(b.ppe_worn) : null,
+    b.ppe_adequate != null ? (b.ppe_adequate ? 1 : 0) : null,
+    b.environmental_impact, b.immediate_actions_taken,
+    b.area_secured ? 1 : 0, b.emergency_services_notified ? 1 : 0, b.regulatory_notification ? 1 : 0);
   res.status(201).json({ id, message: 'Incident created' });
 });
 
 router.put('/incidents/:id', (req: AuthRequest, res: Response) => {
-  const { description, location, date, type, category, severity, status, root_cause, corrective_actions, days_lost, body_part, mechanism, immediate_action } = req.body;
-  db.prepare(
-    `UPDATE incidents SET description=COALESCE(?,description), location=COALESCE(?,location), date=COALESCE(?,date),
-     type=COALESCE(?,type), category=COALESCE(?,category), severity=COALESCE(?,severity), status=COALESCE(?,status),
-     root_cause=COALESCE(?,root_cause), corrective_actions=COALESCE(?,corrective_actions),
-     days_lost=COALESCE(?,days_lost), body_part=COALESCE(?,body_part), mechanism=COALESCE(?,mechanism),
-     immediate_action=COALESCE(?,immediate_action),
-     updated_at=datetime('now') WHERE id=?`
-  ).run(description, location, date, type, category, severity, status, root_cause, corrective_actions, days_lost, body_part, mechanism, immediate_action, req.params.id);
+  const b = req.body;
+  // Build dynamic SET clause for only provided fields
+  const fields: string[] = [];
+  const values: any[] = [];
+  const map: Record<string, any> = {
+    description: b.description, location: b.location, date: b.date,
+    type: b.type, category: b.category, severity: b.severity, status: b.status,
+    root_cause: b.root_cause, corrective_actions: b.corrective_actions,
+    days_lost: b.days_lost, body_part: b.body_part, mechanism: b.mechanism,
+    immediate_action: b.immediate_action, date_reported: b.date_reported,
+    department: b.department, shift: b.shift, weather_conditions: b.weather_conditions,
+    task_being_performed: b.task_being_performed,
+    environmental_impact: b.environmental_impact, immediate_actions_taken: b.immediate_actions_taken,
+  };
+  for (const [col, val] of Object.entries(map)) {
+    if (val !== undefined) { fields.push(`${col}=?`); values.push(val); }
+  }
+  // JSON fields
+  if (b.injured_persons !== undefined) { fields.push('injured_persons=?'); values.push(JSON.stringify(b.injured_persons)); }
+  if (b.witnesses !== undefined) { fields.push('witnesses=?'); values.push(JSON.stringify(b.witnesses)); }
+  if (b.ppe_worn !== undefined) { fields.push('ppe_worn=?'); values.push(JSON.stringify(b.ppe_worn)); }
+  // Boolean fields
+  if (b.ppe_adequate !== undefined) { fields.push('ppe_adequate=?'); values.push(b.ppe_adequate != null ? (b.ppe_adequate ? 1 : 0) : null); }
+  if (b.area_secured !== undefined) { fields.push('area_secured=?'); values.push(b.area_secured ? 1 : 0); }
+  if (b.emergency_services_notified !== undefined) { fields.push('emergency_services_notified=?'); values.push(b.emergency_services_notified ? 1 : 0); }
+  if (b.regulatory_notification !== undefined) { fields.push('regulatory_notification=?'); values.push(b.regulatory_notification ? 1 : 0); }
+
+  fields.push("updated_at=datetime('now')");
+  values.push(req.params.id);
+  db.prepare(`UPDATE incidents SET ${fields.join(', ')} WHERE id=?`).run(...values);
   res.json({ message: 'Updated' });
 });
 

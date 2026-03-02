@@ -8,7 +8,7 @@ import {
 import { getIncidentById, getActions, saveAction, updateIncident, updateAction } from '../services/storageService';
 import { analyzeRootCauseAI, generateSpeechAI, playGeneratedAudio } from '../services/geminiService';
 import { addToSyncQueue } from '../services/offlineService';
-import { Incident, ActionItem, IncidentSeverity } from '../types';
+import { Incident, ActionItem, IncidentSeverity, InjuredPerson, IncidentWitness } from '../types';
 
 export const IncidentDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -315,10 +315,14 @@ export const IncidentDetail: React.FC = () => {
         {/* OVERVIEW TAB */}
         {activeTab === 'overview' && (
           <div className="space-y-6 animate-in fade-in">
+            {/* Description + Core Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="text-sm font-semibold text-slate-500 uppercase mb-2">Description</h3>
                 <p className="text-slate-800 text-lg leading-relaxed">{incident.description}</p>
+                {incident.taskBeingPerformed && (
+                  <div className="mt-3 text-sm"><span className="font-semibold text-slate-600">Task being performed: </span><span className="text-slate-700">{incident.taskBeingPerformed}</span></div>
+                )}
               </div>
               <div className="bg-slate-50 p-4 rounded-lg space-y-3 border border-slate-100">
                 <div className="flex items-center gap-3">
@@ -331,8 +335,8 @@ export const IncidentDetail: React.FC = () => {
                 <div className="flex items-center gap-3">
                   <AlertTriangle size={18} className="text-slate-400" />
                   <div>
-                    <span className="block text-xs text-slate-500">Type & Severity</span>
-                    <span className="font-medium text-slate-800">{incident.type} • {incident.severity}</span>
+                    <span className="block text-xs text-slate-500">Category / Type / Severity</span>
+                    <span className="font-medium text-slate-800">{incident.category && `${incident.category} • `}{incident.type} • {incident.severity}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -342,12 +346,128 @@ export const IncidentDetail: React.FC = () => {
                     <span className="font-medium text-slate-800">{incident.reporter}</span>
                   </div>
                 </div>
+                {incident.department && (
+                  <div className="flex items-center gap-3">
+                    <ClipboardList size={18} className="text-slate-400" />
+                    <div>
+                      <span className="block text-xs text-slate-500">Department</span>
+                      <span className="font-medium text-slate-800">{incident.department}</span>
+                    </div>
+                  </div>
+                )}
+                {incident.shift && (
+                  <div className="flex items-center gap-3">
+                    <Calendar size={18} className="text-slate-400" />
+                    <div>
+                      <span className="block text-xs text-slate-500">Shift</span>
+                      <span className="font-medium text-slate-800">{incident.shift}</span>
+                    </div>
+                  </div>
+                )}
+                {incident.weatherConditions && (
+                  <div className="flex items-center gap-3">
+                    <Calendar size={18} className="text-slate-400" />
+                    <div>
+                      <span className="block text-xs text-slate-500">Weather / Conditions</span>
+                      <span className="font-medium text-slate-800">{incident.weatherConditions}</span>
+                    </div>
+                  </div>
+                )}
+                {incident.dateReported && (
+                  <div className="flex items-center gap-3">
+                    <Calendar size={18} className="text-slate-400" />
+                    <div>
+                      <span className="block text-xs text-slate-500">Date Reported</span>
+                      <span className="font-medium text-slate-800">{new Date(incident.dateReported).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {incident.images.length > 0 && (
+            {/* PPE Section */}
+            {incident.ppeWorn && incident.ppeWorn.length > 0 && (
               <div>
-                <h3 className="text-sm font-semibold text-slate-500 uppercase mb-3">Evidence</h3>
+                <h3 className="text-sm font-semibold text-slate-500 uppercase mb-2">PPE Worn at Time of Incident</h3>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {incident.ppeWorn.map((item, i) => (
+                    <span key={i} className="bg-blue-50 text-blue-700 border border-blue-200 text-xs px-3 py-1 rounded-full font-medium">{item}</span>
+                  ))}
+                </div>
+                {incident.ppeAdequate !== undefined && incident.ppeAdequate !== null && (
+                  <p className="text-sm text-slate-600">PPE adequate: <span className={`font-bold ${incident.ppeAdequate ? 'text-green-700' : 'text-red-700'}`}>{incident.ppeAdequate ? 'Yes' : 'No'}</span></p>
+                )}
+              </div>
+            )}
+
+            {/* Injured Persons */}
+            {incident.injuredPersons && incident.injuredPersons.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-slate-500 uppercase mb-3">Injured / Affected Persons ({incident.injuredPersons.length})</h3>
+                <div className="space-y-3">
+                  {incident.injuredPersons.map((p: InjuredPerson, i: number) => (
+                    <div key={i} className="bg-red-50 border border-red-100 rounded-lg p-4">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                        <div><span className="text-xs text-slate-500 block">Name</span><span className="font-medium text-slate-800">{p.name || '—'}</span></div>
+                        <div><span className="text-xs text-slate-500 block">Employment</span><span className="font-medium text-slate-800">{p.employmentType || '—'}</span></div>
+                        <div><span className="text-xs text-slate-500 block">Job Title</span><span className="font-medium text-slate-800">{p.jobTitle || '—'}</span></div>
+                        <div><span className="text-xs text-slate-500 block">Department</span><span className="font-medium text-slate-800">{p.department || '—'}</span></div>
+                        <div><span className="text-xs text-slate-500 block">Experience</span><span className="font-medium text-slate-800">{p.yearsExperience || 0} yrs</span></div>
+                        <div><span className="text-xs text-slate-500 block">Injury</span><span className="font-medium text-red-700">{p.natureOfInjury || '—'}</span></div>
+                        <div><span className="text-xs text-slate-500 block">Body Part</span><span className="font-medium text-slate-800">{p.bodyPart || '—'}</span></div>
+                        <div><span className="text-xs text-slate-500 block">Days Lost</span><span className="font-medium text-slate-800">{p.daysLost || 0}</span></div>
+                        {p.treatmentProvided && <div className="col-span-2"><span className="text-xs text-slate-500 block">Treatment</span><span className="font-medium text-slate-800">{p.treatmentProvided}</span></div>}
+                        {p.hospitalName && <div className="col-span-2"><span className="text-xs text-slate-500 block">Hospital</span><span className="font-medium text-slate-800">{p.hospitalName}</span></div>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Witnesses */}
+            {incident.witnesses && incident.witnesses.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-slate-500 uppercase mb-3">Witnesses ({incident.witnesses.length})</h3>
+                <div className="space-y-3">
+                  {incident.witnesses.map((w: IncidentWitness, i: number) => (
+                    <div key={i} className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm">
+                      <div className="flex gap-4 mb-1">
+                        <div><span className="text-xs text-slate-500">Name: </span><span className="font-medium text-slate-800">{w.name}</span></div>
+                        {w.contactInfo && <div><span className="text-xs text-slate-500">Contact: </span><span className="font-medium text-slate-800">{w.contactInfo}</span></div>}
+                      </div>
+                      {w.statement && <p className="text-slate-700 italic mt-1 border-l-2 border-slate-300 pl-3">"{w.statement}"</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Environmental Impact */}
+            {incident.environmentalImpact && (
+              <div>
+                <h3 className="text-sm font-semibold text-slate-500 uppercase mb-2">Environmental Impact</h3>
+                <p className="text-slate-700 bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">{incident.environmentalImpact}</p>
+              </div>
+            )}
+
+            {/* Immediate Response */}
+            {(incident.immediateActionsTaken || incident.areaSecured || incident.emergencyServicesNotified || incident.regulatoryNotification) && (
+              <div>
+                <h3 className="text-sm font-semibold text-slate-500 uppercase mb-2">Immediate Response</h3>
+                {incident.immediateActionsTaken && <p className="text-slate-700 text-sm mb-3">{incident.immediateActionsTaken}</p>}
+                <div className="flex flex-wrap gap-3">
+                  {incident.areaSecured && <span className="bg-green-50 text-green-700 border border-green-200 text-xs px-3 py-1 rounded-full font-medium">✓ Area Secured</span>}
+                  {incident.emergencyServicesNotified && <span className="bg-red-50 text-red-700 border border-red-200 text-xs px-3 py-1 rounded-full font-medium">✓ Emergency Services Notified</span>}
+                  {incident.regulatoryNotification && <span className="bg-orange-50 text-orange-700 border border-orange-200 text-xs px-3 py-1 rounded-full font-medium">✓ Regulatory Body Notified</span>}
+                </div>
+              </div>
+            )}
+
+            {/* Evidence Photos */}
+            {incident.images && incident.images.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-slate-500 uppercase mb-3">Photo Evidence</h3>
                 <div className="flex gap-4 overflow-x-auto pb-2">
                   {incident.images.map((img, i) => (
                     <img key={i} src={img} alt="Evidence" className="h-32 w-auto rounded-lg border border-slate-200 shadow-sm" />
@@ -356,6 +476,7 @@ export const IncidentDetail: React.FC = () => {
               </div>
             )}
 
+            {/* AI Classification */}
             {incident.aiClassification && (
               <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
                 <div className="flex items-start gap-3">

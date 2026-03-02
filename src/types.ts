@@ -76,11 +76,23 @@ export enum IncidentType {
 // OSHA Incident Classification (pyramid hierarchy)
 export enum IncidentCategory {
   NEAR_MISS = 'Near Miss',
+  UNSAFE_ACT = 'Unsafe Act',
+  UNSAFE_CONDITION = 'Unsafe Condition',
   FIRST_AID_CASE = 'First Aid Case',
   MEDICAL_TREATMENT_CASE = 'Medical Treatment Case',
   RESTRICTED_WORK_CASE = 'Restricted Work Case',
   LOST_TIME_INJURY = 'Lost Time Injury',
-  FATALITY = 'Fatality'
+  FATALITY = 'Fatality',
+  ENVIRONMENTAL_SPILL = 'Environmental Spill',
+  ENVIRONMENTAL_EMISSION = 'Environmental Emission',
+  ENVIRONMENTAL_WASTE = 'Environmental Waste Incident',
+  PROPERTY_DAMAGE = 'Property Damage',
+  FIRE_EXPLOSION = 'Fire / Explosion',
+  VEHICLE_INCIDENT = 'Vehicle Incident',
+  SECURITY_BREACH = 'Security Breach',
+  OCCUPATIONAL_ILLNESS = 'Occupational Illness',
+  THIRD_PARTY_INJURY = 'Third Party Injury',
+  DANGEROUS_OCCURRENCE = 'Dangerous Occurrence'
 }
 
 // Whether an incident is recordable under OSHA
@@ -89,9 +101,82 @@ export const isRecordable = (category: IncidentCategory): boolean => {
     IncidentCategory.MEDICAL_TREATMENT_CASE,
     IncidentCategory.RESTRICTED_WORK_CASE,
     IncidentCategory.LOST_TIME_INJURY,
-    IncidentCategory.FATALITY
+    IncidentCategory.FATALITY,
+    IncidentCategory.OCCUPATIONAL_ILLNESS,
+    IncidentCategory.DANGEROUS_OCCURRENCE,
   ].includes(category);
 };
+
+// Nature of injury / illness
+export const NATURE_OF_INJURY_OPTIONS = [
+  'Laceration / Cut', 'Contusion / Bruise', 'Fracture', 'Sprain / Strain',
+  'Burn (Thermal)', 'Burn (Chemical)', 'Amputation', 'Dislocation',
+  'Concussion', 'Puncture Wound', 'Abrasion / Scrape', 'Electric Shock',
+  'Hearing Loss', 'Respiratory Irritation', 'Asphyxiation', 'Poisoning',
+  'Heat Stroke / Exhaustion', 'Cold Exposure / Frostbite', 'Dermatitis',
+  'Foreign Body (Eye)', 'Internal Injury', 'Multiple Injuries',
+  'Psychological / Stress', 'No Injury (Near Miss)', 'Other'
+];
+
+// Mechanism / how the injury occurred
+export const MECHANISM_OPTIONS = [
+  'Struck By (Object)', 'Struck Against', 'Fall from Height',
+  'Fall on Same Level (Slip/Trip)', 'Caught In / Between',
+  'Contact with (Hot Surface)', 'Contact with (Chemical)',
+  'Contact with (Electricity)', 'Overexertion / Repetitive Motion',
+  'Exposure to Harmful Substance', 'Exposure to Noise',
+  'Exposure to Radiation', 'Motor Vehicle Collision',
+  'Collapse / Cave-In', 'Explosion', 'Fire',
+  'Drowning', 'Animal / Insect', 'Assault / Violence',
+  'Equipment Malfunction', 'Falling Object', 'Manual Handling',
+  'Confined Space', 'Other'
+];
+
+// Body part affected
+export const BODY_PART_OPTIONS = [
+  'Head', 'Face', 'Eye (Left)', 'Eye (Right)', 'Ear (Left)', 'Ear (Right)',
+  'Neck', 'Shoulder (Left)', 'Shoulder (Right)', 'Upper Arm (Left)', 'Upper Arm (Right)',
+  'Elbow (Left)', 'Elbow (Right)', 'Forearm (Left)', 'Forearm (Right)',
+  'Wrist (Left)', 'Wrist (Right)', 'Hand (Left)', 'Hand (Right)',
+  'Finger(s) (Left)', 'Finger(s) (Right)', 'Chest', 'Abdomen',
+  'Upper Back', 'Lower Back', 'Hip (Left)', 'Hip (Right)',
+  'Thigh (Left)', 'Thigh (Right)', 'Knee (Left)', 'Knee (Right)',
+  'Lower Leg (Left)', 'Lower Leg (Right)', 'Ankle (Left)', 'Ankle (Right)',
+  'Foot (Left)', 'Foot (Right)', 'Toe(s) (Left)', 'Toe(s) (Right)',
+  'Internal Organs', 'Respiratory System', 'Whole Body / Multiple', 'Not Applicable'
+];
+
+// PPE worn at time of incident
+export const PPE_OPTIONS = [
+  'Hard Hat / Helmet', 'Safety Glasses / Goggles', 'Face Shield',
+  'Hearing Protection', 'Dust Mask / Respirator', 'SCBA',
+  'High-Visibility Vest', 'Safety Gloves', 'Chemical Gloves',
+  'Safety Boots / Shoes', 'Fall Harness', 'Welding Shield',
+  'Fire Retardant Clothing', 'Coveralls / Overalls',
+  'Life Jacket / PFD', 'None', 'Not Applicable'
+];
+
+// Departments
+export const DEPARTMENT_OPTIONS = [
+  'Operations', 'Maintenance', 'Engineering', 'Construction',
+  'Logistics / Warehouse', 'Administration', 'HSE',
+  'Quality Control', 'Electrical', 'Mechanical',
+  'Civil', 'Drilling', 'Production', 'Transport',
+  'Catering / Camp', 'Marine', 'IT', 'Other'
+];
+
+// Shift options
+export const SHIFT_OPTIONS = ['Day Shift', 'Night Shift', 'Rotational', 'On-Call', 'Overtime', 'Not Applicable'];
+
+// Weather conditions
+export const WEATHER_OPTIONS = [
+  'Clear / Sunny', 'Cloudy / Overcast', 'Rain', 'Heavy Rain / Storm',
+  'Wind (Strong)', 'Fog / Low Visibility', 'Snow / Ice', 'Extreme Heat',
+  'Extreme Cold', 'Dust Storm', 'Indoor (N/A)', 'Not Relevant'
+];
+
+// Employment type of injured person
+export const EMPLOYMENT_TYPE_OPTIONS = ['Employee', 'Contractor', 'Sub-Contractor', 'Visitor', 'Third Party / Public'];
 
 export interface FishboneCategories {
   man: string;
@@ -111,21 +196,68 @@ export interface Investigation {
   completedAt: string;
 }
 
+// Witness information
+export interface IncidentWitness {
+  name: string;
+  contactInfo: string;
+  statement?: string;
+}
+
+// Injured person details
+export interface InjuredPerson {
+  name: string;
+  employmentType: string; // Employee, Contractor, Visitor, etc.
+  jobTitle: string;
+  department: string;
+  yearsExperience: number;
+  natureOfInjury: string;
+  bodyPart: string;
+  treatmentProvided: string;
+  hospitalName?: string;
+  daysLost: number;
+}
+
 export interface Incident {
   id: string;
   description: string;
-  date: string;
+  date: string;            // Date & time of incident
+  dateReported: string;    // Date the report was filed
   location: string;
+  department: string;      // Department where it occurred
   type: IncidentType;
   category: IncidentCategory;
   severity: IncidentSeverity;
   status: 'Open' | 'Investigating' | 'Closed';
   images: string[];
   reporter: string;
-  daysLost?: number;         // For LTI tracking
-  bodyPart?: string;         // Affected body part
-  mechanism?: string;        // How injury occurred (e.g., Struck by, Fall from height)
-  immediateAction?: string;  // What was done immediately
+
+  // Incident context
+  shift: string;
+  weatherConditions: string;
+  taskBeingPerformed: string;    // What work was happening
+
+  // People involved
+  injuredPersons: InjuredPerson[];
+  witnesses: IncidentWitness[];
+
+  // Legacy single-person fields (backwards compat)
+  daysLost?: number;
+  bodyPart?: string;
+  mechanism?: string;
+  immediateAction?: string;
+
+  // PPE & Environmental
+  ppeWorn: string[];             // PPE items the affected person(s) wore
+  ppeAdequate: boolean | null;   // Was PPE appropriate for the task?
+  environmentalImpact: string;   // Spill, emission, etc.
+
+  // Immediate response
+  immediateActionsTaken: string; // Narrative of what was done immediately
+  areaSecured: boolean;
+  emergencyServicesNotified: boolean;
+  regulatoryNotification: boolean;
+
+  // AI classification
   aiClassification?: {
     confidence: number;
     reasoning: string;
