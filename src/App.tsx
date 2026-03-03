@@ -42,6 +42,7 @@ import { RegulatoryNews } from './components/RegulatoryNews';
 import { PricingPlans } from './components/PricingPlans';
 import { RoleManagement } from './components/RoleManagement';
 import { ProfileSettings } from './components/ProfileSettings';
+import { EnvironmentalLogPage } from './components/EnvironmentalLogPage';
 
 // Services & Types
 import { getActions, getIncidents, saveAction } from './services/storageService';
@@ -401,6 +402,7 @@ function App() {
               <Route path="incidents" element={<IncidentList />} />
               <Route path="incidents/new" element={<IncidentReport />} />
               <Route path="incidents/:id" element={<IncidentDetail />} />
+              <Route path="environmental-log" element={<EnvironmentalLogPage />} />
               <Route path="emergency" element={<EmergencyDashboard />} />
               <Route path="permits" element={<PermitList />} />
               <Route path="permits/:id" element={<PermitForm />} />

@@ -391,15 +391,29 @@ export const stopSpeech = () => {
  */
 export const analyzeWeatherRisksAI = async (weatherData: EnvironmentalData) => {
   try {
-    const prompt = `Analyze weather conditions for construction safety risks:
-Temperature: ${weatherData.temperature}Ãƒâ€šÃ‚Â°C
-Humidity: ${weatherData.humidity}%
-Wind Speed: ${weatherData.windSpeed} km/h
-Weather Condition: ${weatherData.condition}
-Air Quality: ${weatherData.humidity > 70 ? 'Moderate' : 'Good'}
-Noise Level: ${weatherData.noiseLevel} dB
+    const prompt = `Analyze the following environmental conditions for construction site safety risks. Consider ALL readings together and provide practical, specific safety recommendations.
 
-Provide safety recommendations and risk assessment.`;
+CURRENT CONDITIONS:
+- Temperature: ${weatherData.temperature}°C (feels like ${weatherData.feelsLike}°C)
+- Humidity: ${weatherData.humidity}%
+- Wind Speed: ${weatherData.windSpeed} km/h from ${weatherData.windDirection}
+- Weather: ${weatherData.condition}
+- Air Quality Index: ${weatherData.aqi}
+- Noise Level: ${weatherData.noiseLevel} dB
+- UV Index: ${weatherData.uvIndex}
+- Visibility: ${weatherData.visibility} km
+- Barometric Pressure: ${weatherData.pressure} hPa
+- Precipitation Probability: ${weatherData.precipitation}%
+
+SAFETY THRESHOLDS (for reference):
+- Temperature >35°C: Heat stress risk. >40°C: Halt outdoor work
+- Wind >25 km/h: Restrict elevated work. >40 km/h: Suspend crane operations
+- AQI >100: Respiratory protection needed. >150: Limit outdoor exposure
+- Noise >85 dB: Hearing protection mandatory
+- UV >7: Sun protection, hydration breaks required
+- Visibility <1 km: Restrict vehicle movement
+
+Provide actionable safety recommendations that a site HSE officer can immediately implement.`;
 
     const response = await aiGenerate({
       model: MODEL_NAME,
@@ -411,13 +425,12 @@ Provide safety recommendations and risk assessment.`;
           type: Type.OBJECT,
           properties: {
             riskLevel: { type: Type.STRING, enum: ["Low", "Medium", "High", "Critical"] },
-            riskScore: { type: Type.INTEGER },
-            risks: { type: Type.ARRAY, items: { type: Type.STRING } },
+            summary: { type: Type.STRING },
             recommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+            affectedActivities: { type: Type.ARRAY, items: { type: Type.STRING } },
             workStoppageRequired: { type: Type.BOOLEAN },
-            reasoning: { type: Type.STRING }
           },
-          required: ["riskLevel", "riskScore", "risks", "recommendations", "workStoppageRequired", "reasoning"]
+          required: ["riskLevel", "summary", "recommendations", "affectedActivities", "workStoppageRequired"]
         }
       }
     });
@@ -426,11 +439,10 @@ Provide safety recommendations and risk assessment.`;
     console.error("Weather Risk Analysis Error:", error);
     return {
       riskLevel: "Medium",
-      riskScore: 50,
-      risks: ["Unable to analyze current conditions"],
-      recommendations: ["Monitor weather conditions regularly"],
+      summary: "Unable to perform full analysis — using fallback assessment.",
+      recommendations: ["Monitor weather conditions regularly", "Ensure PPE compliance remains enforced"],
+      affectedActivities: ["General Operations"],
       workStoppageRequired: false,
-      reasoning: "Analysis service temporarily unavailable"
     };
   }
 };

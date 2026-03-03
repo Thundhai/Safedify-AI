@@ -6,7 +6,7 @@ import {
   ShieldCheck, BrainCircuit, WifiOff, FileSignature, 
   ArrowRight, CheckCircle2, BarChart2, Smartphone, 
   Users, Globe, Zap, Menu, X, Building2, HardHat, Factory,
-  Check, Crown, Sparkles, Star, Quote, FileText, Lock, Shield
+  Check, Crown, Sparkles, FileText, Lock, Shield
 } from 'lucide-react';
 import { PricingPlans } from './PricingPlans';
 
@@ -334,41 +334,6 @@ export const LandingPage: React.FC = () => {
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="py-24 bg-white border-t border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-16">
-                <h2 className="text-3xl font-bold text-slate-900 mb-2">Trusted by Safety Leaders</h2>
-                <p className="text-slate-600">See how organizations are transforming their safety culture.</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {[
-                    { quote: "Safedify transformed our reporting culture. Incidents dropped by 40% in just 6 months.", author: "James Chen", role: "HSE Director, Construction" },
-                    { quote: "The offline mode is a lifesaver for our remote mining sites. Syncs perfectly when back at camp.", author: "Sarah Miller", role: "Site Manager, Mining Corp" },
-                    { quote: "Finally, an app that our workers actually want to use. The AI features are a game changer.", author: "David Okonjo", role: "Safety Officer, Energy" }
-                ].map((t, i) => (
-                    <div key={i} className="bg-slate-50 p-8 rounded-2xl border border-slate-100 relative shadow-sm">
-                        <Quote size={40} className="text-blue-100 absolute top-6 right-6" />
-                        <div className="flex gap-1 mb-4 text-yellow-400">
-                            {[1,2,3,4,5].map(s => <Star key={s} size={16} fill="currentColor" />)}
-                        </div>
-                        <p className="text-slate-700 italic mb-6 leading-relaxed">"{t.quote}"</p>
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center font-bold text-slate-500">
-                                {t.author.charAt(0)}
-                            </div>
-                            <div>
-                                <p className="font-bold text-slate-900 text-sm">{t.author}</p>
-                                <p className="text-xs text-slate-500 uppercase font-bold">{t.role}</p>
-                            </div>
-                        </div>
-                    </div>
-                ))}
             </div>
         </div>
       </section>

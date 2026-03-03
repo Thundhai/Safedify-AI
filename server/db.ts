@@ -320,6 +320,31 @@ db.exec(`
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS environmental_readings (
+    id TEXT PRIMARY KEY,
+    reading_type TEXT NOT NULL,
+    value REAL NOT NULL,
+    unit TEXT NOT NULL,
+    location TEXT NOT NULL DEFAULT 'Site Zone A',
+    zone TEXT,
+    source TEXT NOT NULL DEFAULT 'manual',
+    recorded_by TEXT,
+    notes TEXT,
+    latitude REAL,
+    longitude REAL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (recorded_by) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS site_locations (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    latitude REAL,
+    longitude REAL,
+    is_default INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
 `);
 
 // ---------- MIGRATIONS (add new columns to existing tables) ----------

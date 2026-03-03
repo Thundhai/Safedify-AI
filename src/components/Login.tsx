@@ -102,11 +102,7 @@ export const Login: React.FC = () => {
                 {isSubmitting ? <Loader2 className="animate-spin" /> : 'Sign In'}
             </button>
 
-            <div className="text-center">
-                <p className="text-xs text-slate-400 mt-4">
-                    Demo Credentials: admin@safedify.com / password
-                </p>
-            </div>
+
             </form>
         </div>
 

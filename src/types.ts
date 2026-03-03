@@ -708,16 +708,24 @@ export interface EnvironmentalData {
   temperature: number; // Celsius
   condition: string; // Sunny, Rainy, Windy, etc.
   windSpeed: number; // km/h
+  windDirection: string; // N, NE, E, SE, S, SW, W, NW
   humidity: number; // %
   aqi: number; // Air Quality Index (0-500)
   noiseLevel: number; // Decibels (dB)
   location: string;
+  uvIndex: number; // 0-11+
+  visibility: number; // km
+  pressure: number; // hPa
+  feelsLike: number; // Heat index / Wind chill in Celsius
+  precipitation: number; // mm probability %
+  updatedAt: string; // ISO timestamp
 }
 
 export interface WeatherRiskAnalysis {
   recommendations: string[];
   riskLevel: 'Low' | 'Medium' | 'High' | 'Critical';
   affectedActivities: string[]; // List of Permit Types or Tasks affected
+  summary?: string; // One-line AI summary of conditions
 }
 
 // --- Notifications ---

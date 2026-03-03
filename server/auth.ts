@@ -53,9 +53,13 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   }
 };
 
-// ---------- Seed default admin ----------
+// ---------- Seed default admin (only when SEED_DEMO_USERS=true) ----------
 
 export const seedDefaultUsers = async () => {
+  if (process.env.SEED_DEMO_USERS !== 'true') {
+    // Skip seeding demo users in production — set SEED_DEMO_USERS=true in .env to enable
+    return;
+  }
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get('admin@safedify.com');
   if (!existing) {
     const hash = await hashPassword('password');
@@ -72,6 +76,6 @@ export const seedDefaultUsers = async () => {
     for (const u of users) {
       insert.run(u.id, u.name, u.email, hash, u.role, u.tier, u.avatar);
     }
-    console.log('[Auth] Seeded default users');
+    console.log('[Auth] Seeded demo users (SEED_DEMO_USERS=true)');
   }
 };

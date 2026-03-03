@@ -208,3 +208,43 @@ export const apiGetUnreadCount = () => apiFetch('/notifications/unread');
 export const apiMarkNotificationRead = (id: string) => apiFetch(`/notifications/${id}/read`, { method: 'PUT' });
 export const apiMarkAllNotificationsRead = () => apiFetch('/notifications/read-all', { method: 'PUT' });
 export const apiDeleteNotification = (id: string) => apiFetch(`/notifications/${id}`, { method: 'DELETE' });
+
+// ---------- Environmental API ----------
+
+export const apiGetWeather = (lat?: number, lng?: number) => {
+  const params = new URLSearchParams();
+  if (lat != null) params.set('lat', String(lat));
+  if (lng != null) params.set('lng', String(lng));
+  const qs = params.toString();
+  return apiFetch(`/environmental/weather${qs ? `?${qs}` : ''}`);
+};
+
+export const apiRefreshWeatherCache = () => apiFetch('/environmental/weather/refresh', { method: 'POST' });
+
+export const apiGetEnvironmentalReadings = (type?: string, limit?: number) => {
+  const params = new URLSearchParams();
+  if (type) params.set('type', type);
+  if (limit) params.set('limit', String(limit));
+  const qs = params.toString();
+  return apiFetch(`/environmental/readings${qs ? `?${qs}` : ''}`);
+};
+
+export const apiGetLatestReadings = () => apiFetch('/environmental/readings/latest');
+
+export const apiGetReadingHistory = (type: string, hours = 24) =>
+  apiFetch(`/environmental/readings/history?type=${type}&hours=${hours}`);
+
+export const apiLogEnvironmentalReading = (data: {
+  reading_type: string;
+  value: number;
+  unit?: string;
+  location?: string;
+  zone?: string;
+  source?: string;
+  notes?: string;
+}) => apiFetch('/environmental/readings', { method: 'POST', body: JSON.stringify(data) });
+
+export const apiGetSiteLocations = () => apiFetch('/environmental/locations');
+
+export const apiCreateSiteLocation = (data: { name: string; latitude?: number; longitude?: number; is_default?: boolean }) =>
+  apiFetch('/environmental/locations', { method: 'POST', body: JSON.stringify(data) });

@@ -38,7 +38,8 @@ import {
   Plus,
   Download,
   Globe,
-  Users
+  Users,
+  Leaf
 } from 'lucide-react';
 import { getSyncQueue, processSyncQueue } from '../services/offlineService';
 import { AIChatAssistant } from './AIChatAssistant';
@@ -167,6 +168,7 @@ export const Layout: React.FC = () => {
       items: [
         { to: '/incidents', icon: AlertTriangle, label: 'Incidents' },
         { to: '/observations', icon: Eye, label: 'Observations / STOP' },
+        { to: '/environmental-log', icon: Leaf, label: 'Environmental Log' },
         { to: '/smart-camera', icon: Camera, label: 'AI Safety Monitor' },
         { to: '/emergency', icon: Siren, label: 'Emergency' },
       ]

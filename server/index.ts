@@ -20,6 +20,7 @@ import dataRoutes from './routes/dataRoutes.js';
 import agentRoutes from './routes/agentRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import environmentalRoutes from './routes/environmentalRoutes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -102,6 +103,7 @@ app.use('/api', apiLimiter, dataRoutes);
 app.use('/api/agent', apiLimiter, agentRoutes);
 app.use('/api/ai', apiLimiter, aiRoutes);
 app.use('/api/notifications', apiLimiter, notificationRoutes);
+app.use('/api/environmental', apiLimiter, environmentalRoutes);
 
 // ---------- SPA Fallback (Production) ----------
 if (isProduction) {

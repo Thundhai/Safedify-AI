@@ -91,13 +91,23 @@ export const Dashboard: React.FC = () => {
           value: severityCounts[key]
         }));
 
-        // Mock Monthly Trends
-        const monthlyData = [
-          { name: 'Jan', incidents: 4 },
-          { name: 'Feb', incidents: 2 },
-          { name: 'Mar', incidents: 5 },
-          { name: 'Apr', incidents: incidents.length }
-        ];
+        // Monthly Trends — aggregate real incident data by month
+        const monthMap = new Map<string, number>();
+        const now = new Date();
+        for (let i = 5; i >= 0; i--) {
+          const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const key = d.toLocaleString('default', { month: 'short' });
+          monthMap.set(key, 0);
+        }
+        incidents.forEach(inc => {
+          const d = new Date(inc.date);
+          const key = d.toLocaleString('default', { month: 'short' });
+          if (monthMap.has(key)) monthMap.set(key, (monthMap.get(key) || 0) + 1);
+        });
+        const monthlyData = Array.from(monthMap.entries()).map(([name, count]) => ({
+          name,
+          incidents: count
+        }));
 
         setStats({
           totalIncidents: incidents.length,
@@ -508,12 +518,12 @@ export const Dashboard: React.FC = () => {
             </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Environmental Card */}
+        <div className="space-y-6">
+            {/* Environmental Intelligence Card (full width with integrated AI Advisory) */}
             <EnvironmentalCard />
 
             {/* Predictive Risk Forecast */}
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-xl shadow-md border border-slate-700 relative overflow-hidden flex flex-col h-full min-h-[300px]">
+            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-xl shadow-md border border-slate-700 relative overflow-hidden flex flex-col min-h-[300px]">
                 {/* Overlay for Free Users */}
                 {user?.tier === SubscriptionTier.FREE && (
                     <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-6 text-center">
