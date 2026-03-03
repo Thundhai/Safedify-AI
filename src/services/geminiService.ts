@@ -1,21 +1,25 @@
-import { GoogleGenAI, Type } from "@google/genai";
 import { 
   IncidentType, IncidentSeverity, IncidentCategory, Incident, ActionItem, 
   Observation, PPEItem, Contractor, HSEMetrics, EnvironmentalData 
 } from "../types";
+import { getAuthToken } from './apiService';
 
 /**
- * CONFIGURATION
- * Vercel uses VITE_ prefix for client-side environment variables.
+ * AI PROXY Ã¢â‚¬â€ All Gemini calls are routed through the backend server
+ * to keep the API key secure (never exposed in the browser bundle).
+ *
+ * The Type constants mirror @google/genai's Type enum values.
  */
-const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
+const Type = {
+  OBJECT: 'OBJECT' as const,
+  STRING: 'STRING' as const,
+  NUMBER: 'NUMBER' as const,
+  INTEGER: 'INTEGER' as const,
+  BOOLEAN: 'BOOLEAN' as const,
+  ARRAY: 'ARRAY' as const,
+};
 
-// Check if API key is configured
-if (!apiKey) {
-  console.warn('VITE_GEMINI_API_KEY environment variable is not set. AI features will be disabled.');
-}
-
-const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+const API_BASE = (import.meta as any).env.VITE_API_URL || '/api';
 const MODEL_NAME = "gemini-2.5-flash";
 
 /**
@@ -24,27 +28,43 @@ const MODEL_NAME = "gemini-2.5-flash";
 const NO_THINK = { thinkingConfig: { thinkingBudget: 0 } } as any;
 
 /**
- * Helper: Check if AI is available and create a safe wrapper for AI calls
+ * Proxy wrapper for ai.models.generateContent Ã¢â‚¬â€ calls the backend /api/ai/generate
  */
-const checkAIAvailable = () => {
-  if (!ai) {
-    console.warn('AI service not available. VITE_GEMINI_API_KEY environment variable not set.');
-    return false;
+const aiGenerate = async (params: { model?: string; contents: any; config?: any }): Promise<{ text: string }> => {
+  const token = getAuthToken();
+  const res = await fetch(`${API_BASE}/ai/generate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || `AI call failed: ${res.status}`);
   }
-  return true;
+  return res.json();
 };
 
 /**
- * Safe wrapper for AI model calls
+ * Proxy wrapper for ai.chats Ã¢â‚¬â€ calls the backend /api/ai/chat
  */
-const safeAICall = async (callFn: () => Promise<any>, fallback: any = {}) => {
-  try {
-    checkAIAvailable();
-    return await callFn();
-  } catch (error) {
-    console.error('AI service error:', error);
-    throw error;
+const aiChat = async (params: { model?: string; history: any[]; config?: any; message: any }): Promise<{ text: string }> => {
+  const token = getAuthToken();
+  const res = await fetch(`${API_BASE}/ai/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || `AI chat failed: ${res.status}`);
   }
+  return res.json();
 };
 
 /**
@@ -57,20 +77,8 @@ const cleanBase64 = (base64: string) => base64.replace(/^data:image\/(png|jpeg|j
  */
 export const classifyIncidentAI = async (description: string) => {
   try {
-    if (!checkAIAvailable()) {
-      // Return safe fallback when AI is not available
-      return {
-        type: 'Safety',
-        severity: 'Medium',
-        category: 'Near Miss',
-        confidence: 50,
-        reasoning: 'AI analysis unavailable - manual review required',
-        causes: ['Service temporarily unavailable'],
-        contributingFactors: ['AI service not configured']
-      };
-    }
     const prompt = `Analyze this HSE incident: "${description}". Classify by type and OSHA category (Near Miss, First Aid Case, Medical Treatment Case, Restricted Work Case, Lost Time Injury, Fatality). Perform causal analysis.`;
-    const response = await ai!.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -112,7 +120,7 @@ export const classifyIncidentAI = async (description: string) => {
  */
 export const getCorrectiveActionsAI = async (description: string, type: string, severity: string) => {
   try {
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: `Suggest 3 actions for: "${description}" (Type: ${type}, Severity: ${severity})`,
       config: {
@@ -141,7 +149,7 @@ export const analyzeRootCauseAI = async (description: string, type: string, meth
       ? `Perform a 5-Why analysis for: ${description}`
       : `Perform a Fishbone analysis (Man, Machine, Method, Material, Environment) for: ${description}`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -177,7 +185,7 @@ export const analyzeRootCauseAI = async (description: string, type: string, meth
  */
 export const detectPPEAI = async (base64Image: string) => {
   try {
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: [
         { inlineData: { mimeType: "image/jpeg", data: cleanBase64(base64Image) } },
@@ -210,7 +218,7 @@ export const detectPPEAI = async (base64Image: string) => {
  */
 export const extractDocumentDataAI = async (base64Image: string) => {
   try {
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: [
         { inlineData: { mimeType: "image/jpeg", data: cleanBase64(base64Image) } },
@@ -242,7 +250,7 @@ export const extractDocumentDataAI = async (base64Image: string) => {
  */
 export const detectSiteHazardsAI = async (base64Image: string) => {
   try {
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: [
         { inlineData: { mimeType: "image/jpeg", data: cleanBase64(base64Image) } },
@@ -286,21 +294,20 @@ export const chatSafetyAssistant = async (
     systemContext: string = ''
 ) => {
     try {
-        const chat = ai.chats.create({
-            model: MODEL_NAME,
-            history: history.map(h => ({ role: h.role, parts: [{ text: h.text }] })),
-            config: {
-                ...NO_THINK,
-                systemInstruction: `You are Safedify AI, an HSE expert. Context: ${systemContext}`
-            }
-        });
-
         const parts: any[] = [{ text: userMessage }];
         if (imageBase64) {
             parts.unshift({ inlineData: { mimeType: "image/jpeg", data: cleanBase64(imageBase64) } });
         }
 
-        const result = await chat.sendMessage({ message: parts });
+        const result = await aiChat({
+            model: MODEL_NAME,
+            history: history.map(h => ({ role: h.role, parts: [{ text: h.text }] })),
+            config: {
+                ...NO_THINK,
+                systemInstruction: `You are Safedify AI, an HSE expert. Context: ${systemContext}`
+            },
+            message: parts,
+        });
         return result.text || "I couldn't process that.";
     } catch (error) {
         return "Chat connection failed. Please check your API key.";
@@ -313,7 +320,7 @@ export const chatSafetyAssistant = async (
 export const fetchRegulatoryNewsAI = async (country: string) => {
   try {
     const prompt = `Search for 3 recent safety regulatory updates in ${country}. Return JSON.`;
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -330,7 +337,7 @@ export const fetchRegulatoryNewsAI = async (country: string) => {
 };
 
 /**
- * 9. Audio / TTS Logic (Browser SpeechSynthesis — reliable, no API calls)
+ * 9. Audio / TTS Logic (Browser SpeechSynthesis Ã¢â‚¬â€ reliable, no API calls)
  */
 export const generateSpeechAI = async (text: string): Promise<string | null> => {
     // Check browser support for SpeechSynthesis
@@ -338,7 +345,7 @@ export const generateSpeechAI = async (text: string): Promise<string | null> => 
         console.warn('SpeechSynthesis not supported in this browser.');
         return null;
     }
-    // Return the cleaned text — actual playback happens in playGeneratedAudio
+    // Return the cleaned text Ã¢â‚¬â€ actual playback happens in playGeneratedAudio
     return text;
 };
 
@@ -385,7 +392,7 @@ export const stopSpeech = () => {
 export const analyzeWeatherRisksAI = async (weatherData: EnvironmentalData) => {
   try {
     const prompt = `Analyze weather conditions for construction safety risks:
-Temperature: ${weatherData.temperature}Â°C
+Temperature: ${weatherData.temperature}Ãƒâ€šÃ‚Â°C
 Humidity: ${weatherData.humidity}%
 Wind Speed: ${weatherData.windSpeed} km/h
 Weather Condition: ${weatherData.condition}
@@ -394,7 +401,7 @@ Noise Level: ${weatherData.noiseLevel} dB
 
 Provide safety recommendations and risk assessment.`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -433,7 +440,6 @@ Provide safety recommendations and risk assessment.`;
  */
 export const predictiveSafetyAlertsAI = async (metrics: any, incidents: any[]) => {
   try {
-    checkAIAvailable();
     const prompt = `Analyze HSE data to predict safety risks for the next 7 days:
 
 Metrics: ${JSON.stringify(metrics)}
@@ -441,7 +447,7 @@ Recent Incidents: ${JSON.stringify(incidents.slice(-10))}
 
 Based on patterns, trends, and seasonality, predict potential safety issues and provide proactive mitigation strategies.`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -493,7 +499,7 @@ ${JSON.stringify(metrics, null, 2)}
 
 Provide a comprehensive executive summary highlighting key performance indicators, trends, and strategic recommendations for HSE improvement.`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -556,7 +562,7 @@ Inspector Comment: "${comment}"
 
 Give a concise, actionable recommendation to address this issue and pass the inspection.`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -595,7 +601,7 @@ Assessment Type: ${type}
 
 Provide a comprehensive list of potential hazards that could occur during this task.`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -627,7 +633,7 @@ Hazard: "${hazardDescription}"
 
 Provide specific control measures using the hierarchy of controls (Elimination, Substitution, Engineering, Administrative, PPE).`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -668,7 +674,7 @@ Risk Score: ${riskScore} (Probability: ${probability}, Severity: ${severity})
 
 Provide a clear explanation of why this risk score was calculated and what it means.`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -703,7 +709,7 @@ Identified Hazards: ${hazardsList.join(', ')}
 
 Provide feedback on the risk assessment quality, missing hazards, and improvement suggestions.`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -752,7 +758,7 @@ ${JSON.stringify(observations.map(o => ({
 
 Identify key themes, recurring patterns, and actionable insights to improve safety performance.`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -807,7 +813,7 @@ Based on the description, suggest:
 2. Category (PPE, Housekeeping, Tools & Equipment, Working at Height, Lifting / Manual Handling, Electrical, Chemicals, Traffic / Vehicles)
 3. Immediate action required to address the observation`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -850,7 +856,7 @@ Based on the description, suggest:
  */
 export const parseCertificateAI = async (base64Image: string) => {
   try {
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: [
         { inlineData: { mimeType: "image/jpeg", data: cleanBase64(base64Image) } },
@@ -898,7 +904,7 @@ Related Incidents: ${incidents.join(' | ')}
 
 Identify missing training requirements and recommend specific modules to address skill gaps and prevent incidents.`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -955,7 +961,7 @@ ${lowStockItems.map(item =>
 
 Assess the safety impact and provide specific action recommendations for restocking and risk mitigation.`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -1007,7 +1013,7 @@ Associated Hazards: ${hazards.join(', ')}
 
 Review for completeness, adequacy of controls, and compliance with safety standards. Identify any gaps or missing requirements.`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -1046,7 +1052,7 @@ Review for completeness, adequacy of controls, and compliance with safety standa
  */
 export const extractCertificateDataAI = async (base64Image: string) => {
   try {
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: [
         { inlineData: { mimeType: "image/jpeg", data: cleanBase64(base64Image) } },
@@ -1099,7 +1105,7 @@ Current Compliance Score: ${contractor.complianceScore}
 
 Assess contractor compliance, identify issues, and provide performance rating based on documentation, worker management, and safety standards.`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: prompt,
       config: {
@@ -1147,7 +1153,7 @@ Content: ${contentUrl}
 
 Provide a concise summary highlighting key safety requirements, procedures, and important points for HSE management.`;
 
-    const response = await ai.models.generateContent({
+    const response = await aiGenerate({
       model: MODEL_NAME,
       contents: [
         { inlineData: { mimeType: "image/jpeg", data: cleanBase64(contentUrl) } },

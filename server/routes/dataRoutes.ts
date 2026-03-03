@@ -25,14 +25,17 @@ router.post('/incidents', (req: AuthRequest, res: Response) => {
   const b = req.body;
   const id = uuid();
   db.prepare(
-    `INSERT INTO incidents (id, description, location, date, type, category, severity, status, reported_by, image,
+    `INSERT INTO incidents (id, description, location, date, type, category, severity, status, reported_by, image, images,
       root_cause, corrective_actions, days_lost, body_part, mechanism, immediate_action,
       date_reported, department, shift, weather_conditions, task_being_performed,
       injured_persons, witnesses, ppe_worn, ppe_adequate, environmental_impact,
       immediate_actions_taken, area_secured, emergency_services_notified, regulatory_notification)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(id, b.description, b.location, b.date || new Date().toISOString(), b.type, b.category || 'Near Miss',
-    b.severity, b.status || 'Open', req.user?.id, b.image, b.root_cause, b.corrective_actions, b.days_lost || 0,
+    b.severity, b.status || 'Open', req.user?.id,
+    b.image || (b.images?.[0] ?? null),
+    b.images ? JSON.stringify(b.images) : null,
+    b.root_cause, b.corrective_actions, b.days_lost || 0,
     b.body_part, b.mechanism, b.immediate_action,
     b.date_reported || new Date().toISOString(), b.department, b.shift, b.weather_conditions, b.task_being_performed,
     b.injured_persons ? JSON.stringify(b.injured_persons) : null,
@@ -63,6 +66,7 @@ router.put('/incidents/:id', (req: AuthRequest, res: Response) => {
     if (val !== undefined) { fields.push(`${col}=?`); values.push(val); }
   }
   // JSON fields
+  if (b.images !== undefined) { fields.push('images=?'); values.push(JSON.stringify(b.images)); fields.push('image=?'); values.push(b.images?.[0] ?? null); }
   if (b.injured_persons !== undefined) { fields.push('injured_persons=?'); values.push(JSON.stringify(b.injured_persons)); }
   if (b.witnesses !== undefined) { fields.push('witnesses=?'); values.push(JSON.stringify(b.witnesses)); }
   if (b.ppe_worn !== undefined) { fields.push('ppe_worn=?'); values.push(JSON.stringify(b.ppe_worn)); }

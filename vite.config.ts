@@ -9,7 +9,7 @@ export default defineConfig({
     host: 'localhost',
     proxy: {
       '/api': {
-        target: 'http://localhost:4500',
+        target: `http://localhost:${process.env.VITE_API_PORT || '4000'}`,  // matches Dockerfile default; override with VITE_API_PORT=4500 for local dev
         changeOrigin: true,
       },
     },

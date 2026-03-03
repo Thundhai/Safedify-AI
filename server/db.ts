@@ -337,6 +337,7 @@ migrate('incidents', 'immediate_actions_taken', 'TEXT');
 migrate('incidents', 'area_secured', 'INTEGER DEFAULT 0');
 migrate('incidents', 'emergency_services_notified', 'INTEGER DEFAULT 0');
 migrate('incidents', 'regulatory_notification', 'INTEGER DEFAULT 0');
+migrate('incidents', 'images', 'TEXT');                 // JSON array of base64 images
 
 // Action migrations
 migrate('actions', 'description', 'TEXT');

@@ -118,9 +118,21 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 // ---------- Start ----------
 async function start() {
+  // --- JWT Secret Validation ---
+  const jwtSecret = process.env.JWT_SECRET || '';
+  const DEFAULT_SECRETS = ['safedify-secret-key-change-in-production', 'change-me-to-a-long-random-string', ''];
+  if (isProduction && DEFAULT_SECRETS.includes(jwtSecret)) {
+    console.error('\n\x1b[31m[FATAL] JWT_SECRET is not set or uses a default value.\x1b[0m');
+    console.error('Set a strong, unique JWT_SECRET environment variable before running in production.');
+    console.error('Example: JWT_SECRET=$(openssl rand -base64 48)\n');
+    process.exit(1);
+  }
+
   await seedDefaultUsers();
 
-  const HOST = process.env.HOST || '127.0.0.1';
+  // In production/Docker, bind to 0.0.0.0 to accept external connections
+  // In development, bind to 127.0.0.1 for security
+  const HOST = process.env.HOST || (isProduction ? '0.0.0.0' : '127.0.0.1');
   const server = app.listen(PORT, HOST, () => {
     console.log(`\n========================================`);
     console.log(`  Safedify AI Server (${NODE_ENV})`);

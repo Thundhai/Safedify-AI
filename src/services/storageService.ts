@@ -60,7 +60,7 @@ const mapIncident = (row: any): Incident => ({
   category: (row.category || 'Near Miss') as IncidentCategory,
   severity: row.severity as IncidentSeverity,
   status: row.status || 'Open',
-  images: row.image ? [row.image] : [],
+  images: row.images ? parseJson(row.images, []) : (row.image ? [row.image] : []),
   reporter: row.reported_by || '',
   // Context
   shift: row.shift || '',
@@ -324,6 +324,7 @@ const incidentToApi = (inc: Incident) => ({
   severity: inc.severity,
   status: inc.status,
   image: inc.images?.[0] || null,
+  images: inc.images || [],
   root_cause: inc.investigation?.rootCause,
   days_lost: inc.daysLost || 0,
   body_part: inc.bodyPart,
