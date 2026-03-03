@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import { Plus, Eye, CheckCircle, Sparkles, Loader2, Camera, Trash2, Edit2, X, Save, MapPin, Tag, FileText, Printer, Filter } from 'lucide-react';
 import { getObservations, deleteObservation, updateObservation } from '../services/storageService';
 import { analyzeObservationTrendsAI } from '../services/geminiService';
-import { addToSyncQueue } from '../services/offlineService';
 import { Observation, ObservationType } from '../types';
 
 export const ObservationList: React.FC = () => {
@@ -48,7 +47,6 @@ export const ObservationList: React.FC = () => {
         e.stopPropagation();
         if (confirm('Are you sure you want to permanently delete this observation?')) {
             await deleteObservation(id);
-            addToSyncQueue('DELETE_OBSERVATION', `Deleted Obs: ${id}`);
             setObservations(prev => prev.filter(o => o.id !== id));
         }
     };
@@ -71,7 +69,6 @@ export const ObservationList: React.FC = () => {
         
         const updatedObs = { ...selectedObs, ...editForm } as Observation;
         await updateObservation(updatedObs);
-        addToSyncQueue('UPDATE_OBSERVATION', `Updated Obs: ${updatedObs.id}`);
         
         setObservations(prev => prev.map(o => o.id === updatedObs.id ? updatedObs : o));
         setSelectedObs(null);

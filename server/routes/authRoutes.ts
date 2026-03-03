@@ -30,7 +30,8 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
     const token = generateToken(user);
     res.json({ token, user });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[Auth] Login error:', err.message);
+    res.status(500).json({ error: 'Login failed. Please try again.' });
   }
 });
 
@@ -42,6 +43,16 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
       res.status(400).json({ error: 'Name, email and password required' });
       return;
     }
+
+    // Password policy: minimum 8 characters
+    if (password.length < 8) {
+      res.status(400).json({ error: 'Password must be at least 8 characters' });
+      return;
+    }
+
+    // Restrict self-registration to safe roles only
+    const allowedSelfRegRoles = ['Worker', 'HSE Supervisor'];
+    const safeRole = (role && allowedSelfRegRoles.includes(role)) ? role : 'Worker';
 
     const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
     if (existing) {
@@ -55,13 +66,14 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
 
     db.prepare(
       'INSERT INTO users (id, name, email, password_hash, role, tier, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(id, name, email, hash, role || 'Worker', 'Free', avatar);
+    ).run(id, name, email, hash, safeRole, 'Free', avatar);
 
-    const user = { id, name, email, role: role || 'Worker', tier: 'Free', avatar };
+    const user = { id, name, email, role: safeRole, tier: 'Free', avatar };
     const token = generateToken(user);
     res.status(201).json({ token, user });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[Auth] Registration error:', err.message);
+    res.status(500).json({ error: 'Registration failed. Please try again.' });
   }
 });
 

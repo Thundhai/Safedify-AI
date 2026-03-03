@@ -36,7 +36,7 @@ export const UserRoles = {
 export type UserRole = string;
 
 export enum SubscriptionTier {
-  FREE = 'Basic',
+  FREE = 'Free',
   PRO = 'Pro',
   ENTERPRISE = 'Enterprise'
 }

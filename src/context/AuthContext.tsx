@@ -14,7 +14,11 @@ interface AuthContextType {
   checkPermission: (permission: Permission) => boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Persist context across Vite HMR to prevent "useAuth must be used within AuthProvider" errors
+const AuthContext: React.Context<AuthContextType | undefined> =
+  (globalThis as any).__SAFEDIFY_AUTH_CTX__ ||
+  createContext<AuthContextType | undefined>(undefined);
+(globalThis as any).__SAFEDIFY_AUTH_CTX__ = AuthContext;
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -83,8 +87,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const userRole = cachedRoles.current.find((r: any) => r.name === user.role);
       
       if (!userRole) {
-          // Fallback if role missing in cache (e.g. not loaded yet)
-          return true;
+          // Deny by default if role not loaded yet (safe default)
+          return false;
       }
 
       return userRole.permissions.includes(permission);

@@ -9,7 +9,7 @@ import {
 import { classifyIncidentAI, getCorrectiveActionsAI } from '../services/geminiService';
 import { saveIncident } from '../services/storageService';
 import { SmartTextInput, SmartTextArea } from './SmartTextInput';
-import { compressImage, addToSyncQueue } from '../services/offlineService';
+import { compressImage } from '../services/offlineService';
 import {
   IncidentSeverity, IncidentType, IncidentCategory, Incident, SubscriptionTier,
   InjuredPerson, IncidentWitness,
@@ -222,7 +222,6 @@ export const IncidentReport: React.FC = () => {
     };
 
     await saveIncident(newInc);
-    addToSyncQueue('SAVE_INCIDENT', `New Incident: ${newInc.type} at ${location}`);
     navigate('/incidents');
   };
 

@@ -304,7 +304,7 @@ const runCustomQuery: ToolDefinition = {
   }
 };
 
-const getOverduActions: ToolDefinition = {
+const getOverdueActions: ToolDefinition = {
   name: 'get_overdue_actions',
   description: 'Get all overdue corrective actions (due date has passed and status is not Done).',
   parameters: { type: 'object', properties: {} },
@@ -321,7 +321,7 @@ const getExpiringPermits: ToolDefinition = {
   parameters: { type: 'object', properties: {} },
   execute: () => {
     return db.prepare(
-      "SELECT * FROM permits WHERE status = 'Approved' AND valid_until < date('now', '+7 days') ORDER BY valid_until ASC"
+      "SELECT * FROM permits WHERE status = 'Active' AND valid_until < date('now', '+7 days') ORDER BY valid_until ASC"
     ).all();
   }
 };
@@ -339,7 +339,7 @@ export const allTools: ToolDefinition[] = [
   createAction,
   calculateSafetyMetrics,
   runCustomQuery,
-  getOverduActions,
+  getOverdueActions,
   getExpiringPermits,
 ];
 

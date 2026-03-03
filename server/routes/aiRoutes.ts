@@ -12,8 +12,8 @@ import { GoogleGenAI } from '@google/genai';
 const router = Router();
 router.use(authenticate);
 
-// Use the same API key as the agent
-const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+// Use consistent GEMINI_API_KEY env var
+const apiKey = process.env.GEMINI_API_KEY;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 /**

@@ -24,6 +24,7 @@ export const Dashboard: React.FC = () => {
   const [stats, setStats] = useState({
     totalIncidents: 0,
     openActions: 0,
+    inspectionCount: 0,
     severityBreakdown: [] as { name: string; value: number }[],
     monthlyTrends: [] as { name: string; incidents: number }[]
   });
@@ -112,6 +113,7 @@ export const Dashboard: React.FC = () => {
         setStats({
           totalIncidents: incidents.length,
           openActions: (actions || []).filter(a => a.status !== 'Done').length,
+          inspectionCount: inspections.length,
           severityBreakdown: severityData,
           monthlyTrends: monthlyData
         });
@@ -141,6 +143,7 @@ export const Dashboard: React.FC = () => {
         setStats({
           totalIncidents: 0,
           openActions: 0,
+          inspectionCount: 0,
           severityBreakdown: [],
           monthlyTrends: []
         });
@@ -153,6 +156,7 @@ export const Dashboard: React.FC = () => {
       }
     };
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isFirstTimeUser]);
 
   const COLORS = ['#22c55e', '#eab308', '#f97316', '#ef4444'];
@@ -328,7 +332,7 @@ export const Dashboard: React.FC = () => {
                     <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                         <div>
                             <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Compliance</p>
-                            <h3 className="text-2xl font-bold text-slate-800 dark:text-white mt-1">94%</h3>
+                            <h3 className="text-2xl font-bold text-slate-800 dark:text-white mt-1">{siteScore ? `${siteScore.score}%` : '—'}</h3>
                         </div>
                         <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg text-green-600 dark:text-green-400">
                             <CheckCircle size={20} />
@@ -339,7 +343,7 @@ export const Dashboard: React.FC = () => {
                     <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                         <div>
                             <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Inspections</p>
-                            <h3 className="text-2xl font-bold text-slate-800 dark:text-white mt-1">12</h3>
+                            <h3 className="text-2xl font-bold text-slate-800 dark:text-white mt-1">{stats.inspectionCount}</h3>
                         </div>
                         <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-blue-600 dark:text-blue-400">
                             <ClipboardCheck size={20} />

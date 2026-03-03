@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import db from '../db.js';
-import { AuthRequest, authenticate } from '../auth.js';
+import { AuthRequest, authenticate, requirePermission } from '../auth.js';
 import { notify, notifyAllManagers } from '../services/notificationService.js';
 
 const router = Router();
@@ -107,7 +107,7 @@ router.put('/incidents/:id', (req: AuthRequest, res: Response) => {
   }
 });
 
-router.delete('/incidents/:id', (req: AuthRequest, res: Response) => {
+router.delete('/incidents/:id', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
   db.prepare('DELETE FROM incidents WHERE id = ?').run(req.params.id);
   res.json({ message: 'Deleted' });
 });
@@ -171,7 +171,7 @@ router.put('/actions/:id', (req: AuthRequest, res: Response) => {
   }
 });
 
-router.delete('/actions/:id', (req: AuthRequest, res: Response) => {
+router.delete('/actions/:id', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
   db.prepare('DELETE FROM actions WHERE id = ?').run(req.params.id);
   res.json({ message: 'Deleted' });
 });
@@ -189,6 +189,21 @@ router.post('/observations', (req: AuthRequest, res: Response) => {
     'INSERT INTO observations (id, type, category, description, location, date, observer, is_anonymous, immediate_action, images) VALUES (?,?,?,?,?,?,?,?,?,?)'
   ).run(id, type, category, description, location, date || new Date().toISOString(), observer, is_anonymous ? 1 : 0, immediate_action, JSON.stringify(images || []));
   res.status(201).json({ id });
+});
+
+router.put('/observations/:id', (req: AuthRequest, res: Response) => {
+  const { type, category, description, location, date, observer, status, immediate_action, images } = req.body;
+  db.prepare(
+    `UPDATE observations SET type=COALESCE(?,type), category=COALESCE(?,category), description=COALESCE(?,description),
+     location=COALESCE(?,location), date=COALESCE(?,date), observer=COALESCE(?,observer), status=COALESCE(?,status),
+     immediate_action=COALESCE(?,immediate_action), images=COALESCE(?,images) WHERE id=?`
+  ).run(type, category, description, location, date, observer, status, immediate_action, images ? JSON.stringify(images) : null, req.params.id);
+  res.json({ message: 'Updated' });
+});
+
+router.delete('/observations/:id', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
+  db.prepare('DELETE FROM observations WHERE id = ?').run(req.params.id);
+  res.json({ message: 'Deleted' });
 });
 
 // ---------- INSPECTIONS ----------
@@ -221,7 +236,7 @@ router.post('/permits', (req: AuthRequest, res: Response) => {
   res.status(201).json({ id });
 });
 
-router.put('/permits/:id', (req: AuthRequest, res: Response) => {
+router.put('/permits/:id', requirePermission('approve_permit'), (req: AuthRequest, res: Response) => {
   const { status, approver, approver_comments } = req.body;
   db.prepare(
     'UPDATE permits SET status=COALESCE(?,status), approver=COALESCE(?,approver), approver_comments=COALESCE(?,approver_comments) WHERE id=?'
@@ -261,6 +276,12 @@ router.get('/workers', (req: AuthRequest, res: Response) => {
   res.json(db.prepare('SELECT * FROM workers ORDER BY created_at DESC').all());
 });
 
+router.get('/workers/:id', (req: AuthRequest, res: Response) => {
+  const row = db.prepare('SELECT * FROM workers WHERE id = ?').get(req.params.id);
+  if (!row) { res.status(404).json({ error: 'Worker not found' }); return; }
+  res.json(row);
+});
+
 router.post('/workers', (req: AuthRequest, res: Response) => {
   const { name, role, department, company_id, joined_date, email, phone } = req.body;
   const id = uuid();
@@ -284,6 +305,12 @@ router.get('/contractors', (req: AuthRequest, res: Response) => {
   res.json(db.prepare('SELECT * FROM contractors ORDER BY created_at DESC').all());
 });
 
+router.get('/contractors/:id', (req: AuthRequest, res: Response) => {
+  const row = db.prepare('SELECT * FROM contractors WHERE id = ?').get(req.params.id);
+  if (!row) { res.status(404).json({ error: 'Contractor not found' }); return; }
+  res.json(row);
+});
+
 router.post('/contractors', (req: AuthRequest, res: Response) => {
   const { name, contact_person, email, phone, status } = req.body;
   const id = uuid();
@@ -299,6 +326,12 @@ router.get('/assets', (req: AuthRequest, res: Response) => {
   res.json(db.prepare('SELECT * FROM assets ORDER BY created_at DESC').all());
 });
 
+router.get('/assets/:id', (req: AuthRequest, res: Response) => {
+  const row = db.prepare('SELECT * FROM assets WHERE id = ?').get(req.params.id);
+  if (!row) { res.status(404).json({ error: 'Asset not found' }); return; }
+  res.json(row);
+});
+
 router.post('/assets', (req: AuthRequest, res: Response) => {
   const { name, category, model_number, serial_number, location, status, next_inspection_date } = req.body;
   const id = uuid();
@@ -312,6 +345,12 @@ router.post('/assets', (req: AuthRequest, res: Response) => {
 
 router.get('/documents', (req: AuthRequest, res: Response) => {
   res.json(db.prepare('SELECT * FROM documents ORDER BY created_at DESC').all());
+});
+
+router.get('/documents/:id', (req: AuthRequest, res: Response) => {
+  const row = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
+  if (!row) { res.status(404).json({ error: 'Document not found' }); return; }
+  res.json(row);
 });
 
 router.post('/documents', (req: AuthRequest, res: Response) => {
@@ -542,7 +581,7 @@ router.get('/roles', (req: AuthRequest, res: Response) => {
   res.json(rows.map((r: any) => ({ ...r, permissions: JSON.parse(r.permissions || '[]'), isSystem: !!r.is_system })));
 });
 
-router.post('/roles', (req: AuthRequest, res: Response) => {
+router.post('/roles', requirePermission('manage_roles'), (req: AuthRequest, res: Response) => {
   const { id: clientId, name, description, is_system, isSystem, permissions } = req.body;
   const id = clientId || uuid();
   db.prepare(
@@ -551,7 +590,7 @@ router.post('/roles', (req: AuthRequest, res: Response) => {
   res.status(201).json({ id });
 });
 
-router.delete('/roles/:id', (req: AuthRequest, res: Response) => {
+router.delete('/roles/:id', requirePermission('manage_roles'), (req: AuthRequest, res: Response) => {
   const role = db.prepare('SELECT * FROM roles WHERE id = ?').get(req.params.id) as any;
   if (role && role.is_system) {
     res.status(403).json({ error: 'Cannot delete system role' });
@@ -577,7 +616,7 @@ router.post('/safety-zones', (req: AuthRequest, res: Response) => {
   res.status(201).json({ id });
 });
 
-router.delete('/safety-zones/:id', (req: AuthRequest, res: Response) => {
+router.delete('/safety-zones/:id', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
   db.prepare('DELETE FROM safety_zones WHERE id = ?').run(req.params.id);
   res.json({ message: 'Deleted' });
 });

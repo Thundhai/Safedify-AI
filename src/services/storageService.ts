@@ -20,10 +20,10 @@ import {
 import {
   apiGetIncidents, apiGetIncident, apiCreateIncident, apiUpdateIncident, apiDeleteIncident,
   apiGetActions, apiCreateAction, apiUpdateAction, apiDeleteAction,
-  apiGetObservations, apiCreateObservation,
+  apiGetObservations, apiCreateObservation, apiUpdateObservation, apiDeleteObservation,
   apiGetInspections, apiCreateInspection,
   apiGetPermits, apiCreatePermit, apiUpdatePermit,
-  apiGetWorkers, apiCreateWorker, apiUpdateWorker,
+  apiGetWorkers, apiGetWorker, apiCreateWorker, apiUpdateWorker,
   apiGetContractors, apiCreateContractor,
   apiGetAssets, apiCreateAsset,
   apiGetDocuments, apiCreateDocument,
@@ -514,11 +514,11 @@ export const saveObservation = async (obs: Observation): Promise<void> => {
 };
 
 export const updateObservation = async (obs: Observation): Promise<void> => {
-  await apiCreateObservation(observationToApi(obs));
+  await apiUpdateObservation(obs.id, observationToApi(obs));
 };
 
-export const deleteObservation = async (_id: string): Promise<void> => {
-  console.warn('Observation delete not yet supported on backend');
+export const deleteObservation = async (id: string): Promise<void> => {
+  await apiDeleteObservation(id);
 };
 
 // ---------- Workers ----------
@@ -531,8 +531,14 @@ export const getWorkers = async (): Promise<WorkerProfile[]> => {
 };
 
 export const getWorkerById = async (id: string): Promise<WorkerProfile | undefined> => {
-  const workers = await getWorkers();
-  return workers.find(w => w.id === id);
+  try {
+    const row = await apiGetWorker(id);
+    return row ? mapWorker(row) : undefined;
+  } catch {
+    // Fallback: fetch all and find (for backward compat)
+    const workers = await getWorkers();
+    return workers.find(w => w.id === id);
+  }
 };
 
 export const saveWorker = async (worker: WorkerProfile): Promise<void> => {

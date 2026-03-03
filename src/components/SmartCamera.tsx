@@ -4,7 +4,6 @@ import { Camera, AlertTriangle, CheckCircle, ShieldAlert, Loader2, Sparkles, X, 
 import { detectSiteHazardsAI } from '../services/geminiService';
 import { HazardDetection, Observation, SubscriptionTier } from '../types';
 import { saveObservation } from '../services/storageService';
-import { addToSyncQueue } from '../services/offlineService';
 import { Link, useNavigate } from 'react-router-dom';
 import { FeatureGate } from './FeatureGate';
 
@@ -72,7 +71,6 @@ export const SmartCamera: React.FC = () => {
       };
 
       await saveObservation(newObs);
-      addToSyncQueue('SAVE_OBSERVATION', `AI Observation: ${newObs.description}`);
       
       alert("Hazard logged to Observations successfully.");
       setLoggingHazard(null); // Close modal

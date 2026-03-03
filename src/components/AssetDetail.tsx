@@ -158,18 +158,7 @@ export const AssetDetail: React.FC = () => {
                                 <p className="text-slate-500 text-sm">Details specific to {asset.name} would appear here (e.g. Load Capacity, Engine type, Dimensions).</p>
                                 
                                 <h3 className="font-bold text-slate-800 mt-6">Recent Activity</h3>
-                                <div className="border-l-2 border-slate-200 pl-4 space-y-6">
-                                    <div className="relative">
-                                        <div className="absolute -left-[21px] top-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                                        <p className="text-sm font-medium">Daily Inspection Passed</p>
-                                        <p className="text-xs text-slate-500">Yesterday by Operator A</p>
-                                    </div>
-                                    <div className="relative">
-                                        <div className="absolute -left-[21px] top-0 w-3 h-3 bg-blue-500 rounded-full border-2 border-white"></div>
-                                        <p className="text-sm font-medium">Certificate Updated</p>
-                                        <p className="text-xs text-slate-500">3 days ago by HSE Manager</p>
-                                    </div>
-                                </div>
+                                <p className="text-sm text-slate-400 py-4">No recent activity recorded for this asset.</p>
                             </div>
                         )}
 

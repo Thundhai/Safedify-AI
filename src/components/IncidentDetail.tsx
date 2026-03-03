@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { getIncidentById, getActions, saveAction, updateIncident, updateAction } from '../services/storageService';
 import { analyzeRootCauseAI, generateSpeechAI, playGeneratedAudio } from '../services/geminiService';
-import { addToSyncQueue } from '../services/offlineService';
 import { Incident, ActionItem, IncidentSeverity, InjuredPerson, IncidentWitness } from '../types';
 
 export const IncidentDetail: React.FC = () => {
@@ -186,7 +185,6 @@ export const IncidentDetail: React.FC = () => {
     };
     
     await updateIncident(updatedIncident);
-    addToSyncQueue('UPDATE_INCIDENT', `Updated Investigation: ${incident.id}`);
     
     setIncident(updatedIncident);
     setIsSaving(false);
@@ -204,11 +202,13 @@ export const IncidentDetail: React.FC = () => {
       dueDate: newAction.dueDate,
       priority: newAction.priority as any,
       status: 'Open',
+      actionType: 'Corrective',
+      category: 'Other',
+      indicator: 'Lagging',
       relatedIncidentId: incident.id
     };
 
     await saveAction(action);
-    addToSyncQueue('SAVE_ACTION', `New Action: ${action.title}`);
     
     setActions([...actions, action]);
     setShowActionForm(false);
@@ -223,7 +223,6 @@ export const IncidentDetail: React.FC = () => {
   const handleActionStatusChange = async (action: ActionItem, newStatus: 'Open' | 'In Progress' | 'Done') => {
     const updatedAction: ActionItem = { ...action, status: newStatus };
     await updateAction(updatedAction);
-    addToSyncQueue('UPDATE_ACTION', `Updated Action Status: ${action.title} -> ${newStatus}`);
     
     setActions(prev => prev.map(a => a.id === action.id ? updatedAction : a));
   };
@@ -241,7 +240,6 @@ export const IncidentDetail: React.FC = () => {
     if (actionToLink) {
       const updated = { ...actionToLink, relatedIncidentId: incident.id };
       await updateAction(updated);
-      addToSyncQueue('UPDATE_ACTION', `Linked Action: ${updated.title}`);
       
       setActions(prev => [...prev, updated]);
       setAvailableActions(prev => prev.filter(a => a.id !== actionId));

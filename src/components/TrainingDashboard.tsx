@@ -53,7 +53,7 @@ export const TrainingDashboard: React.FC = () => {
     // Simplistic: assume all modules required for all for stats demo (in reality, filter by role)
     const validCount = records.filter(r => r.status === 'Valid').length;
     const expiringCount = records.filter(r => r.status === 'Expiring Soon').length;
-    const complianceRate = Math.round((validCount / (totalAssignments * 0.6)) * 100); // Mock calculation
+    const complianceRate = totalAssignments > 0 ? Math.min(Math.round((validCount / totalAssignments) * 100), 100) : 0;
 
     return (
         <div className="space-y-6">
@@ -189,27 +189,7 @@ export const TrainingDashboard: React.FC = () => {
                 <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500">
                     <Calendar size={48} className="mx-auto mb-4 opacity-20" />
                     <p className="text-lg font-medium text-slate-700">Training Calendar</p>
-                    <p className="text-sm">Upcoming scheduled sessions will appear here.</p>
-                    <div className="mt-6 space-y-3 max-w-md mx-auto text-left">
-                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-lg flex gap-3">
-                            <div className="bg-blue-200 text-blue-800 rounded px-2 py-1 text-xs font-bold text-center min-w-[50px]">
-                                OCT<br/><span className="text-lg">25</span>
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-slate-800 text-sm">Confined Space Refresher</h4>
-                                <p className="text-xs text-slate-500">09:00 AM - Training Room A</p>
-                            </div>
-                        </div>
-                        <div className="p-3 bg-purple-50 border border-purple-100 rounded-lg flex gap-3">
-                            <div className="bg-purple-200 text-purple-800 rounded px-2 py-1 text-xs font-bold text-center min-w-[50px]">
-                                NOV<br/><span className="text-lg">02</span>
-                            </div>
-                            <div>
-                                <h4 className="font-bold text-slate-800 text-sm">First Aid & CPR</h4>
-                                <p className="text-xs text-slate-500">10:00 AM - Main Hall</p>
-                            </div>
-                        </div>
-                    </div>
+                    <p className="text-sm">No upcoming sessions scheduled. Use the Training Matrix to plan sessions.</p>
                 </div>
             )}
         </div>

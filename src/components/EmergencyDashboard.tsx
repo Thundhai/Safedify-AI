@@ -500,7 +500,7 @@ export const EmergencyDashboard: React.FC = () => {
                         <AlertTriangle className="text-yellow-600 shrink-0 mt-1" />
                         <div>
                             <h4 className="font-bold text-yellow-800">Primary Muster Point</h4>
-                            <p className="text-yellow-700 text-sm">Main Car Park (Zone A), North Gate Entrance.</p>
+                            <p className="text-yellow-700 text-sm">Contact your site HSE manager for your designated muster point location.</p>
                         </div>
                     </div>
                 </div>

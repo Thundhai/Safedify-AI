@@ -1,11 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { getWorkers } from '../services/storageService';
+import { getWorkers, getObservations } from '../services/storageService';
 import { WorkerProfile } from '../types';
 import { Award, Trophy, Star, Medal, Crown } from 'lucide-react';
 
 export const Gamification: React.FC = () => {
     const [workers, setWorkers] = useState<WorkerProfile[]>([]);
+    const [challengeProgress, setChallengeProgress] = useState({ completed: 0, goal: 5 });
 
     useEffect(() => {
         const load = async () => {
@@ -13,6 +14,19 @@ export const Gamification: React.FC = () => {
             // Sort by points desc
             const sorted = [...allWorkers].sort((a, b) => (b.points || 0) - (a.points || 0));
             setWorkers(sorted);
+
+            // Calculate monthly challenge: count 'Positive' observations this month
+            try {
+                const observations = await getObservations();
+                const now = new Date();
+                const thisMonth = now.getMonth();
+                const thisYear = now.getFullYear();
+                const positiveThisMonth = observations.filter(o => {
+                    const d = new Date(o.date);
+                    return o.category === 'Positive' && d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+                }).length;
+                setChallengeProgress({ completed: Math.min(positiveThisMonth, 5), goal: 5 });
+            } catch { /* ignore */ }
         };
         load();
     }, []);
@@ -98,9 +112,9 @@ export const Gamification: React.FC = () => {
                             Identify 5 "Safe Behaviors" this month to unlock the <b>Positivity Badge</b>.
                         </p>
                         <div className="w-full bg-white/20 rounded-full h-2 mb-1">
-                            <div className="bg-yellow-400 h-2 rounded-full" style={{ width: '40%' }}></div>
+                            <div className="bg-yellow-400 h-2 rounded-full" style={{ width: `${(challengeProgress.completed / challengeProgress.goal) * 100}%` }}></div>
                         </div>
-                        <p className="text-xs text-right opacity-80">2 / 5 Completed (Team Avg)</p>
+                        <p className="text-xs text-right opacity-80">{challengeProgress.completed} / {challengeProgress.goal} Completed</p>
                     </div>
                 </div>
             </div>

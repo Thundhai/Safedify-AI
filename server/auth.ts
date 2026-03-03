@@ -53,6 +53,43 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   }
 };
 
+// ---------- RBAC Middleware ----------
+
+/** Require the user to have one of the listed roles */
+export const requireRole = (...roles: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    // Admin always passes
+    if (req.user.role === 'Admin') { next(); return; }
+    // Check role by name against the roles DB
+    const userRoleRow = db.prepare('SELECT permissions FROM roles WHERE name = ?').get(req.user.role) as any;
+    const userRoleName = req.user.role;
+    if (roles.includes(userRoleName)) { next(); return; }
+    res.status(403).json({ error: 'Insufficient permissions for this action' });
+  };
+};
+
+/** Require the user's role to include a specific permission key */
+export const requirePermission = (...permissions: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    // Admin bypass
+    if (req.user.role === 'Admin') { next(); return; }
+    const roleRow = db.prepare('SELECT permissions FROM roles WHERE name = ?').get(req.user.role) as any;
+    if (!roleRow) { res.status(403).json({ error: 'Role not found' }); return; }
+    const perms: string[] = JSON.parse(roleRow.permissions || '[]');
+    const hasAll = permissions.every(p => perms.includes(p));
+    if (hasAll) { next(); return; }
+    res.status(403).json({ error: 'Insufficient permissions for this action' });
+  };
+};
+
 // ---------- Seed default admin (only when SEED_DEMO_USERS=true) ----------
 
 export const seedDefaultUsers = async () => {

@@ -5,7 +5,7 @@ import { Camera, MapPin, Send, UserX, User, AlertOctagon, ShieldCheck, AlertTria
 import { saveObservation } from '../services/storageService';
 import { analyzeObservationAI } from '../services/geminiService';
 import { SmartTextInput, SmartTextArea } from './SmartTextInput';
-import { compressImage, addToSyncQueue } from '../services/offlineService';
+import { compressImage } from '../services/offlineService';
 import { Observation, ObservationType } from '../types';
 
 export const ObservationForm: React.FC = () => {
@@ -80,9 +80,8 @@ export const ObservationForm: React.FC = () => {
     };
 
     await saveObservation(newObs);
-    addToSyncQueue('SAVE_OBSERVATION', `Observation: ${newObs.type}`);
     
-    alert("Observation Submitted! (Saved Offline & Queued)");
+    alert("Observation submitted successfully!");
     navigate('/observations');
   };
 

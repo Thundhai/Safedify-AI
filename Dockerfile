@@ -14,10 +14,6 @@ COPY index.html vite.config.ts tsconfig.json tsconfig.node.json tailwind.config.
 COPY public/ public/
 COPY src/ src/
 
-# Build-time env vars (frontend only)
-ARG VITE_GEMINI_API_KEY=""
-ENV VITE_GEMINI_API_KEY=$VITE_GEMINI_API_KEY
-
 RUN npm run build
 
 # ==========================================

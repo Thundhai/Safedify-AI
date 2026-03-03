@@ -8,7 +8,7 @@ import {
 import { saveInspection, getInspectionTemplates, getInspections, saveInspectionTemplate } from '../services/storageService';
 import { suggestInspectionFixAI } from '../services/geminiService';
 import { SmartTextInput } from './SmartTextInput';
-import { compressImage, addToSyncQueue } from '../services/offlineService';
+import { compressImage } from '../services/offlineService';
 import { Inspection, InspectionItem, InspectionTemplate } from '../types';
 
 export const InspectionForm: React.FC = () => {
@@ -179,10 +179,9 @@ export const InspectionForm: React.FC = () => {
         completed: true
     };
     await saveInspection(finalInspection);
-    addToSyncQueue('SAVE_INSPECTION', `Inspection: ${finalInspection.title}`);
     
     setCurrentInspection(finalInspection); // Set for report view
-    alert("Inspection Completed & Saved Locally. Queued for Sync.");
+    alert("Inspection completed and saved.");
     setView('report');
   };
 

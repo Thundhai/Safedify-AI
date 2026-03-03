@@ -103,6 +103,8 @@ export const apiDeleteAction = (id: string) => apiFetch(`/actions/${id}`, { meth
 
 export const apiGetObservations = () => apiFetch('/observations');
 export const apiCreateObservation = (data: any) => apiFetch('/observations', { method: 'POST', body: JSON.stringify(data) });
+export const apiUpdateObservation = (id: string, data: any) => apiFetch(`/observations/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const apiDeleteObservation = (id: string) => apiFetch(`/observations/${id}`, { method: 'DELETE' });
 
 export const apiGetInspections = () => apiFetch('/inspections');
 export const apiCreateInspection = (data: any) => apiFetch('/inspections', { method: 'POST', body: JSON.stringify(data) });
@@ -112,13 +114,16 @@ export const apiCreatePermit = (data: any) => apiFetch('/permits', { method: 'PO
 export const apiUpdatePermit = (id: string, data: any) => apiFetch(`/permits/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 
 export const apiGetWorkers = () => apiFetch('/workers');
+export const apiGetWorker = (id: string) => apiFetch(`/workers/${id}`);
 export const apiCreateWorker = (data: any) => apiFetch('/workers', { method: 'POST', body: JSON.stringify(data) });
 export const apiUpdateWorker = (id: string, data: any) => apiFetch(`/workers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 
 export const apiGetContractors = () => apiFetch('/contractors');
+export const apiGetContractor = (id: string) => apiFetch(`/contractors/${id}`);
 export const apiCreateContractor = (data: any) => apiFetch('/contractors', { method: 'POST', body: JSON.stringify(data) });
 
 export const apiGetAssets = () => apiFetch('/assets');
+export const apiGetAsset = (id: string) => apiFetch(`/assets/${id}`);
 export const apiCreateAsset = (data: any) => apiFetch('/assets', { method: 'POST', body: JSON.stringify(data) });
 
 export const apiGetDocuments = () => apiFetch('/documents');

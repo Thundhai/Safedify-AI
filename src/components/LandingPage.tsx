@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { 
   ShieldCheck, BrainCircuit, WifiOff, FileSignature, 
   ArrowRight, CheckCircle2, BarChart2, Smartphone, 
-  Users, Globe, Zap, Menu, X, Building2, HardHat, Factory,
+  Users, Zap, Menu, X, Building2, HardHat, Factory,
   Check, Crown, Sparkles, FileText, Lock, Shield
 } from 'lucide-react';
 import { PricingPlans } from './PricingPlans';
@@ -193,13 +193,7 @@ export const LandingPage: React.FC = () => {
             </button>
           </div>
           
-          <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 opacity-60 grayscale">
-             {/* Mock Logos */}
-             <div className="flex items-center justify-center gap-2 text-white font-bold text-xl"><Globe size={24}/> GlobalCorp</div>
-             <div className="flex items-center justify-center gap-2 text-white font-bold text-xl"><Zap size={24}/> PowerGrid</div>
-             <div className="flex items-center justify-center gap-2 text-white font-bold text-xl"><Users size={24}/> BuildSafe</div>
-             <div className="flex items-center justify-center gap-2 text-white font-bold text-xl"><ShieldCheck size={24}/> SecureInd</div>
-          </div>
+
         </div>
       </section>
 
@@ -299,37 +293,34 @@ export const LandingPage: React.FC = () => {
                                 <CheckCircle2 size={24} />
                             </div>
                             <div>
-                                <div className="font-bold text-slate-800">Safety Compliance Score</div>
+                                <div className="font-bold text-slate-800">Live Safety Dashboard</div>
                                 <div className="text-xs text-slate-500">Real-time Site Status</div>
                             </div>
-                            <div className="ml-auto text-2xl font-bold text-green-600">98%</div>
                         </div>
                         
                         <div className="space-y-4 mb-6">
                             <div className="flex items-center gap-3 text-sm text-slate-600">
                                 <Check size={16} className="text-green-500 shrink-0" />
-                                <span>Daily Inspection Completed - Zone A</span>
+                                <span>Real-time compliance scoring</span>
                             </div>
                             <div className="flex items-center gap-3 text-sm text-slate-600">
                                 <Check size={16} className="text-green-500 shrink-0" />
-                                <span>Toolbox Talk Attendance Verified</span>
+                                <span>Automated inspection tracking</span>
                             </div>
                             <div className="flex items-center gap-3 text-sm text-slate-600">
                                 <Check size={16} className="text-green-500 shrink-0" />
-                                <span>Zero LTI Days: 45</span>
+                                <span>Live incident trend analytics</span>
                             </div>
                         </div>
 
                         <div className="mt-4 flex gap-3">
                             <div className="flex-1 bg-blue-50 rounded-lg border border-blue-100 p-3 flex flex-col items-center justify-center text-center">
                                 <FileSignature size={20} className="text-blue-600 mb-1" />
-                                <span className="text-xl font-bold text-slate-800">12</span>
-                                <span className="text-[10px] text-slate-500 uppercase font-bold">Active Permits</span>
+                                <span className="text-sm font-bold text-slate-800">Permit Tracking</span>
                             </div>
                             <div className="flex-1 bg-purple-50 rounded-lg border border-purple-100 p-3 flex flex-col items-center justify-center text-center">
                                 <Users size={20} className="text-purple-600 mb-1" />
-                                <span className="text-xl font-bold text-slate-800">100%</span>
-                                <span className="text-[10px] text-slate-500 uppercase font-bold">Training Status</span>
+                                <span className="text-sm font-bold text-slate-800">Training Matrix</span>
                             </div>
                         </div>
                     </div>
@@ -348,7 +339,7 @@ export const LandingPage: React.FC = () => {
         <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
         <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
           <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">Ready to modernize your safety culture?</h2>
-          <p className="text-xl text-blue-200 mb-10">Join forward-thinking HSE teams reducing incidents by up to 40% in the first year.</p>
+          <p className="text-xl text-blue-200 mb-10">Join forward-thinking HSE teams building a stronger safety culture with AI-powered tools.</p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <button onClick={() => navigate('/register')} className="px-8 py-4 bg-white text-brand-navy rounded-xl font-bold text-lg hover:bg-blue-50 transition-colors">
               Get Started for Free

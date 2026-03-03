@@ -347,6 +347,31 @@ db.exec(`
   );
 `);
 
+// ---------- INDEXES for query performance ----------
+const createIndex = (sql: string) => { try { db.exec(sql); } catch {} };
+createIndex('CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_incidents_severity ON incidents(severity)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_incidents_date ON incidents(date)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_incidents_reported_by ON incidents(reported_by)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_incidents_category ON incidents(category)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_actions_status ON actions(status)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_actions_due_date ON actions(due_date)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_actions_assignee ON actions(assignee)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_actions_indicator ON actions(indicator)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_observations_type ON observations(type)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_observations_date ON observations(date)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_permits_status ON permits(status)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_permits_valid_until ON permits(valid_until)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_workers_department ON workers(department)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_training_records_worker ON training_records(worker_id)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_training_records_status ON training_records(status)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_ppe_issuance_worker ON ppe_issuance(worker_id)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_ppe_issuance_status ON ppe_issuance(status)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_env_readings_type ON environmental_readings(reading_type)');
+createIndex('CREATE INDEX IF NOT EXISTS idx_env_readings_date ON environmental_readings(created_at)');
+
 // ---------- MIGRATIONS (add new columns to existing tables) ----------
 const migrate = (table: string, column: string, colDef: string) => {
   try {
