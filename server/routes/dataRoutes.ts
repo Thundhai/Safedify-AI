@@ -118,7 +118,7 @@ router.get('/actions', (req: AuthRequest, res: Response) => {
   res.json(db.prepare('SELECT * FROM actions ORDER BY created_at DESC').all());
 });
 
-router.post('/actions', (req: AuthRequest, res: Response) => {
+router.post('/actions', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
   const { title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, effectiveness } = req.body;
   const id = uuid();
   db.prepare(
@@ -142,7 +142,7 @@ router.post('/actions', (req: AuthRequest, res: Response) => {
   }
 });
 
-router.put('/actions/:id', (req: AuthRequest, res: Response) => {
+router.put('/actions/:id', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
   const { title, description, assignee, due_date, completed_date, priority, status, action_type, category, indicator, verified_by, effectiveness } = req.body;
   db.prepare(
     `UPDATE actions SET title=COALESCE(?,title), description=COALESCE(?,description), assignee=COALESCE(?,assignee),
@@ -182,7 +182,7 @@ router.get('/observations', (req: AuthRequest, res: Response) => {
   res.json(db.prepare('SELECT * FROM observations ORDER BY created_at DESC').all());
 });
 
-router.post('/observations', (req: AuthRequest, res: Response) => {
+router.post('/observations', requirePermission('create_incident'), (req: AuthRequest, res: Response) => {
   const { type, category, description, location, date, observer, is_anonymous, immediate_action, images } = req.body;
   const id = uuid();
   db.prepare(
@@ -191,7 +191,7 @@ router.post('/observations', (req: AuthRequest, res: Response) => {
   res.status(201).json({ id });
 });
 
-router.put('/observations/:id', (req: AuthRequest, res: Response) => {
+router.put('/observations/:id', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
   const { type, category, description, location, date, observer, status, immediate_action, images } = req.body;
   db.prepare(
     `UPDATE observations SET type=COALESCE(?,type), category=COALESCE(?,category), description=COALESCE(?,description),
@@ -212,7 +212,7 @@ router.get('/inspections', (req: AuthRequest, res: Response) => {
   res.json(db.prepare('SELECT * FROM inspections ORDER BY created_at DESC').all());
 });
 
-router.post('/inspections', (req: AuthRequest, res: Response) => {
+router.post('/inspections', requirePermission('perform_inspection'), (req: AuthRequest, res: Response) => {
   const { template_name, title, date, location, items, score, completed, signature } = req.body;
   const id = uuid();
   db.prepare(
@@ -227,7 +227,7 @@ router.get('/permits', (req: AuthRequest, res: Response) => {
   res.json(db.prepare('SELECT * FROM permits ORDER BY created_at DESC').all());
 });
 
-router.post('/permits', (req: AuthRequest, res: Response) => {
+router.post('/permits', requirePermission('create_permit'), (req: AuthRequest, res: Response) => {
   const { type, location, description, valid_from, valid_until, requestor, status, controls } = req.body;
   const id = uuid();
   db.prepare(
@@ -282,7 +282,7 @@ router.get('/workers/:id', (req: AuthRequest, res: Response) => {
   res.json(row);
 });
 
-router.post('/workers', (req: AuthRequest, res: Response) => {
+router.post('/workers', requirePermission('manage_users'), (req: AuthRequest, res: Response) => {
   const { name, role, department, company_id, joined_date, email, phone } = req.body;
   const id = uuid();
   db.prepare(
@@ -291,12 +291,17 @@ router.post('/workers', (req: AuthRequest, res: Response) => {
   res.status(201).json({ id });
 });
 
-router.put('/workers/:id', (req: AuthRequest, res: Response) => {
+router.put('/workers/:id', requirePermission('manage_users'), (req: AuthRequest, res: Response) => {
   const { name, role, department, email, phone, points, level } = req.body;
   db.prepare(
     'UPDATE workers SET name=COALESCE(?,name), role=COALESCE(?,role), department=COALESCE(?,department), email=COALESCE(?,email), phone=COALESCE(?,phone), points=COALESCE(?,points), level=COALESCE(?,level) WHERE id=?'
   ).run(name, role, department, email, phone, points, level, req.params.id);
   res.json({ message: 'Updated' });
+});
+
+router.delete('/workers/:id', requirePermission('manage_users'), (req: AuthRequest, res: Response) => {
+  db.prepare('DELETE FROM workers WHERE id = ?').run(req.params.id);
+  res.json({ message: 'Deleted' });
 });
 
 // ---------- CONTRACTORS ----------
@@ -311,7 +316,7 @@ router.get('/contractors/:id', (req: AuthRequest, res: Response) => {
   res.json(row);
 });
 
-router.post('/contractors', (req: AuthRequest, res: Response) => {
+router.post('/contractors', requirePermission('manage_users'), (req: AuthRequest, res: Response) => {
   const { name, contact_person, email, phone, status } = req.body;
   const id = uuid();
   db.prepare(
@@ -332,7 +337,7 @@ router.get('/assets/:id', (req: AuthRequest, res: Response) => {
   res.json(row);
 });
 
-router.post('/assets', (req: AuthRequest, res: Response) => {
+router.post('/assets', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
   const { name, category, model_number, serial_number, location, status, next_inspection_date } = req.body;
   const id = uuid();
   db.prepare(
@@ -353,7 +358,7 @@ router.get('/documents/:id', (req: AuthRequest, res: Response) => {
   res.json(row);
 });
 
-router.post('/documents', (req: AuthRequest, res: Response) => {
+router.post('/documents', requirePermission('manage_documents'), (req: AuthRequest, res: Response) => {
   const { title, category, content, status } = req.body;
   const id = uuid();
   db.prepare(
@@ -398,7 +403,7 @@ router.get('/stats', (req: AuthRequest, res: Response) => {
   });
 });
 
-router.post('/stats/log', (req: AuthRequest, res: Response) => {
+router.post('/stats/log', requirePermission('view_analytics'), (req: AuthRequest, res: Response) => {
   const { date, period, man_hours, active_workers, remarks } = req.body;
   const id = uuid();
   db.prepare(
@@ -413,7 +418,7 @@ router.get('/emergency/contacts', (req: AuthRequest, res: Response) => {
   res.json(db.prepare('SELECT * FROM emergency_contacts ORDER BY created_at DESC').all());
 });
 
-router.post('/emergency/contacts', (req: AuthRequest, res: Response) => {
+router.post('/emergency/contacts', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
   const { name, role, phone, type, location } = req.body;
   const id = uuid();
   db.prepare(
@@ -426,7 +431,7 @@ router.get('/emergency/drills', (req: AuthRequest, res: Response) => {
   res.json(db.prepare('SELECT * FROM emergency_drills ORDER BY created_at DESC').all());
 });
 
-router.post('/emergency/drills', (req: AuthRequest, res: Response) => {
+router.post('/emergency/drills', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
   const { type, date, location, participants_count, duration_minutes, outcome, notes, attendance_list } = req.body;
   const id = uuid();
   db.prepare(
@@ -448,16 +453,16 @@ router.get('/risk-assessments/:id', (req: AuthRequest, res: Response) => {
   res.json({ ...row, hazards: JSON.parse(row.hazards || '[]') });
 });
 
-router.post('/risk-assessments', (req: AuthRequest, res: Response) => {
-  const { id: clientId, title, task_description, taskDescription, type, date, author, hazards, status } = req.body;
-  const id = clientId || uuid();
+router.post('/risk-assessments', requirePermission('create_incident'), (req: AuthRequest, res: Response) => {
+  const { title, task_description, taskDescription, type, date, author, hazards, status } = req.body;
+  const id = uuid();
   db.prepare(
     'INSERT INTO risk_assessments (id, title, task_description, type, date, author, hazards, status) VALUES (?,?,?,?,?,?,?,?)'
   ).run(id, title, task_description || taskDescription, type || 'JHA', date || new Date().toISOString(), author || req.user?.name, JSON.stringify(hazards || []), status || 'Draft');
   res.status(201).json({ id });
 });
 
-router.put('/risk-assessments/:id', (req: AuthRequest, res: Response) => {
+router.put('/risk-assessments/:id', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
   const { title, task_description, taskDescription, type, date, hazards, status } = req.body;
   db.prepare(
     `UPDATE risk_assessments SET title=COALESCE(?,title), task_description=COALESCE(?,task_description),
@@ -474,9 +479,9 @@ router.get('/inspection-templates', (req: AuthRequest, res: Response) => {
   res.json(rows.map((r: any) => ({ ...r, items: JSON.parse(r.items || '[]') })));
 });
 
-router.post('/inspection-templates', (req: AuthRequest, res: Response) => {
-  const { id: clientId, name, category, description, items } = req.body;
-  const id = clientId || uuid();
+router.post('/inspection-templates', requirePermission('perform_inspection'), (req: AuthRequest, res: Response) => {
+  const { name, category, description, items } = req.body;
+  const id = uuid();
   db.prepare(
     'INSERT INTO inspection_templates (id, name, category, description, items) VALUES (?,?,?,?,?)'
   ).run(id, name, category, description, JSON.stringify(items || []));
@@ -490,9 +495,9 @@ router.get('/training-modules', (req: AuthRequest, res: Response) => {
   res.json(rows.map((r: any) => ({ ...r, required_for_roles: JSON.parse(r.required_for_roles || '[]') })));
 });
 
-router.post('/training-modules', (req: AuthRequest, res: Response) => {
-  const { id: clientId, title, description, required_for_roles, requiredForRoles, validity_months, validityMonths } = req.body;
-  const id = clientId || uuid();
+router.post('/training-modules', requirePermission('manage_users'), (req: AuthRequest, res: Response) => {
+  const { title, description, required_for_roles, requiredForRoles, validity_months, validityMonths } = req.body;
+  const id = uuid();
   db.prepare(
     'INSERT INTO training_modules (id, title, description, required_for_roles, validity_months) VALUES (?,?,?,?,?)'
   ).run(id, title, description, JSON.stringify(required_for_roles || requiredForRoles || []), validity_months ?? validityMonths ?? 0);
@@ -505,9 +510,9 @@ router.get('/training-records', (req: AuthRequest, res: Response) => {
   res.json(db.prepare('SELECT * FROM training_records ORDER BY created_at DESC').all());
 });
 
-router.post('/training-records', (req: AuthRequest, res: Response) => {
-  const { id: clientId, worker_id, workerId, module_id, moduleId, module_title, moduleTitle, completion_date, completionDate, expiry_date, expiryDate, certificate_url, certificateUrl, status } = req.body;
-  const id = clientId || uuid();
+router.post('/training-records', requirePermission('manage_users'), (req: AuthRequest, res: Response) => {
+  const { worker_id, workerId, module_id, moduleId, module_title, moduleTitle, completion_date, completionDate, expiry_date, expiryDate, certificate_url, certificateUrl, status } = req.body;
+  const id = uuid();
   db.prepare(
     'INSERT INTO training_records (id, worker_id, module_id, module_title, completion_date, expiry_date, certificate_url, status) VALUES (?,?,?,?,?,?,?,?)'
   ).run(id, worker_id || workerId, module_id || moduleId, module_title || moduleTitle, completion_date || completionDate, expiry_date || expiryDate, certificate_url || certificateUrl, status || 'Valid');
@@ -520,16 +525,16 @@ router.get('/ppe/inventory', (req: AuthRequest, res: Response) => {
   res.json(db.prepare('SELECT * FROM ppe_inventory ORDER BY created_at DESC').all());
 });
 
-router.post('/ppe/inventory', (req: AuthRequest, res: Response) => {
-  const { id: clientId, name, category, stock_quantity, stockQuantity, min_stock_threshold, minStockThreshold, description } = req.body;
-  const id = clientId || uuid();
+router.post('/ppe/inventory', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
+  const { name, category, stock_quantity, stockQuantity, min_stock_threshold, minStockThreshold, description } = req.body;
+  const id = uuid();
   db.prepare(
     'INSERT INTO ppe_inventory (id, name, category, stock_quantity, min_stock_threshold, description) VALUES (?,?,?,?,?,?)'
   ).run(id, name, category, stock_quantity ?? stockQuantity ?? 0, min_stock_threshold ?? minStockThreshold ?? 5, description);
   res.status(201).json({ id });
 });
 
-router.put('/ppe/inventory/:id', (req: AuthRequest, res: Response) => {
+router.put('/ppe/inventory/:id', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
   const { stock_quantity, stockQuantity, name, category } = req.body;
   db.prepare(
     'UPDATE ppe_inventory SET stock_quantity=COALESCE(?,stock_quantity), name=COALESCE(?,name), category=COALESCE(?,category) WHERE id=?'
@@ -543,9 +548,9 @@ router.get('/ppe/issuance', (req: AuthRequest, res: Response) => {
   res.json(db.prepare('SELECT * FROM ppe_issuance ORDER BY created_at DESC').all());
 });
 
-router.post('/ppe/issuance', (req: AuthRequest, res: Response) => {
-  const { id: clientId, worker_id, workerId, worker_name, workerName, ppe_item_id, ppeItemId, ppe_item_name, ppeItemName, issue_date, issueDate, expiry_date, expiryDate, signature_url, signatureUrl, status } = req.body;
-  const id = clientId || uuid();
+router.post('/ppe/issuance', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
+  const { worker_id, workerId, worker_name, workerName, ppe_item_id, ppeItemId, ppe_item_name, ppeItemName, issue_date, issueDate, expiry_date, expiryDate, signature_url, signatureUrl, status } = req.body;
+  const id = uuid();
   const ppeId = ppe_item_id || ppeItemId;
   db.prepare(
     'INSERT INTO ppe_issuance (id, worker_id, worker_name, ppe_item_id, ppe_item_name, issue_date, expiry_date, signature_url, status) VALUES (?,?,?,?,?,?,?,?,?)'
@@ -559,7 +564,7 @@ router.post('/ppe/issuance', (req: AuthRequest, res: Response) => {
   res.status(201).json({ id });
 });
 
-router.put('/ppe/issuance/:id', (req: AuthRequest, res: Response) => {
+router.put('/ppe/issuance/:id', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
   const { status } = req.body;
   const log = db.prepare('SELECT * FROM ppe_issuance WHERE id = ?').get(req.params.id) as any;
   if (!log) { res.status(404).json({ error: 'Not found' }); return; }
@@ -582,10 +587,24 @@ router.get('/roles', (req: AuthRequest, res: Response) => {
 });
 
 router.post('/roles', requirePermission('manage_roles'), (req: AuthRequest, res: Response) => {
-  const { id: clientId, name, description, is_system, isSystem, permissions } = req.body;
-  const id = clientId || uuid();
+  const { name, description, is_system, isSystem, permissions } = req.body;
+  // Check if role name already exists
+  const existing = db.prepare('SELECT id, is_system FROM roles WHERE name = ?').get(name) as any;
+  if (existing) {
+    if (existing.is_system) {
+      res.status(403).json({ error: 'Cannot overwrite a system role' });
+      return;
+    }
+    // Update existing role
+    db.prepare(
+      'UPDATE roles SET description = ?, permissions = ? WHERE id = ?'
+    ).run(description, JSON.stringify(permissions || []), existing.id);
+    res.json({ id: existing.id, message: 'Role updated' });
+    return;
+  }
+  const id = uuid();
   db.prepare(
-    'INSERT OR REPLACE INTO roles (id, name, description, is_system, permissions) VALUES (?,?,?,?,?)'
+    'INSERT INTO roles (id, name, description, is_system, permissions) VALUES (?,?,?,?,?)'
   ).run(id, name, description, is_system ?? isSystem ?? 0, JSON.stringify(permissions || []));
   res.status(201).json({ id });
 });
@@ -607,9 +626,9 @@ router.get('/safety-zones', (req: AuthRequest, res: Response) => {
   res.json(rows.map((r: any) => ({ ...r, required_ppe: JSON.parse(r.required_ppe || '[]'), required_training: JSON.parse(r.required_training || '[]') })));
 });
 
-router.post('/safety-zones', (req: AuthRequest, res: Response) => {
-  const { id: clientId, name, type, lat, lng, radius, required_ppe, requiredPPE, required_training, requiredTraining } = req.body;
-  const id = clientId || uuid();
+router.post('/safety-zones', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
+  const { name, type, lat, lng, radius, required_ppe, requiredPPE, required_training, requiredTraining } = req.body;
+  const id = uuid();
   db.prepare(
     'INSERT INTO safety_zones (id, name, type, lat, lng, radius, required_ppe, required_training) VALUES (?,?,?,?,?,?,?,?)'
   ).run(id, name, type || 'Safe', lat, lng, radius || 100, JSON.stringify(required_ppe || requiredPPE || []), JSON.stringify(required_training || requiredTraining || []));

@@ -8,10 +8,12 @@ import { getPermitById, savePermit, getRiskAssessments } from '../services/stora
 import { auditPermitAI } from '../services/geminiService';
 import { SmartTextInput, SmartTextArea } from './SmartTextInput';
 import { Permit, PermitType, PermitStatus, RiskAssessment } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 export const PermitForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const isNew = !id || id === 'new';
   const isReadOnly = !isNew && id !== 'new'; // Simplification: Editing existing not full scope of MVP unless status is Draft
 
@@ -23,7 +25,7 @@ export const PermitForm: React.FC = () => {
     description: '',
     validFrom: new Date().toISOString(), // Defaults to now
     validUntil: new Date(new Date().setHours(new Date().getHours() + 8)).toISOString(), // Defaults to +8h
-    requestor: 'Current User',
+    requestor: user?.name || 'Unknown',
     status: PermitStatus.DRAFT,
     controls: []
   });
@@ -173,7 +175,7 @@ export const PermitForm: React.FC = () => {
 
   const handleApprove = async () => {
       // Simulation
-      const updated = { ...formData, status: PermitStatus.APPROVED, approver: 'Current User' };
+      const updated = { ...formData, status: PermitStatus.APPROVED, approver: user?.name || 'Unknown' };
       await savePermit(updated);
       setFormData(updated);
       alert("Permit Approved and Active.");

@@ -4,6 +4,7 @@ import { getDocumentById, saveDocument } from '../services/storageService';
 import { summarizeDocumentAI } from '../services/geminiService';
 import { SmartTextInput, SmartTextArea } from './SmartTextInput';
 import { HSEDocument, DocumentCategory } from '../types';
+import { useAuth } from '../context/AuthContext';
 import { 
     ArrowLeft, Save, Upload, QrCode, Sparkles, Loader2, CheckCircle, 
     XCircle, FileText, Calendar, User
@@ -12,6 +13,7 @@ import {
 export const DocumentForm: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { user } = useAuth();
     const isNew = !id || id === 'new';
 
     const [doc, setDoc] = useState<HSEDocument>({
@@ -21,7 +23,7 @@ export const DocumentForm: React.FC = () => {
         version: 'v1.0',
         status: 'Draft',
         uploadDate: new Date().toISOString().split('T')[0],
-        author: 'Current User',
+        author: user?.name || 'Unknown',
         description: ''
     });
 
@@ -76,7 +78,7 @@ export const DocumentForm: React.FC = () => {
         const updated = { 
             ...doc, 
             status: 'Approved' as const, 
-            approvedBy: 'Current User', 
+            approvedBy: user?.name || 'Unknown', 
             approvalDate: new Date().toISOString().split('T')[0] 
         };
         setDoc(updated);

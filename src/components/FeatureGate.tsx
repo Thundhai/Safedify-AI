@@ -56,16 +56,13 @@ export const FeatureGate: React.FC<FeatureGateProps> = ({
       );
   }
 
-  // Inline lock (e.g., for specific buttons)
+  // Inline lock (e.g., for specific buttons) — don't mount children to prevent side-effects
   return (
-    <div className="relative group cursor-not-allowed">
-        <div className="opacity-40 pointer-events-none grayscale">
-            {children}
-        </div>
-        <div className="absolute inset-0 flex items-center justify-center">
+    <div className="relative group cursor-not-allowed inline-block">
+        <div className="flex items-center justify-center px-4 py-2">
             <div className="bg-slate-900/90 text-white text-xs px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md backdrop-blur-sm transform transition-transform group-hover:scale-105">
                 <Lock size={12} className="text-yellow-400" />
-                <span className="font-bold">{requiredTier}</span>
+                <span className="font-bold">{requiredTier} — {featureName}</span>
             </div>
         </div>
         <div className="absolute inset-0 z-10" onClick={() => navigate('/pricing')}></div>

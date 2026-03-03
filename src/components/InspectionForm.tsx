@@ -10,8 +10,10 @@ import { suggestInspectionFixAI } from '../services/geminiService';
 import { SmartTextInput } from './SmartTextInput';
 import { compressImage } from '../services/offlineService';
 import { Inspection, InspectionItem, InspectionTemplate } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 export const InspectionForm: React.FC = () => {
+  const { user } = useAuth();
   // Mode: list (dashboard) | create-template | select-template | form (executing) | report (view/print)
   const [view, setView] = useState<'list' | 'create-template' | 'select-template' | 'form' | 'report'>('list');
   const [inspections, setInspections] = useState<Inspection[]>([]);
@@ -100,7 +102,7 @@ export const InspectionForm: React.FC = () => {
         templateId: template.id,
         templateName: template.name,
         date: new Date().toISOString(),
-        inspector: 'Current User', // Mock
+        inspector: user?.name || 'Unknown',
     });
     setView('form');
   };

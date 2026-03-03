@@ -345,6 +345,16 @@ db.exec(`
     is_default INTEGER DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    token TEXT UNIQUE NOT NULL,
+    expires_at TEXT NOT NULL,
+    used INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
 `);
 
 // ---------- INDEXES for query performance ----------
@@ -454,6 +464,21 @@ const seedDefaults = () => {
 };
 
 seedDefaults();
+
+// ---------- Periodic cleanup ----------
+// Clean up expired password reset tokens on startup and every hour
+const cleanupExpiredTokens = () => {
+  try {
+    const result = db.prepare("DELETE FROM password_reset_tokens WHERE expires_at < datetime('now') OR used = 1").run();
+    if (result.changes > 0) {
+      console.log(`[DB] Cleaned up ${result.changes} expired/used password reset tokens`);
+    }
+  } catch (err: any) {
+    console.error('[DB] Token cleanup error:', err.message);
+  }
+};
+cleanupExpiredTokens();
+setInterval(cleanupExpiredTokens, 60 * 60 * 1000); // every hour
 
 export default db;
 export { DB_PATH };

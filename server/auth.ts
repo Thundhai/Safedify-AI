@@ -46,7 +46,23 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   try {
     const token = header.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
-    req.user = decoded;
+
+    // Re-check user still exists and get fresh role/tier from DB
+    const dbUser = db.prepare('SELECT id, name, email, role, tier, avatar FROM users WHERE id = ?').get(decoded.id) as any;
+    if (!dbUser) {
+      res.status(401).json({ error: 'User account no longer exists' });
+      return;
+    }
+
+    // Use DB values (not stale JWT values) for role/tier
+    req.user = {
+      id: dbUser.id,
+      name: dbUser.name,
+      email: dbUser.email,
+      role: dbUser.role,
+      tier: dbUser.tier,
+      avatar: dbUser.avatar,
+    };
     next();
   } catch {
     res.status(401).json({ error: 'Invalid or expired token' });
@@ -64,10 +80,7 @@ export const requireRole = (...roles: string[]) => {
     }
     // Admin always passes
     if (req.user.role === 'Admin') { next(); return; }
-    // Check role by name against the roles DB
-    const userRoleRow = db.prepare('SELECT permissions FROM roles WHERE name = ?').get(req.user.role) as any;
-    const userRoleName = req.user.role;
-    if (roles.includes(userRoleName)) { next(); return; }
+    if (roles.includes(req.user.role)) { next(); return; }
     res.status(403).json({ error: 'Insufficient permissions for this action' });
   };
 };
@@ -101,9 +114,9 @@ export const seedDefaultUsers = async () => {
   if (!existing) {
     const hash = await hashPassword('password');
     const users = [
-      { id: uuid(), name: 'John Doe', email: 'admin@safedify.com', role: 'Manager', tier: 'Enterprise', avatar: 'JD' },
+      { id: uuid(), name: 'John Doe', email: 'admin@safedify.com', role: 'Admin', tier: 'Enterprise', avatar: 'JD' },
       { id: uuid(), name: 'Robert Fox', email: 'worker@safedify.com', role: 'Worker', tier: 'Free', avatar: 'RF' },
-      { id: uuid(), name: 'Sarah Connor', email: 'supervisor@safedify.com', role: 'Supervisor', tier: 'Pro', avatar: 'SC' },
+      { id: uuid(), name: 'Sarah Connor', email: 'supervisor@safedify.com', role: 'HSE Supervisor', tier: 'Pro', avatar: 'SC' },
     ];
 
     const insert = db.prepare(

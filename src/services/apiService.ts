@@ -110,6 +110,7 @@ export const apiGetInspections = () => apiFetch('/inspections');
 export const apiCreateInspection = (data: any) => apiFetch('/inspections', { method: 'POST', body: JSON.stringify(data) });
 
 export const apiGetPermits = () => apiFetch('/permits');
+export const apiGetPermit = (id: string) => apiFetch(`/permits/${id}`);
 export const apiCreatePermit = (data: any) => apiFetch('/permits', { method: 'POST', body: JSON.stringify(data) });
 export const apiUpdatePermit = (id: string, data: any) => apiFetch(`/permits/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 
@@ -117,6 +118,7 @@ export const apiGetWorkers = () => apiFetch('/workers');
 export const apiGetWorker = (id: string) => apiFetch(`/workers/${id}`);
 export const apiCreateWorker = (data: any) => apiFetch('/workers', { method: 'POST', body: JSON.stringify(data) });
 export const apiUpdateWorker = (id: string, data: any) => apiFetch(`/workers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const apiDeleteWorker = (id: string) => apiFetch(`/workers/${id}`, { method: 'DELETE' });
 
 export const apiGetContractors = () => apiFetch('/contractors');
 export const apiGetContractor = (id: string) => apiFetch(`/contractors/${id}`);
@@ -127,6 +129,7 @@ export const apiGetAsset = (id: string) => apiFetch(`/assets/${id}`);
 export const apiCreateAsset = (data: any) => apiFetch('/assets', { method: 'POST', body: JSON.stringify(data) });
 
 export const apiGetDocuments = () => apiFetch('/documents');
+export const apiGetDocument = (id: string) => apiFetch(`/documents/${id}`);
 export const apiCreateDocument = (data: any) => apiFetch('/documents', { method: 'POST', body: JSON.stringify(data) });
 
 export const apiGetStats = () => apiFetch('/stats');

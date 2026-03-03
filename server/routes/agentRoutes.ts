@@ -42,7 +42,10 @@ router.post('/chat', async (req: AuthRequest, res: Response) => {
     }
 
     // Run the agent
-    const { response, toolCalls } = await runAgent(message, history);
+    const { response, toolCalls } = await runAgent(message, history, {
+      userId: req.user?.id,
+      userName: req.user?.name,
+    });
 
     // Update history
     history.push({ role: 'user', text: message });
@@ -54,11 +57,11 @@ router.post('/chat', async (req: AuthRequest, res: Response) => {
     }
 
     // Save conversation
-    const existing = db.prepare('SELECT id FROM agent_conversations WHERE id = ?').get(convId);
+    const existing = db.prepare('SELECT id FROM agent_conversations WHERE id = ? AND user_id = ?').get(convId, req.user?.id);
     if (existing) {
       db.prepare(
-        "UPDATE agent_conversations SET messages = ?, updated_at = datetime('now') WHERE id = ?"
-      ).run(JSON.stringify(history), convId);
+        "UPDATE agent_conversations SET messages = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?"
+      ).run(JSON.stringify(history), convId, req.user?.id);
     } else {
       db.prepare(
         'INSERT INTO agent_conversations (id, user_id, messages) VALUES (?, ?, ?)'

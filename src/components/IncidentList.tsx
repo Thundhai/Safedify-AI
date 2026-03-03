@@ -30,10 +30,25 @@ export const IncidentList: React.FC = () => {
         if (statusFilter !== 'All') result = result.filter(i => i.status === statusFilter);
         if (severityFilter !== 'All') result = result.filter(i => i.severity === severityFilter);
         if (categoryFilter !== 'All') result = result.filter(i => i.category === categoryFilter);
+        if (typeFilter !== 'All') result = result.filter(i => i.type === typeFilter);
+        if (dateFilter !== 'All') {
+            const now = new Date();
+            result = result.filter(i => {
+                const d = new Date(i.date);
+                if (dateFilter === 'Today') return d.toDateString() === now.toDateString();
+                if (dateFilter === 'This Week') {
+                    const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+                    return d >= weekAgo;
+                }
+                if (dateFilter === 'This Month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+                if (dateFilter === 'This Year') return d.getFullYear() === now.getFullYear();
+                return true;
+            });
+        }
         
         result.sort((a, b) => sortBy === 'DateDesc' ? new Date(b.date).getTime() - new Date(a.date).getTime() : new Date(a.date).getTime() - new Date(b.date).getTime());
         return result;
-    }, [incidents, searchTerm, statusFilter, severityFilter, categoryFilter, sortBy]);
+    }, [incidents, searchTerm, statusFilter, severityFilter, categoryFilter, typeFilter, dateFilter, sortBy]);
 
     return (
         <div className="space-y-4">

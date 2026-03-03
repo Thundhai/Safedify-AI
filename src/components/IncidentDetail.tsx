@@ -8,9 +8,11 @@ import {
 import { getIncidentById, getActions, saveAction, updateIncident, updateAction } from '../services/storageService';
 import { analyzeRootCauseAI, generateSpeechAI, playGeneratedAudio } from '../services/geminiService';
 import { Incident, ActionItem, IncidentSeverity, InjuredPerson, IncidentWitness } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 export const IncidentDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [incident, setIncident] = useState<Incident | undefined>(undefined);
   const [actions, setActions] = useState<ActionItem[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'investigation' | 'capa'>('overview');
@@ -166,9 +168,6 @@ export const IncidentDetail: React.FC = () => {
     }
 
     setIsSaving(true);
-    
-    // Simulate a small network delay for better UX
-    await new Promise(resolve => setTimeout(resolve, 500));
 
     const updatedIncident: Incident = {
       ...incident,
@@ -179,7 +178,7 @@ export const IncidentDetail: React.FC = () => {
         categories: investigationMethod === 'Fishbone' ? fishbone : undefined,
         rootCause,
         evidence: evidence,
-        completedBy: 'Current User',
+        completedBy: user?.name || 'Unknown',
         completedAt: new Date().toISOString()
       }
     };

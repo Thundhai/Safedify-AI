@@ -188,9 +188,9 @@ const createIncident: ToolDefinition = {
   execute: (params) => {
     const id = uuid();
     db.prepare(
-      `INSERT INTO incidents (id, description, location, date, type, category, severity, status, days_lost, body_part, mechanism, immediate_action) 
-       VALUES (?, ?, ?, datetime('now'), ?, ?, ?, 'Open', ?, ?, ?, ?)`
-    ).run(id, params.description, params.location || 'Not specified', params.type, params.category || 'Near Miss', params.severity, params.days_lost || 0, params.body_part, params.mechanism, params.immediate_action);
+      `INSERT INTO incidents (id, description, location, date, type, category, severity, status, reported_by, days_lost, body_part, mechanism, immediate_action) 
+       VALUES (?, ?, ?, datetime('now'), ?, ?, ?, 'Open', ?, ?, ?, ?, ?)`
+    ).run(id, params.description, params.location || 'Not specified', params.type, params.category || 'Near Miss', params.severity, params._userId || null, params.days_lost || 0, params.body_part, params.mechanism, params.immediate_action);
     return { success: true, id, message: `Incident created with ID ${id}` };
   }
 };
@@ -284,15 +284,26 @@ const runCustomQuery: ToolDefinition = {
   },
   execute: (params) => {
     const sql = params.sql.trim();
-    // Safety: only allow SELECT
-    if (!sql.toUpperCase().startsWith('SELECT')) {
+    // Safety: only allow SELECT statements (must start with SELECT after stripping comments)
+    const stripped = sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '').trim();
+    if (!stripped.toUpperCase().startsWith('SELECT')) {
       return { error: 'Only SELECT queries are allowed for safety.' };
     }
-    // Block dangerous keywords
-    const forbidden = ['DROP', 'DELETE', 'INSERT', 'UPDATE', 'ALTER', 'CREATE', 'ATTACH', 'DETACH'];
+    // Block dangerous keywords (case-insensitive, word-boundary matching to avoid false positives)
+    const forbidden = ['DROP', 'DELETE', 'INSERT', 'UPDATE', 'ALTER', 'CREATE', 'ATTACH', 'DETACH', 'PRAGMA', 'REPLACE'];
+    const upper = stripped.toUpperCase();
     for (const kw of forbidden) {
-      if (sql.toUpperCase().includes(kw)) {
+      const regex = new RegExp(`\\b${kw}\\b`, 'i');
+      if (regex.test(upper)) {
         return { error: `Query contains forbidden keyword: ${kw}` };
+      }
+    }
+    // Block access to sensitive tables
+    const sensitiveTablePatterns = ['users', 'password_reset_tokens', 'agent_conversations'];
+    for (const table of sensitiveTablePatterns) {
+      const regex = new RegExp(`\\b${table}\\b`, 'i');
+      if (regex.test(stripped)) {
+        return { error: `Access to table "${table}" is not allowed for security reasons.` };
       }
     }
     try {

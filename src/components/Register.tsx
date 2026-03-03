@@ -47,8 +47,8 @@ export const Register: React.FC = () => {
         return;
     }
 
-    if (password.length < 6) {
-        setError("Password must be at least 6 characters");
+    if (password.length < 8) {
+        setError("Password must be at least 8 characters");
         return;
     }
 
@@ -189,7 +189,7 @@ export const Register: React.FC = () => {
                 className="mt-1"
               />
               <span className="text-xs text-slate-500">
-                  I agree to the <a href="#" className="text-blue-600 hover:underline">Terms of Service</a> and <a href="#" className="text-blue-600 hover:underline">Privacy Policy</a>.
+                  I agree to the <a href="/#/terms" className="text-blue-600 hover:underline">Terms of Service</a> and <a href="/#/privacy" className="text-blue-600 hover:underline">Privacy Policy</a>.
               </span>
           </label>
 

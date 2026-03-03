@@ -7,16 +7,18 @@ import { analyzeObservationAI } from '../services/geminiService';
 import { SmartTextInput, SmartTextArea } from './SmartTextInput';
 import { compressImage } from '../services/offlineService';
 import { Observation, ObservationType } from '../types';
+import { useAuth } from '../context/AuthContext';
 
 export const ObservationForm: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [type, setType] = useState<ObservationType>('Unsafe Act');
   const [category, setCategory] = useState('PPE');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [immediateAction, setImmediateAction] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
-  const [observerName, setObserverName] = useState('Current User');
+  const [observerName, setObserverName] = useState(user?.name || '');
   const [image, setImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);

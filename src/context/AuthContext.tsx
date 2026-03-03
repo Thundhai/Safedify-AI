@@ -1,7 +1,7 @@
 
 import React, { createContext, useState, useContext, useEffect, useRef, ReactNode } from 'react';
 import { AuthUser, UserRole, Permission, UserRoles } from '../types';
-import { getCurrentUser, login as authLogin, logout as authLogout, register as authRegister } from '../services/authService';
+import { getCurrentUser, login as authLogin, logout as authLogout, register as authRegister, verifySession } from '../services/authService';
 import { getRoles } from '../services/storageService';
 
 interface AuthContextType {
@@ -37,10 +37,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     const init = async () => {
+      // First load from local storage for instant UI, then verify with backend
       const storedUser = getCurrentUser();
       if (storedUser) {
         setUser(storedUser);
         await loadRoles();
+        // Verify session with backend in the background (updates localStorage if role/tier changed)
+        const verified = await verifySession();
+        if (verified) {
+          setUser(verified);
+        } else {
+          // Token invalid or user deleted — log out
+          setUser(null);
+        }
       }
       setLoading(false);
     };

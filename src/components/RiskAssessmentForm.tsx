@@ -23,7 +23,7 @@ export const RiskAssessmentForm: React.FC = () => {
     taskDescription: '',
     type: 'JHA',
     date: new Date().toISOString(),
-    author: 'Current User',
+    author: user?.name || 'Unknown',
     hazards: [],
     status: 'Draft'
   });

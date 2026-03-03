@@ -22,11 +22,11 @@ import {
   apiGetActions, apiCreateAction, apiUpdateAction, apiDeleteAction,
   apiGetObservations, apiCreateObservation, apiUpdateObservation, apiDeleteObservation,
   apiGetInspections, apiCreateInspection,
-  apiGetPermits, apiCreatePermit, apiUpdatePermit,
-  apiGetWorkers, apiGetWorker, apiCreateWorker, apiUpdateWorker,
-  apiGetContractors, apiCreateContractor,
-  apiGetAssets, apiCreateAsset,
-  apiGetDocuments, apiCreateDocument,
+  apiGetPermits, apiGetPermit, apiCreatePermit, apiUpdatePermit,
+  apiGetWorkers, apiGetWorker, apiCreateWorker, apiUpdateWorker, apiDeleteWorker,
+  apiGetContractors, apiGetContractor, apiCreateContractor,
+  apiGetAssets, apiGetAsset, apiCreateAsset,
+  apiGetDocuments, apiGetDocument, apiCreateDocument,
   apiGetStats, apiLogStats,
   apiGetEmergencyContacts, apiCreateEmergencyContact,
   apiGetEmergencyDrills, apiCreateEmergencyDrill,
@@ -566,7 +566,7 @@ export const updateWorker = async (worker: WorkerProfile): Promise<void> => {
 };
 
 export const deleteWorker = async (id: string): Promise<void> => {
-  console.warn('Worker delete not yet supported on backend, id:', id);
+  await apiDeleteWorker(id);
 };
 
 export const awardPoints = async (workerId: string, points: number): Promise<void> => {
@@ -630,11 +630,39 @@ export const updatePPEStock = async (id: string, newQuantity: number): Promise<v
 };
 
 export const getPPECategories = async (): Promise<string[]> => {
-  return ['Head Protection', 'Eye Protection', 'Hearing Protection', 'Respiratory Protection', 'Hand Protection', 'Foot Protection', 'Body Protection', 'Fall Protection'];
+  const defaultCategories = ['Head Protection', 'Eye Protection', 'Hearing Protection', 'Respiratory Protection', 'Hand Protection', 'Foot Protection', 'Body Protection', 'Fall Protection'];
+  try {
+    const items = await apiGetPPEInventory();
+    const dbCategories = [...new Set((Array.isArray(items) ? items : []).map((i: any) => i.category).filter(Boolean))] as string[];
+    // Merge defaults with any custom categories from the DB
+    return [...new Set([...defaultCategories, ...dbCategories])];
+  } catch {
+    return defaultCategories;
+  }
 };
 
-export const savePPECategory = async (_cat: string): Promise<void> => {};
-export const deletePPECategory = async (_cat: string): Promise<void> => {};
+export const savePPECategory = async (cat: string): Promise<void> => {
+  // Create a placeholder PPE item to persist the category
+  await apiCreatePPEItem({
+    name: `${cat} - Uncategorized`,
+    category: cat,
+    stockQuantity: 0,
+    minStockThreshold: 0,
+    description: `Placeholder for category: ${cat}`,
+  });
+};
+
+export const deletePPECategory = async (cat: string): Promise<void> => {
+  // Remove all PPE items in this category (only uncategorized placeholders)
+  const items = await apiGetPPEInventory();
+  const toDelete = (Array.isArray(items) ? items : []).filter(
+    (i: any) => i.category === cat && i.name?.includes('Uncategorized') && (i.stock_quantity ?? 0) === 0
+  );
+  // For now, we can't delete PPE items via API (no endpoint) — just log a warning
+  if (toDelete.length === 0) {
+    console.warn(`Cannot delete category "${cat}" — it has items with stock or no placeholder found.`);
+  }
+};
 
 export const getPPEIssuanceLogs = async (): Promise<PPEIssuance[]> => {
   try {
@@ -675,8 +703,10 @@ export const getPermits = async (): Promise<Permit[]> => {
 };
 
 export const getPermitById = async (id: string): Promise<Permit | undefined> => {
-  const permits = await getPermits();
-  return permits.find(p => p.id === id);
+  try {
+    const row = await apiGetPermit(id);
+    return row ? mapPermit(row) : undefined;
+  } catch { return undefined; }
 };
 
 export const savePermit = async (permit: Permit): Promise<void> => {
@@ -710,8 +740,10 @@ export const getAssets = async (): Promise<Asset[]> => {
 };
 
 export const getAssetById = async (id: string): Promise<Asset | undefined> => {
-  const assets = await getAssets();
-  return assets.find(a => a.id === id);
+  try {
+    const row = await apiGetAsset(id);
+    return row ? mapAsset(row) : undefined;
+  } catch { return undefined; }
 };
 
 export const saveAsset = async (asset: Asset): Promise<void> => {
@@ -738,8 +770,10 @@ export const getContractors = async (): Promise<Contractor[]> => {
 };
 
 export const getContractorById = async (id: string): Promise<Contractor | undefined> => {
-  const list = await getContractors();
-  return list.find(c => c.id === id);
+  try {
+    const row = await apiGetContractor(id);
+    return row ? mapContractor(row) : undefined;
+  } catch { return undefined; }
 };
 
 export const saveContractor = async (contractor: Contractor): Promise<void> => {
@@ -762,8 +796,10 @@ export const getDocuments = async (): Promise<HSEDocument[]> => {
 };
 
 export const getDocumentById = async (id: string): Promise<HSEDocument | undefined> => {
-  const docs = await getDocuments();
-  return docs.find(d => d.id === id);
+  try {
+    const row = await apiGetDocument(id);
+    return row ? mapDocument(row) : undefined;
+  } catch { return undefined; }
 };
 
 export const saveDocument = async (doc: HSEDocument): Promise<void> => {
@@ -875,7 +911,15 @@ export const getManHours = async (): Promise<number> => {
   } catch { return 0; }
 };
 
-export const saveManHours = async (_hours: number): Promise<void> => {};
+export const saveManHours = async (hours: number): Promise<void> => {
+  await apiLogStats({
+    date: new Date().toISOString().split('T')[0],
+    period: 'Daily',
+    man_hours: hours,
+    active_workers: 0,
+    remarks: 'Manual man-hours entry',
+  });
+};
 
 // ---------- HSE Metrics ----------
 

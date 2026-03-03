@@ -5,8 +5,8 @@
  *   User message → Agent (Gemini) → may call tools → observe results → reason → respond
  *   Supports multi-step reasoning with up to 10 tool calls per turn.
  */
-import { GoogleGenAI, Type } from '@google/genai';
-import { allTools, toolMap, getToolDeclarations } from './tools.js';
+import { GoogleGenAI } from '@google/genai';
+import { toolMap, getToolDeclarations } from './tools.js';
 
 const apiKey = process.env.GEMINI_API_KEY;
 
@@ -50,7 +50,8 @@ export interface AgentMessage {
  */
 export async function runAgent(
   userMessage: string,
-  conversationHistory: AgentMessage[] = []
+  conversationHistory: AgentMessage[] = [],
+  userContext?: { userId?: string; userName?: string }
 ): Promise<{ response: string; toolCalls: { name: string; args: any; result: any }[] }> {
   if (!ai) {
     return {
@@ -126,7 +127,11 @@ export async function runAgent(
 
       if (tool) {
         try {
-          result = tool.execute(toolArgs);
+          // Inject user context for tools that create records
+          const argsWithContext = (toolName === 'create_incident' || toolName === 'create_action')
+            ? { ...toolArgs, _userId: userContext?.userId, _userName: userContext?.userName }
+            : toolArgs;
+          result = tool.execute(argsWithContext);
         } catch (err: any) {
           result = { error: err.message };
         }
