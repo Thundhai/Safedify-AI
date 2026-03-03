@@ -1,10 +1,11 @@
 
 import React, { useEffect, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { AlertTriangle, CheckCircle, Clock, TrendingUp, ClipboardCheck, Sparkles, Loader2, Gauge, BarChart2, Zap, ShieldCheck, Plus, X, ChevronRight, PlayCircle } from 'lucide-react';
-import { getIncidents, getActions, calculateSiteSafetyScore, calculateHSEMetrics, getInspections, getRiskAssessments } from '../services/storageService';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area } from 'recharts';
+import { AlertTriangle, CheckCircle, Clock, TrendingUp, ClipboardCheck, Sparkles, Loader2, Gauge, BarChart2, Zap, ShieldCheck, Plus, X, ChevronRight, PlayCircle, Download, Calendar } from 'lucide-react';
+import { getIncidents, getActions, calculateSiteSafetyScore, calculateHSEMetrics, getInspections, getRiskAssessments, getObservations } from '../services/storageService';
 import { predictiveSafetyAlertsAI } from '../services/geminiService';
 import { Incident, ActionItem, IncidentSeverity, SiteSafetyScore, SubscriptionTier } from '../types';
+import { apiExportData } from '../services/apiService';
 import { EnvironmentalCard } from './EnvironmentalCard';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -25,8 +26,11 @@ export const Dashboard: React.FC = () => {
     totalIncidents: 0,
     openActions: 0,
     inspectionCount: 0,
+    closedActions: 0,
+    totalActions: 0,
+    daysSinceLastIncident: 0,
     severityBreakdown: [] as { name: string; value: number }[],
-    monthlyTrends: [] as { name: string; incidents: number }[]
+    monthlyTrends: [] as { name: string; incidents: number; observations: number }[]
   });
   const [siteScore, setSiteScore] = useState<SiteSafetyScore | null>(null);
   const [predictiveAlerts, setPredictiveAlerts] = useState<any[]>([]);
@@ -54,6 +58,7 @@ export const Dashboard: React.FC = () => {
         const actions = (await getActions()) || [];
         const inspections = (await getInspections()) || [];
         const risks = (await getRiskAssessments()) || [];
+        const observations = (await getObservations()) || [];
 
         const anyData = incidents.length > 0 || actions.length > 0 || inspections.length > 0 || risks.length > 0;
         setHasData(anyData);
@@ -92,27 +97,48 @@ export const Dashboard: React.FC = () => {
           value: severityCounts[key]
         }));
 
-        // Monthly Trends — aggregate real incident data by month
-        const monthMap = new Map<string, number>();
+        // Monthly Trends — aggregate real incident + observation data by month
+        const monthMap = new Map<string, { incidents: number; observations: number }>();
         const now = new Date();
         for (let i = 5; i >= 0; i--) {
           const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
           const key = d.toLocaleString('default', { month: 'short' });
-          monthMap.set(key, 0);
+          monthMap.set(key, { incidents: 0, observations: 0 });
         }
         incidents.forEach(inc => {
           const d = new Date(inc.date);
           const key = d.toLocaleString('default', { month: 'short' });
-          if (monthMap.has(key)) monthMap.set(key, (monthMap.get(key) || 0) + 1);
+          const entry = monthMap.get(key);
+          if (entry) entry.incidents++;
         });
-        const monthlyData = Array.from(monthMap.entries()).map(([name, count]) => ({
+        observations.forEach((obs: any) => {
+          const d = new Date(obs.date || obs.created_at);
+          const key = d.toLocaleString('default', { month: 'short' });
+          const entry = monthMap.get(key);
+          if (entry) entry.observations++;
+        });
+        const monthlyData = Array.from(monthMap.entries()).map(([name, counts]) => ({
           name,
-          incidents: count
+          incidents: counts.incidents,
+          observations: counts.observations,
         }));
+
+        // Days since last incident
+        let daysSinceLastIncident = 0;
+        if (incidents.length > 0) {
+          const sorted = [...incidents].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          daysSinceLastIncident = Math.floor((Date.now() - new Date(sorted[0].date).getTime()) / (1000 * 60 * 60 * 24));
+        }
+
+        // Action closure rate
+        const closedActions = actions.filter(a => a.status === 'Done').length;
 
         setStats({
           totalIncidents: incidents.length,
           openActions: (actions || []).filter(a => a.status !== 'Done').length,
+          closedActions,
+          totalActions: actions.length,
+          daysSinceLastIncident,
           inspectionCount: inspections.length,
           severityBreakdown: severityData,
           monthlyTrends: monthlyData
@@ -144,6 +170,9 @@ export const Dashboard: React.FC = () => {
           totalIncidents: 0,
           openActions: 0,
           inspectionCount: 0,
+          closedActions: 0,
+          totalActions: 0,
+          daysSinceLastIncident: 0,
           severityBreakdown: [],
           monthlyTrends: []
         });
@@ -299,13 +328,22 @@ export const Dashboard: React.FC = () => {
                 <h2 className="text-xl font-bold text-slate-800 dark:text-white">Safety Performance</h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400">Real-time KPIs and incident statistics</p>
             </div>
+            <div className="ml-auto">
+              <button
+                onClick={() => apiExportData('incidents', 'csv').catch(() => {})}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition"
+                title="Export incidents to CSV"
+              >
+                <Download size={14} /> Export CSV
+              </button>
+            </div>
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
             {/* Left Column: KPIs & Charts (Span 3) */}
             <div className="xl:col-span-3 space-y-6">
                 {/* KPI Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                     {/* KPI 1: Incidents */}
                     <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
                         <div>
@@ -349,13 +387,35 @@ export const Dashboard: React.FC = () => {
                             <ClipboardCheck size={20} />
                         </div>
                     </div>
+
+                    {/* KPI 5: Days Since Last Incident */}
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                        <div>
+                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Days Incident-Free</p>
+                            <h3 className={`text-2xl font-bold mt-1 ${stats.daysSinceLastIncident >= 30 ? 'text-green-600' : stats.daysSinceLastIncident >= 7 ? 'text-yellow-600' : 'text-red-600'}`}>{stats.totalIncidents > 0 ? stats.daysSinceLastIncident : '∞'}</h3>
+                        </div>
+                        <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg text-purple-600 dark:text-purple-400">
+                            <Calendar size={20} />
+                        </div>
+                    </div>
+
+                    {/* KPI 6: Action Closure Rate */}
+                    <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                        <div>
+                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Action Closure</p>
+                            <h3 className="text-2xl font-bold text-slate-800 dark:text-white mt-1">{stats.totalActions > 0 ? Math.round((stats.closedActions / stats.totalActions) * 100) : 0}%</h3>
+                        </div>
+                        <div className="bg-teal-50 dark:bg-teal-900/20 p-3 rounded-lg text-teal-600 dark:text-teal-400">
+                            <TrendingUp size={20} />
+                        </div>
+                    </div>
                 </div>
 
                 {/* Charts Row */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {/* Bar Chart */}
                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                        <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4 uppercase tracking-wide">Incident Trends (YTD)</h3>
+                        <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4 uppercase tracking-wide">Incident & Observation Trends (6 Mo)</h3>
                         <div className="h-64 w-full" style={{ minHeight: '200px', minWidth: '300px' }}>
                             {stats.totalIncidents > 0 && Array.isArray(stats.monthlyTrends) && stats.monthlyTrends.length > 0 ? (
                                 <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
@@ -367,7 +427,8 @@ export const Dashboard: React.FC = () => {
                                             contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
                                             itemStyle={{color: '#1e293b'}}
                                         />
-                                        <Bar dataKey="incidents" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={32} />
+                                        <Bar dataKey="incidents" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={24} name="Incidents" />
+                                        <Bar dataKey="observations" fill="#22c55e" radius={[4, 4, 0, 0]} barSize={24} name="Observations" />
                                     </BarChart>
                                 </ResponsiveContainer>
                             ) : (

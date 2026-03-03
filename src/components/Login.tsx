@@ -2,14 +2,16 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Loader2, ShieldCheck, Lock, Mail, AlertCircle, ArrowRight, ArrowLeft, HardHat } from 'lucide-react';
+import { Loader2, ShieldCheck, Lock, Mail, AlertCircle, ArrowRight, ArrowLeft, HardHat, KeyRound } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [needs2FA, setNeeds2FA] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { login } = useAuth();
+  const { login, loginWith2FA } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -18,14 +20,34 @@ export const Login: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const success = await login(email, password);
-      if (success) {
+      const result = await login(email, password);
+      if (result === '2fa_required') {
+        setNeeds2FA(true);
+      } else if (result === true) {
         navigate('/');
       } else {
         setError('Invalid email or password. Please try again.');
       }
     } catch (err) {
       setError('An error occurred during login.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handle2FASubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsSubmitting(true);
+    try {
+      const success = await loginWith2FA(totpCode);
+      if (success) {
+        navigate('/');
+      } else {
+        setError('Invalid 2FA code. Please try again.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Invalid 2FA code');
     } finally {
       setIsSubmitting(false);
     }
@@ -57,13 +79,38 @@ export const Login: React.FC = () => {
                 <p className="text-slate-500">Enter your credentials to access your workspace.</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={needs2FA ? handle2FASubmit : handleSubmit} className="space-y-5">
             {error && (
                 <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg flex items-center gap-2 border border-red-100 animate-in fade-in">
                 <AlertCircle size={16} /> {error}
                 </div>
             )}
 
+            {needs2FA ? (
+              <>
+                <div className="text-center mb-2">
+                  <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-100 rounded-full mb-3">
+                    <KeyRound size={28} className="text-blue-600" />
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-800">Two-Factor Authentication</h2>
+                  <p className="text-sm text-slate-500">Enter the 6-digit code from your authenticator app</p>
+                </div>
+                <div className="space-y-1.5">
+                  <input
+                    type="text"
+                    required
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 text-center text-2xl font-mono tracking-[0.3em] focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    placeholder="000000"
+                    maxLength={8}
+                    autoFocus
+                  />
+                  <p className="text-xs text-slate-400 text-center">You can also use a backup code</p>
+                </div>
+              </>
+            ) : (
+              <>
             <div className="space-y-1.5">
                 <label className="text-sm font-bold text-slate-700">Email</label>
                 <div className="relative">
@@ -99,13 +146,15 @@ export const Login: React.FC = () => {
                     Forgot password?
                 </Link>
             </div>
+              </>
+            )}
 
             <button 
                 type="submit" 
                 disabled={isSubmitting}
                 className="w-full bg-brand-navy hover:bg-slate-800 text-white py-3.5 rounded-xl font-bold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-                {isSubmitting ? <Loader2 className="animate-spin" /> : 'Sign In'}
+                {isSubmitting ? <Loader2 className="animate-spin" /> : needs2FA ? 'Verify Code' : 'Sign In'}
             </button>
 
 

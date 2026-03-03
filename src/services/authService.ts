@@ -6,15 +6,26 @@
  */
 
 import { AuthUser, UserRole, SubscriptionTier } from "../types";
-import { apiLogin, apiRegister, apiGetMe, setAuthToken, getAuthToken } from './apiService';
+import { apiLogin, apiRegister, apiGetMe, setAuthToken, getAuthToken, apiLoginWith2FA } from './apiService';
 
 const AUTH_KEY = 'hse_auth_user';
 
-export const login = async (email: string, password: string): Promise<AuthUser | null> => {
+// 2FA challenge state — stored temporarily when login requires 2FA
+let pending2FAUserId: string | null = null;
+export const getPending2FAUserId = () => pending2FAUserId;
+export const clearPending2FA = () => { pending2FAUserId = null; };
+
+export const login = async (email: string, password: string): Promise<AuthUser | null | '2fa_required'> => {
     try {
         const data = await apiLogin(email, password);
+
+        // Handle 2FA challenge
+        if (data.requires2FA && data.userId) {
+            pending2FAUserId = data.userId;
+            return '2fa_required';
+        }
+
         if (data.token && data.user) {
-            // Map backend user to frontend AuthUser
             const user: AuthUser = {
                 id: data.user.id,
                 name: data.user.name,
@@ -30,6 +41,30 @@ export const login = async (email: string, password: string): Promise<AuthUser |
     } catch (error: any) {
         console.error('Login failed:', error.message);
         return null;
+    }
+};
+
+export const completeLoginWith2FA = async (token: string): Promise<AuthUser | null> => {
+    if (!pending2FAUserId) return null;
+    try {
+        const data = await apiLoginWith2FA(pending2FAUserId, token);
+        if (data.token && data.user) {
+            const user: AuthUser = {
+                id: data.user.id,
+                name: data.user.name,
+                email: data.user.email,
+                role: data.user.role,
+                tier: (data.user.tier as SubscriptionTier) || SubscriptionTier.FREE,
+                avatar: data.user.avatar,
+            };
+            localStorage.setItem(AUTH_KEY, JSON.stringify(user));
+            pending2FAUserId = null;
+            return user;
+        }
+        return null;
+    } catch (error: any) {
+        console.error('2FA login failed:', error.message);
+        throw error;
     }
 };
 

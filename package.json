@@ -16,7 +16,9 @@
     "test:coverage": "vitest run --coverage",
     "docker:build": "docker build -t safedify-ai .",
     "docker:up": "docker compose up -d",
-    "docker:down": "docker compose down"
+    "docker:down": "docker compose down",
+    "test:e2e": "npx playwright test",
+    "test:e2e:ui": "npx playwright test --ui"
   },
   "dependencies": {
     "lucide-react": "^0.556.0",
@@ -27,6 +29,7 @@
     "recharts": "^3.5.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",

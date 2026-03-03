@@ -44,6 +44,7 @@ import {
 import { getSyncQueue, processSyncQueue } from '../services/offlineService';
 import { AIChatAssistant } from './AIChatAssistant';
 import { NotificationBell } from './NotificationBell';
+import GlobalSearch from './GlobalSearch';
 import { useAuth } from '../context/AuthContext';
 import { SubscriptionTier } from '../types';
 
@@ -411,6 +412,9 @@ export const Layout: React.FC = () => {
                  {user?.tier === SubscriptionTier.ENTERPRISE ? <Crown size={14} className="text-yellow-600" /> : <CreditCard size={14} />}
                  {user?.tier === SubscriptionTier.FREE ? 'Upgrade' : 'My Plan'}
              </button>
+
+             {/* Global Search */}
+             <GlobalSearch />
 
              {/* Dark Mode Toggle */}
              <button 

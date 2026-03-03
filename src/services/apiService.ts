@@ -280,3 +280,62 @@ export const apiGetSiteLocations = () => apiFetch('/environmental/locations');
 
 export const apiCreateSiteLocation = (data: { name: string; latitude?: number; longitude?: number; is_default?: boolean }) =>
   apiFetch('/environmental/locations', { method: 'POST', body: JSON.stringify(data) });
+
+// ---------- Search API ----------
+
+export const apiSearch = (query: string, types?: string[], limit = 30) => {
+  const params = new URLSearchParams({ q: query });
+  if (types?.length) params.set('type', types.join(','));
+  if (limit !== 30) params.set('limit', String(limit));
+  return apiFetch(`/search?${params}`);
+};
+
+// ---------- Export API ----------
+
+export const apiExportData = async (entity: string, format: 'csv' | 'json' = 'csv', from?: string, to?: string) => {
+  const params = new URLSearchParams({ format });
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const token = getAuthToken();
+  const res = await fetch(`${API_BASE}/export/${entity}?${params}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Export failed');
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${entity}-export.${format}`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+// ---------- Audit Logs API ----------
+
+export const apiGetAuditLogs = (params?: { page?: number; per_page?: number; action?: string; entity_type?: string; from?: string; to?: string }) => {
+  const qs = new URLSearchParams();
+  if (params) Object.entries(params).forEach(([k, v]) => { if (v != null) qs.set(k, String(v)); });
+  return apiFetch(`/audit-logs?${qs}`);
+};
+
+// ---------- Admin / Backup API ----------
+
+export const apiCreateBackup = () => apiFetch('/admin/backup', { method: 'POST' });
+export const apiGetBackups = () => apiFetch('/admin/backups');
+
+// ---------- Password API ----------
+
+export const apiForgotPassword = (email: string) => apiFetch('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) });
+export const apiResetPassword = (token: string, password: string) => apiFetch('/auth/reset-password', { method: 'POST', body: JSON.stringify({ token, password }) });
+
+// ---------- Two-Factor Auth API ----------
+
+export const api2FASetup = () => apiFetch('/auth/2fa/setup', { method: 'POST' });
+export const api2FAVerify = (token: string) => apiFetch('/auth/2fa/verify', { method: 'POST', body: JSON.stringify({ token }) });
+export const api2FAStatus = () => apiFetch('/auth/2fa/status');
+export const api2FADisable = () => apiFetch('/auth/2fa', { method: 'DELETE' });
+export const apiLoginWith2FA = async (userId: string, token: string) => {
+  const data = await apiFetch('/auth/login/2fa', { method: 'POST', body: JSON.stringify({ userId, token }) });
+  setAuthToken(data.token);
+  return data;
+};

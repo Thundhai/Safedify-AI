@@ -1,0 +1,485 @@
+openapi: '3.1.0'
+info:
+  title: Safedify AI — HSE Management Platform API
+  version: '1.0.0'
+  description: |
+    REST API for the Safedify AI Health, Safety & Environment management platform.
+    All authenticated endpoints require `Authorization: Bearer <token>` header.
+  contact:
+    name: Safedify AI
+    url: https://github.com/Thundhai/Safedify-AI
+
+servers:
+  - url: /api
+    description: Default (same-origin in production, proxied in dev)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+
+    User:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { type: string }
+        tier: { type: string }
+        avatar: { type: string }
+
+    Incident:
+      type: object
+      required: [description, date, type, severity]
+      properties:
+        id: { type: string }
+        description: { type: string }
+        location: { type: string }
+        date: { type: string, format: date-time }
+        type: { type: string, enum: [LTI, Near Miss, Fire, Chemical Spill, Vehicle Incident, Slip Trip Fall, Electrical, Confined Space, Working at Height, Environmental] }
+        category: { type: string, enum: [Near Miss, First Aid Case, Medical Treatment Case, Restricted Work Case, Lost Time Injury, Fatality] }
+        severity: { type: string, enum: [Low, Medium, High, Critical] }
+        status: { type: string, enum: [Open, Investigating, Closed] }
+        images: { type: array, items: { type: string } }
+        days_lost: { type: integer }
+
+    Observation:
+      type: object
+      required: [type, description, date]
+      properties:
+        id: { type: string }
+        type: { type: string }
+        category: { type: string }
+        description: { type: string }
+        location: { type: string }
+        date: { type: string, format: date }
+        status: { type: string }
+
+    Action:
+      type: object
+      required: [title, priority, status]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        assignee: { type: string }
+        due_date: { type: string, format: date }
+        priority: { type: string, enum: [Low, Medium, High, Critical] }
+        status: { type: string, enum: [Open, In Progress, Overdue, Done, Verified] }
+        action_type: { type: string, enum: [Corrective, Preventive, Improvement] }
+
+    Permit:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string }
+        location: { type: string }
+        description: { type: string }
+        valid_from: { type: string, format: date }
+        valid_until: { type: string, format: date }
+        status: { type: string }
+
+    SearchResult:
+      type: object
+      properties:
+        query: { type: string }
+        total: { type: integer }
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              type: { type: string }
+              title: { type: string }
+              snippet: { type: string }
+              rank: { type: number }
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema: { type: integer, default: 1 }
+    LimitParam:
+      name: limit
+      in: query
+      schema: { type: integer, default: 50, maximum: 200 }
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [System]
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: Server status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string }
+                  version: { type: string }
+                  environment: { type: string }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: JWT token and user info
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+                  user: { $ref: '#/components/schemas/User' }
+        '401':
+          description: Invalid credentials
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                role: { type: string, enum: [Worker, HSE Supervisor] }
+      responses:
+        '201':
+          description: Account created
+        '409':
+          description: Email already registered
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/User' }
+
+  /incidents:
+    get:
+      tags: [Incidents]
+      summary: List incidents (paginated)
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Paginated list
+          headers:
+            X-Total-Count: { schema: { type: integer } }
+            X-Page: { schema: { type: integer } }
+            X-Per-Page: { schema: { type: integer } }
+            X-Total-Pages: { schema: { type: integer } }
+    post:
+      tags: [Incidents]
+      summary: Create incident
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Incident' }
+      responses:
+        '201':
+          description: Created
+
+  /incidents/{id}:
+    get:
+      tags: [Incidents]
+      summary: Get incident by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Incident detail }
+        '404': { description: Not found }
+    put:
+      tags: [Incidents]
+      summary: Update incident
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Updated }
+    delete:
+      tags: [Incidents]
+      summary: Delete incident
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Deleted }
+
+  /observations:
+    get:
+      tags: [Observations]
+      summary: List observations (paginated)
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200': { description: Paginated list }
+    post:
+      tags: [Observations]
+      summary: Create observation
+      responses:
+        '201': { description: Created }
+
+  /actions:
+    get:
+      tags: [Actions]
+      summary: List actions (paginated)
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200': { description: Paginated list }
+    post:
+      tags: [Actions]
+      summary: Create action
+      responses:
+        '201': { description: Created }
+
+  /permits:
+    get:
+      tags: [Permits]
+      summary: List permits (paginated)
+      responses:
+        '200': { description: Paginated list }
+    post:
+      tags: [Permits]
+      summary: Create permit
+      responses:
+        '201': { description: Created }
+
+  /workers:
+    get:
+      tags: [Workers]
+      summary: List workers (paginated)
+      responses:
+        '200': { description: Paginated list }
+    post:
+      tags: [Workers]
+      summary: Create worker
+      responses:
+        '201': { description: Created }
+
+  /search:
+    get:
+      tags: [Search]
+      summary: Full-text search across all entities
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string, minLength: 2 }
+          description: Search query
+        - name: type
+          in: query
+          schema: { type: string }
+          description: Comma-separated entity types to search (incidents,observations,actions,permits,documents)
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SearchResult' }
+
+  /export/{entity}:
+    get:
+      tags: [Export]
+      summary: Export data as CSV or JSON
+      parameters:
+        - name: entity
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [incidents, observations, actions, inspections, permits, workers, contractors, assets, risk-assessments, training]
+        - name: format
+          in: query
+          schema: { type: string, enum: [csv, json], default: csv }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Exported data file
+
+  /agent/chat:
+    post:
+      tags: [AI Agent]
+      summary: Chat with AI HSE agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { type: string }
+                conversationId: { type: string }
+      responses:
+        '200':
+          description: Agent response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reply: { type: string }
+                  conversationId: { type: string }
+        '429':
+          description: Rate limit exceeded
+
+  /uploads:
+    post:
+      tags: [Uploads]
+      summary: Upload file (base64)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data: { type: string, description: 'Base64 data URI' }
+                files: { type: array, items: { type: string }, description: 'Multiple base64 URIs' }
+      responses:
+        '201':
+          description: Upload result
+  /uploads/{filename}:
+    get:
+      tags: [Uploads]
+      summary: Serve uploaded file
+      security: []
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: File content }
+        '404': { description: Not found }
+
+  /audit-logs:
+    get:
+      tags: [Admin]
+      summary: List audit logs (Admin only)
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: entity_type
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        '200': { description: Paginated audit logs }
+
+  /admin/backup:
+    post:
+      tags: [Admin]
+      summary: Trigger manual backup (Admin only)
+      responses:
+        '200': { description: Backup created }
+
+  /admin/backups:
+    get:
+      tags: [Admin]
+      summary: List available backups (Admin only)
+      responses:
+        '200':
+          description: Backup list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name: { type: string }
+                    size: { type: integer }
+                    created: { type: string, format: date-time }
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications
+      responses:
+        '200': { description: Notification list }
+
+  /notifications/unread:
+    get:
+      tags: [Notifications]
+      summary: Get unread count
+      responses:
+        '200':
+          description: Unread count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }

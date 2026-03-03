@@ -22,6 +22,12 @@ import aiRoutes from './routes/aiRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import environmentalRoutes from './routes/environmentalRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
+import auditRoutes from './routes/auditRoutes.js';
+import exportRoutes from './routes/exportRoutes.js';
+import searchRoutes from './routes/searchRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import twoFactorRoutes from './routes/twoFactorRoutes.js';
+import { readFileSync, existsSync } from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -33,7 +39,20 @@ const isProduction = NODE_ENV === 'production';
 app.use(helmet({
   contentSecurityPolicy: false,  // frontend uses inline styles (Tailwind)
   crossOriginEmbedderPolicy: false,
+  hsts: isProduction ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
 }));
+
+// ---------- HTTPS Redirect (Production) ----------
+if (isProduction) {
+  app.use((req, res, next) => {
+    // Trust proxy (e.g. nginx, cloud LB) for x-forwarded-proto
+    if (req.headers['x-forwarded-proto'] === 'http') {
+      res.redirect(301, `https://${req.headers.host}${req.url}`);
+      return;
+    }
+    next();
+  });
+}
 
 // ---------- Compression ----------
 app.use(compression());
@@ -109,12 +128,26 @@ app.get('/api/health', (_req, res) => {
 
 // ---------- API Routes ----------
 app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth/2fa', authLimiter, twoFactorRoutes);
 app.use('/api', apiLimiter, dataRoutes);
 app.use('/api/agent', aiLimiter, agentRoutes);
 app.use('/api/ai', aiLimiter, aiRoutes);
 app.use('/api/notifications', apiLimiter, notificationRoutes);
 app.use('/api/environmental', apiLimiter, environmentalRoutes);
 app.use('/api/uploads', apiLimiter, uploadRoutes);
+app.use('/api/audit-logs', apiLimiter, auditRoutes);
+app.use('/api/export', apiLimiter, exportRoutes);
+app.use('/api/search', apiLimiter, searchRoutes);
+app.use('/api/admin', apiLimiter, adminRoutes);
+
+// ---------- OpenAPI spec ----------
+const openapiPath = path.join(__dirname, 'openapi.yaml');
+if (existsSync(openapiPath)) {
+  app.get('/api/docs/openapi.yaml', (_req, res) => {
+    res.set('Content-Type', 'text/yaml');
+    res.send(readFileSync(openapiPath, 'utf-8'));
+  });
+}
 
 // ---------- SPA Fallback (Production) ----------
 if (isProduction) {

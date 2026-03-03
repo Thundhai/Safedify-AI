@@ -3,6 +3,7 @@ import { v4 as uuid } from 'uuid';
 import crypto from 'crypto';
 import db from '../db.js';
 import { AuthRequest, hashPassword, comparePassword, generateToken, authenticate } from '../auth.js';
+import { logAudit } from './auditRoutes.js';
 
 const router = Router();
 
@@ -23,12 +24,22 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
 
     const valid = await comparePassword(password, row.password_hash);
     if (!valid) {
+      logAudit(req, { action: 'login_failed', entityType: 'user', entityId: row.id, details: `Failed login for ${email}` });
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
 
     const user = { id: row.id, name: row.name, email: row.email, role: row.role, tier: row.tier, avatar: row.avatar };
+
+    // Check if 2FA is enabled
+    if (row.totp_enabled) {
+      logAudit(req, { action: 'login_2fa_required', entityType: 'user', entityId: row.id, details: `2FA challenge for ${email}` });
+      res.json({ requires2FA: true, userId: row.id });
+      return;
+    }
+
     const token = generateToken(user);
+    logAudit(req, { action: 'login', entityType: 'user', entityId: row.id, details: `User ${email} logged in` });
     res.json({ token, user });
   } catch (err: any) {
     console.error('[Auth] Login error:', err.message);
@@ -78,10 +89,71 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
 
     const user = { id, name, email, role: safeRole, tier: 'Free', avatar };
     const token = generateToken(user);
+    logAudit(req, { action: 'register', entityType: 'user', entityId: id, details: `New user registered: ${email}` });
     res.status(201).json({ token, user });
   } catch (err: any) {
     console.error('[Auth] Registration error:', err.message);
     res.status(500).json({ error: 'Registration failed. Please try again.' });
+  }
+});
+
+// POST /api/auth/login/2fa — Complete login after 2FA verification
+router.post('/login/2fa', async (req: AuthRequest, res: Response) => {
+  try {
+    const { userId, token: totpToken } = req.body;
+    if (!userId || !totpToken) {
+      res.status(400).json({ error: 'User ID and 2FA code required' });
+      return;
+    }
+
+    const row = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as any;
+    if (!row || !row.totp_enabled || !row.totp_secret) {
+      res.status(400).json({ error: 'Invalid request' });
+      return;
+    }
+
+    // Verify TOTP using the same logic as twoFactorRoutes
+    const crypto = await import('crypto');
+    function verifyTOTP(secretHex: string, token: string): boolean {
+      for (let w = -1; w <= 1; w++) {
+        const epoch = Math.floor(Date.now() / 1000);
+        const counter = Math.floor(epoch / 30) + w;
+        const counterBuf = Buffer.alloc(8);
+        counterBuf.writeUInt32BE(Math.floor(counter / 0x100000000), 0);
+        counterBuf.writeUInt32BE(counter & 0xffffffff, 4);
+        const hmac = crypto.createHmac('sha1', Buffer.from(secretHex, 'hex')).update(counterBuf).digest();
+        const offset = hmac[hmac.length - 1] & 0xf;
+        const code = ((hmac[offset] & 0x7f) << 24 | hmac[offset+1] << 16 | hmac[offset+2] << 8 | hmac[offset+3]) % 1000000;
+        if (code.toString().padStart(6, '0') === token) return true;
+      }
+      // Check backup codes
+      if (row.totp_backup_codes) {
+        try {
+          const codes: string[] = JSON.parse(row.totp_backup_codes);
+          const idx = codes.indexOf(token);
+          if (idx !== -1) {
+            codes.splice(idx, 1);
+            db.prepare('UPDATE users SET totp_backup_codes = ? WHERE id = ?').run(JSON.stringify(codes), userId);
+            return true;
+          }
+        } catch { /* ignore */ }
+      }
+      return false;
+    }
+
+    if (!verifyTOTP(row.totp_secret, totpToken)) {
+      logAudit(req, { action: '2fa_failed', entityType: 'user', entityId: userId, details: 'Invalid 2FA code' });
+      res.status(401).json({ error: 'Invalid 2FA code' });
+      return;
+    }
+
+    const user = { id: row.id, name: row.name, email: row.email, role: row.role, tier: row.tier, avatar: row.avatar };
+    const jwtToken = generateToken(user);
+    logAudit(req, { action: 'login', entityType: 'user', entityId: row.id, details: `User ${row.email} logged in with 2FA` });
+    res.json({ token: jwtToken, user });
+  } catch (err: any) {
+    console.error('[Auth] 2FA login error:', err.message);
+    res.status(500).json({ error: '2FA verification failed' });
   }
 });
 
@@ -136,6 +208,7 @@ router.post('/forgot-password', async (req: AuthRequest, res: Response) => {
       console.log(`========================================\n`);
     }
 
+    logAudit(req, { action: 'password_reset_request', entityType: 'user', entityId: user?.id || 'unknown', details: `Password reset requested for ${email}` });
     res.json({ message: 'If the email exists, a reset link has been generated.' });
   } catch (err: any) {
     console.error('[Auth] Forgot password error:', err.message);
@@ -182,6 +255,7 @@ router.post('/reset-password', async (req: AuthRequest, res: Response) => {
     // Mark token as used
     db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE id = ?').run(resetRow.id);
 
+    logAudit(req, { action: 'password_reset', entityType: 'user', entityId: resetRow.user_id, details: 'Password reset completed' });
     console.log(`[Auth] Password reset successful for user ${resetRow.user_id}`);
     res.json({ message: 'Password has been reset successfully. You can now log in.' });
   } catch (err: any) {

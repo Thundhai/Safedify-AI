@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getStorageUsage, clearUserData } from '../services/storageService';
 import { SubscriptionTier } from '../types';
 import { User, Shield, CreditCard, HardDrive, AlertTriangle, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+const TwoFactorSetup = lazy(() => import('./TwoFactorSetup'));
 
 export const ProfileSettings: React.FC = () => {
     const { user, logout } = useAuth();
@@ -122,6 +123,11 @@ export const ProfileSettings: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Two-Factor Authentication */}
+            <Suspense fallback={<div className="animate-pulse bg-slate-100 rounded-xl h-40" />}>
+              <TwoFactorSetup />
+            </Suspense>
         </div>
     );
 };

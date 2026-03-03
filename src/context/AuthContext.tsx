@@ -1,13 +1,14 @@
 
 import React, { createContext, useState, useContext, useEffect, useRef, ReactNode } from 'react';
 import { AuthUser, UserRole, Permission, UserRoles } from '../types';
-import { getCurrentUser, login as authLogin, logout as authLogout, register as authRegister, verifySession } from '../services/authService';
+import { getCurrentUser, login as authLogin, logout as authLogout, register as authRegister, verifySession, completeLoginWith2FA } from '../services/authService';
 import { getRoles } from '../services/storageService';
 
 interface AuthContextType {
   user: AuthUser | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean | '2fa_required'>;
+  loginWith2FA: (token: string) => Promise<boolean>;
   register: (name: string, email: string, password: string, role: UserRole) => Promise<boolean>;
   logout: () => void;
   loading: boolean;
@@ -56,8 +57,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     init();
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
-    const loggedUser = await authLogin(email, password);
+  const login = async (email: string, password: string): Promise<boolean | '2fa_required'> => {
+    const result = await authLogin(email, password);
+    if (result === '2fa_required') return '2fa_required';
+    if (result && typeof result === 'object') {
+      setUser(result);
+      await loadRoles();
+      return true;
+    }
+    return false;
+  };
+
+  const loginWith2FA = async (token: string): Promise<boolean> => {
+    const loggedUser = await completeLoginWith2FA(token);
     if (loggedUser) {
       setUser(loggedUser);
       await loadRoles();
@@ -104,7 +116,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, register, logout, loading, checkPermission }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, loginWith2FA, register, logout, loading, checkPermission }}>
       {children}
     </AuthContext.Provider>
   );
