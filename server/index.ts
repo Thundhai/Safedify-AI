@@ -18,6 +18,8 @@ import { seedDefaultUsers } from './auth.js';
 import authRoutes from './routes/authRoutes.js';
 import dataRoutes from './routes/dataRoutes.js';
 import agentRoutes from './routes/agentRoutes.js';
+import aiRoutes from './routes/aiRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -98,6 +100,8 @@ app.get('/api/health', (_req, res) => {
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api', apiLimiter, dataRoutes);
 app.use('/api/agent', apiLimiter, agentRoutes);
+app.use('/api/ai', apiLimiter, aiRoutes);
+app.use('/api/notifications', apiLimiter, notificationRoutes);
 
 // ---------- SPA Fallback (Production) ----------
 if (isProduction) {

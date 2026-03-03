@@ -28,6 +28,8 @@ export const getAuthToken = (): string | null => {
 
 // ---------- Fetch Wrapper ----------
 
+import { queueOfflineRequest } from './offlineService';
+
 const apiFetch = async (path: string, options: RequestInit = {}): Promise<any> => {
   const token = getAuthToken();
   const headers: Record<string, string> = {
@@ -38,17 +40,30 @@ const apiFetch = async (path: string, options: RequestInit = {}): Promise<any> =
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers,
-  });
+  const method = (options.method || 'GET').toUpperCase();
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(body.error || `API Error: ${res.status}`);
+  try {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers,
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(body.error || `API Error: ${res.status}`);
+    }
+
+    return res.json();
+  } catch (err: any) {
+    // If offline and this is a mutating request, queue for later sync
+    if (!navigator.onLine && ['POST', 'PUT', 'DELETE'].includes(method)) {
+      const body = options.body ? JSON.parse(options.body as string) : null;
+      queueOfflineRequest(method, path, body);
+      // Return an optimistic placeholder so the UI flow continues
+      return { id: `offline-${Date.now()}`, _offline: true };
+    }
+    throw err;
   }
-
-  return res.json();
 };
 
 // ---------- Auth API ----------
@@ -185,3 +200,11 @@ export const apiHealthCheck = async (): Promise<boolean> => {
     return false;
   }
 };
+
+// ---------- Notifications API ----------
+
+export const apiGetNotifications = (limit = 50) => apiFetch(`/notifications?limit=${limit}`);
+export const apiGetUnreadCount = () => apiFetch('/notifications/unread');
+export const apiMarkNotificationRead = (id: string) => apiFetch(`/notifications/${id}/read`, { method: 'PUT' });
+export const apiMarkAllNotificationsRead = () => apiFetch('/notifications/read-all', { method: 'PUT' });
+export const apiDeleteNotification = (id: string) => apiFetch(`/notifications/${id}`, { method: 'DELETE' });

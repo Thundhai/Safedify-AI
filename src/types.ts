@@ -719,3 +719,20 @@ export interface WeatherRiskAnalysis {
   riskLevel: 'Low' | 'Medium' | 'High' | 'Critical';
   affectedActivities: string[]; // List of Permit Types or Tasks affected
 }
+
+// --- Notifications ---
+
+export type NotificationType = 'info' | 'success' | 'warning' | 'danger';
+
+export interface AppNotification {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  entity_type?: string;
+  entity_id?: string;
+  is_read: number;      // 0 | 1
+  email_sent: number;   // 0 | 1
+  created_at: string;
+}

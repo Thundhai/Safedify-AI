@@ -21,15 +21,16 @@ export const Register: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-      const roles = getRoles();
-      // Filter out Admin from registration for security
-      const publicRoles = roles.filter(r => r.name !== UserRoles.ADMIN);
-      setAvailableRoles(publicRoles);
-      
-      // Default to Worker if available, otherwise first available
-      const workerRole = publicRoles.find(r => r.name === UserRoles.WORKER);
-      if (workerRole) setRole(workerRole.name);
-      else if (publicRoles.length > 0) setRole(publicRoles[0].name);
+      getRoles().then(roles => {
+        // Filter out Admin from registration for security
+        const publicRoles = roles.filter(r => r.name !== UserRoles.ADMIN);
+        setAvailableRoles(publicRoles);
+        
+        // Default to Worker if available, otherwise first available
+        const workerRole = publicRoles.find(r => r.name === UserRoles.WORKER);
+        if (workerRole) setRole(workerRole.name);
+        else if (publicRoles.length > 0) setRole(publicRoles[0].name);
+      });
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

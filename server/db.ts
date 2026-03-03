@@ -306,6 +306,20 @@ db.exec(`
     required_training TEXT DEFAULT '[]',
     created_at TEXT DEFAULT (datetime('now'))
   );
+
+  CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'info',
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    entity_type TEXT,
+    entity_id TEXT,
+    is_read INTEGER DEFAULT 0,
+    email_sent INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
 `);
 
 // ---------- MIGRATIONS (add new columns to existing tables) ----------

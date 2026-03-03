@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import db from '../db.js';
 import { AuthRequest, authenticate } from '../auth.js';
+import { notify, notifyAllManagers } from '../services/notificationService.js';
 
 const router = Router();
 
@@ -31,20 +32,29 @@ router.post('/incidents', (req: AuthRequest, res: Response) => {
       injured_persons, witnesses, ppe_worn, ppe_adequate, environmental_impact,
       immediate_actions_taken, area_secured, emergency_services_notified, regulatory_notification)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, b.description, b.location, b.date || new Date().toISOString(), b.type, b.category || 'Near Miss',
-    b.severity, b.status || 'Open', req.user?.id,
+  ).run(id, b.description ?? null, b.location ?? null, b.date || new Date().toISOString(), b.type ?? null, b.category || 'Near Miss',
+    b.severity ?? null, b.status || 'Open', req.user?.id ?? null,
     b.image || (b.images?.[0] ?? null),
     b.images ? JSON.stringify(b.images) : null,
-    b.root_cause, b.corrective_actions, b.days_lost || 0,
-    b.body_part, b.mechanism, b.immediate_action,
-    b.date_reported || new Date().toISOString(), b.department, b.shift, b.weather_conditions, b.task_being_performed,
+    b.root_cause ?? null, b.corrective_actions ?? null, b.days_lost || 0,
+    b.body_part ?? null, b.mechanism ?? null, b.immediate_action ?? null,
+    b.date_reported || new Date().toISOString(), b.department ?? null, b.shift ?? null, b.weather_conditions ?? null, b.task_being_performed ?? null,
     b.injured_persons ? JSON.stringify(b.injured_persons) : null,
     b.witnesses ? JSON.stringify(b.witnesses) : null,
     b.ppe_worn ? JSON.stringify(b.ppe_worn) : null,
     b.ppe_adequate != null ? (b.ppe_adequate ? 1 : 0) : null,
-    b.environmental_impact, b.immediate_actions_taken,
+    b.environmental_impact ?? null, b.immediate_actions_taken ?? null,
     b.area_secured ? 1 : 0, b.emergency_services_notified ? 1 : 0, b.regulatory_notification ? 1 : 0);
   res.status(201).json({ id, message: 'Incident created' });
+
+  // Fire-and-forget notification
+  notifyAllManagers({
+    type: b.severity === 'Critical' || b.severity === 'High' ? 'danger' : 'warning',
+    title: `New Incident Reported`,
+    message: `A ${b.severity || 'new'} ${b.type || 'incident'} has been reported at ${b.location || 'site'}. Description: ${(b.description || '').slice(0, 120)}`,
+    entityType: 'incident',
+    entityId: id,
+  }).catch(err => console.error('[Notify] incident create:', err.message));
 });
 
 router.put('/incidents/:id', (req: AuthRequest, res: Response) => {
@@ -80,6 +90,21 @@ router.put('/incidents/:id', (req: AuthRequest, res: Response) => {
   values.push(req.params.id);
   db.prepare(`UPDATE incidents SET ${fields.join(', ')} WHERE id=?`).run(...values);
   res.json({ message: 'Updated' });
+
+  // Notify on status change
+  if (b.status) {
+    const inc = db.prepare('SELECT reported_by, type, location FROM incidents WHERE id = ?').get(req.params.id) as any;
+    if (inc?.reported_by) {
+      notify({
+        userId: inc.reported_by,
+        type: b.status === 'Closed' ? 'success' : 'info',
+        title: `Incident Status → ${b.status}`,
+        message: `The ${inc.type || 'incident'} at ${inc.location || 'site'} has been updated to "${b.status}".`,
+        entityType: 'incident',
+        entityId: req.params.id,
+      }).catch(err => console.error('[Notify] incident update:', err.message));
+    }
+  }
 });
 
 router.delete('/incidents/:id', (req: AuthRequest, res: Response) => {
@@ -100,6 +125,21 @@ router.post('/actions', (req: AuthRequest, res: Response) => {
     'INSERT INTO actions (id, title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, effectiveness) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
   ).run(id, title, description, assignee, due_date, priority || 'Medium', status || 'Open', action_type || 'Corrective', category || 'Other', indicator || 'Lagging', related_incident_id, effectiveness || 'Not Assessed');
   res.status(201).json({ id });
+
+  // Notify assignee if set
+  if (assignee) {
+    const worker = db.prepare('SELECT id FROM users WHERE name = ? OR id = ?').get(assignee, assignee) as any;
+    if (worker) {
+      notify({
+        userId: worker.id,
+        type: priority === 'Critical' ? 'danger' : 'info',
+        title: 'New Action Assigned to You',
+        message: `Action: "${title}" (${priority || 'Medium'} priority). Due: ${due_date || 'No date set'}.`,
+        entityType: 'action',
+        entityId: id,
+      }).catch(err => console.error('[Notify] action create:', err.message));
+    }
+  }
 });
 
 router.put('/actions/:id', (req: AuthRequest, res: Response) => {
@@ -111,6 +151,24 @@ router.put('/actions/:id', (req: AuthRequest, res: Response) => {
      indicator=COALESCE(?,indicator), verified_by=COALESCE(?,verified_by), effectiveness=COALESCE(?,effectiveness) WHERE id=?`
   ).run(title, description, assignee, due_date, completed_date, priority, status, action_type, category, indicator, verified_by, effectiveness, req.params.id);
   res.json({ message: 'Updated' });
+
+  // Notify on status change
+  if (status) {
+    const action = db.prepare('SELECT assignee, title FROM actions WHERE id = ?').get(req.params.id) as any;
+    if (action?.assignee) {
+      const worker = db.prepare('SELECT id FROM users WHERE name = ? OR id = ?').get(action.assignee, action.assignee) as any;
+      if (worker) {
+        notify({
+          userId: worker.id,
+          type: status === 'Done' ? 'success' : 'info',
+          title: `Action Status → ${status}`,
+          message: `The action "${action.title}" status has been updated to "${status}".`,
+          entityType: 'action',
+          entityId: req.params.id,
+        }).catch(err => console.error('[Notify] action update:', err.message));
+      }
+    }
+  }
 });
 
 router.delete('/actions/:id', (req: AuthRequest, res: Response) => {
@@ -169,6 +227,32 @@ router.put('/permits/:id', (req: AuthRequest, res: Response) => {
     'UPDATE permits SET status=COALESCE(?,status), approver=COALESCE(?,approver), approver_comments=COALESCE(?,approver_comments) WHERE id=?'
   ).run(status, approver, approver_comments, req.params.id);
   res.json({ message: 'Updated' });
+
+  // Notify permit requestor on status change
+  if (status) {
+    const permit = db.prepare('SELECT requestor, type, location FROM permits WHERE id = ?').get(req.params.id) as any;
+    if (permit?.requestor) {
+      const requestorUser = db.prepare('SELECT id FROM users WHERE name = ? OR id = ?').get(permit.requestor, permit.requestor) as any;
+      if (requestorUser) {
+        notify({
+          userId: requestorUser.id,
+          type: status === 'Active' ? 'success' : status === 'Rejected' ? 'danger' : 'info',
+          title: `Permit ${status}`,
+          message: `Your ${permit.type || 'permit'} for ${permit.location || 'site'} has been ${status.toLowerCase()}.${approver_comments ? ` Comment: ${approver_comments}` : ''}`,
+          entityType: 'permit',
+          entityId: req.params.id,
+        }).catch(err => console.error('[Notify] permit update:', err.message));
+      }
+    }
+    // Also notify managers of permit approval/rejection
+    notifyAllManagers({
+      type: status === 'Active' ? 'success' : status === 'Rejected' ? 'warning' : 'info',
+      title: `Permit ${status}: ${permit?.type || 'Unknown'}`,
+      message: `${permit?.type || 'Permit'} at ${permit?.location || 'site'} has been ${status.toLowerCase()}.`,
+      entityType: 'permit',
+      entityId: req.params.id,
+    }).catch(err => console.error('[Notify] permit managers:', err.message));
+  }
 });
 
 // ---------- WORKERS ----------

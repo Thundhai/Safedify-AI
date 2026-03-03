@@ -1,0 +1,104 @@
+/**
+ * Notification Service — Creates in-app notifications and optionally sends emails.
+ *
+ * Usage:
+ *   import { notify, notifyAllManagers } from '../services/notificationService.js';
+ *   await notify({ userId, type, title, message, entityType, entityId });
+ *   await notifyAllManagers({ type, title, message, entityType, entityId });
+ */
+import { v4 as uuid } from 'uuid';
+import db from '../db.js';
+import { sendEmail } from './emailService.js';
+
+export type NotificationType = 'info' | 'success' | 'warning' | 'danger';
+
+export interface NotifyParams {
+  userId: string;
+  type?: NotificationType;
+  title: string;
+  message: string;
+  entityType?: string;   // 'incident' | 'action' | 'permit' | 'inspection' etc.
+  entityId?: string;
+}
+
+/**
+ * Create a notification for a specific user. Also sends email to the user.
+ */
+export const notify = async (params: NotifyParams): Promise<string> => {
+  const id = uuid();
+  const { userId, type = 'info', title, message, entityType, entityId } = params;
+
+  // Insert into DB
+  db.prepare(
+    `INSERT INTO notifications (id, user_id, type, title, message, entity_type, entity_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
+  ).run(id, userId, type, title, message, entityType || null, entityId || null);
+
+  // Attempt to send email (async, non-blocking)
+  try {
+    const user = db.prepare('SELECT email, name FROM users WHERE id = ?').get(userId) as any;
+    if (user?.email) {
+      const emailSent = await sendEmail({
+        to: user.email,
+        subject: `[Safedify] ${title}`,
+        text: `Hi ${user.name || 'there'},\n\n${message}\n\nYou can view details in the Safedify dashboard.`,
+      });
+      if (emailSent) {
+        db.prepare('UPDATE notifications SET email_sent = 1 WHERE id = ?').run(id);
+      }
+    }
+  } catch (err: any) {
+    console.error(`[Notify] Email failed for user ${userId}:`, err.message);
+  }
+
+  return id;
+};
+
+/**
+ * Send a notification to all users with manager/admin/supervisor roles.
+ * Useful for critical events like new incidents, high-severity updates, etc.
+ */
+export const notifyAllManagers = async (
+  params: Omit<NotifyParams, 'userId'>
+): Promise<number> => {
+  const managerRoles = ['Admin', 'Manager', 'HSE Manager', 'Supervisor', 'HSE Supervisor', 'HSE Coordinator', 'HSE Advisor'];
+  const managers = db.prepare(
+    `SELECT id FROM users WHERE role IN (${managerRoles.map(() => '?').join(',')})`
+  ).all(...managerRoles) as any[];
+
+  let count = 0;
+  for (const mgr of managers) {
+    try {
+      await notify({ ...params, userId: mgr.id });
+      count++;
+    } catch {
+      // continue sending to others
+    }
+  }
+  return count;
+};
+
+/**
+ * Send a notification to a specific user + all managers.
+ * Common pattern for status updates where the original reporter
+ * AND managers should be informed.
+ */
+export const notifyUserAndManagers = async (
+  params: NotifyParams
+): Promise<void> => {
+  // Notify the specific user first
+  await notify(params);
+  // Then notify managers (skip the specific user to avoid duplicate)
+  const managerRoles = ['Admin', 'Manager', 'HSE Manager', 'Supervisor', 'HSE Supervisor', 'HSE Coordinator', 'HSE Advisor'];
+  const managers = db.prepare(
+    `SELECT id FROM users WHERE role IN (${managerRoles.map(() => '?').join(',')}) AND id != ?`
+  ).all(...managerRoles, params.userId) as any[];
+
+  for (const mgr of managers) {
+    try {
+      await notify({ ...params, userId: mgr.id });
+    } catch {
+      // continue
+    }
+  }
+};

@@ -1,13 +1,79 @@
+/**
+ * Offline Service — Queues failed API requests when the browser is offline
+ * and replays them when connectivity is restored.
+ *
+ * Two queues:
+ *  1. OFFLINE_QUEUE_KEY  — machine-readable API requests to replay
+ *  2. SYNC_QUEUE_KEY     — human-readable log entries shown in the UI
+ */
 
-export const SYNC_QUEUE_KEY = 'hse_sync_queue';
+// ─── Types ───────────────────────────────────────────────────
 
+export interface QueuedRequest {
+  id: string;
+  method: string;       // POST | PUT | DELETE
+  path: string;         // e.g. /incidents
+  body: any;            // JSON payload
+  timestamp: number;
+  description: string;  // human-readable label
+}
+
+/** Display-only entry used by the Layout sync badge */
 export interface SyncTask {
   id: string;
-  action: string; // e.g., 'SAVE_INCIDENT', 'SAVE_INSPECTION'
-  description: string; // For UI display
+  action: string;
+  description: string;
   timestamp: number;
-  payload?: any; // Optional: store actual data delta if needed for real backend
+  payload?: any;
 }
+
+// ─── Storage Keys ────────────────────────────────────────────
+
+const OFFLINE_QUEUE_KEY = 'hse_offline_queue';
+export const SYNC_QUEUE_KEY = 'hse_sync_queue';
+
+// ─── Offline Request Queue (machine-readable) ───────────────
+
+export const getOfflineQueue = (): QueuedRequest[] => {
+  try {
+    const stored = localStorage.getItem(OFFLINE_QUEUE_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveOfflineQueue = (queue: QueuedRequest[]) => {
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+};
+
+/**
+ * Queue a failed mutating API request for later replay.
+ * Called automatically by apiFetch when navigator.onLine is false.
+ */
+export const queueOfflineRequest = (
+  method: string,
+  path: string,
+  body: any,
+  description?: string
+) => {
+  const queue = getOfflineQueue();
+  const entry: QueuedRequest = {
+    id: `oq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    method,
+    path,
+    body,
+    timestamp: Date.now(),
+    description: description || `${method} ${path}`,
+  };
+  queue.push(entry);
+  saveOfflineQueue(queue);
+
+  // Mirror into the display queue so the UI badge updates
+  addToSyncQueue(entry.description, entry.description, { ref: entry.id });
+};
+
+// ─── Display Sync Queue (UI badge / list) ────────────────────
 
 export const getSyncQueue = (): SyncTask[] => {
   try {
@@ -21,51 +87,80 @@ export const getSyncQueue = (): SyncTask[] => {
 export const addToSyncQueue = (action: string, description: string, payload?: any) => {
   const queue = getSyncQueue();
   queue.push({
-    id: `sync-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+    id: `sync-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     action,
     description,
     timestamp: Date.now(),
-    payload
+    payload,
   });
   localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(queue));
 };
 
+// ─── Process / Replay ────────────────────────────────────────
+
+/**
+ * Replay all queued offline requests.
+ * Returns the number of successfully synced items.
+ *
+ * Uses a plain fetch with the stored auth token to avoid
+ * a circular import with apiService.
+ */
 export const processSyncQueue = async (): Promise<number> => {
-  const queue = getSyncQueue();
-  if (queue.length === 0) return 0;
+  const queue = getOfflineQueue();
+  if (queue.length === 0) {
+    // Nothing queued — clear the display queue too
+    localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify([]));
+    return 0;
+  }
 
-  console.log(`[Offline Service] Attempting to sync ${queue.length} items...`);
+  console.log(`[Offline] Replaying ${queue.length} queued request(s)…`);
 
-  const remainingQueue: SyncTask[] = [];
-  let processedCount = 0;
+  const remaining: QueuedRequest[] = [];
+  let synced = 0;
 
-  for (const task of queue) {
+  for (const req of queue) {
     try {
-      // Simulate processing individual task
-      // In a real app, this would switch/case on task.action and call specific API endpoints
-      await new Promise((resolve, reject) => {
-        // Simulate mostly successful sync, occasional failure if needed for testing
-        const isSuccess = true; 
-        setTimeout(() => isSuccess ? resolve(true) : reject(new Error("Network timeout")), 800);
+      const token = localStorage.getItem('safedify_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const API_BASE = (import.meta as any).env?.VITE_API_URL || '/api';
+      const res = await fetch(`${API_BASE}${req.path}`, {
+        method: req.method,
+        headers,
+        body: req.body ? JSON.stringify(req.body) : undefined,
       });
-      
-      console.log(`[Offline Service] Successfully synced: ${task.description}`);
-      processedCount++;
-    } catch (error) {
-      console.error(`[Offline Service] Sync failed for item: ${task.description}`, error);
-      // Keep in queue to retry later
-      remainingQueue.push(task);
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      console.log(`[Offline] ✓ Synced: ${req.description}`);
+      synced++;
+    } catch (err) {
+      console.warn(`[Offline] ✗ Failed: ${req.description}`, err);
+      remaining.push(req); // keep for next retry
     }
   }
 
-  // Update queue with only failed items
-  localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(remainingQueue));
-  
-  return processedCount;
+  // Persist only the failed items
+  saveOfflineQueue(remaining);
+
+  // Rebuild the display queue to match remaining items
+  const displayQueue = remaining.map(r => ({
+    id: `sync-${r.id}`,
+    action: r.description,
+    description: r.description,
+    timestamp: r.timestamp,
+    payload: { ref: r.id },
+  }));
+  localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(displayQueue));
+
+  console.log(`[Offline] Sync complete — ${synced} succeeded, ${remaining.length} pending`);
+  return synced;
 };
 
+// ─── Image Compression ──────────────────────────────────────
+
 /**
- * Compresses an image file to a lower resolution and quality JPEG.
+ * Compresses an image file to a lower-resolution JPEG.
  * Essential for offline storage quotas and fast uploads.
  */
 export const compressImage = (file: File, maxWidth = 1024, quality = 0.6): Promise<string> => {
@@ -80,7 +175,6 @@ export const compressImage = (file: File, maxWidth = 1024, quality = 0.6): Promi
         let width = img.width;
         let height = img.height;
 
-        // Resize logic
         if (width > maxWidth) {
           height = (height * maxWidth) / width;
           width = maxWidth;
@@ -90,11 +184,10 @@ export const compressImage = (file: File, maxWidth = 1024, quality = 0.6): Promi
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (ctx) {
-            ctx.drawImage(img, 0, 0, width, height);
-            // Return compressed Base64
-            resolve(canvas.toDataURL('image/jpeg', quality));
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
         } else {
-            reject(new Error("Canvas context failed"));
+          reject(new Error('Canvas context failed'));
         }
       };
       img.onerror = (err) => reject(err);

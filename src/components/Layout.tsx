@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { getSyncQueue, processSyncQueue } from '../services/offlineService';
 import { AIChatAssistant } from './AIChatAssistant';
+import { NotificationBell } from './NotificationBell';
 import { useAuth } from '../context/AuthContext';
 import { SubscriptionTier } from '../types';
 
@@ -417,6 +418,9 @@ export const Layout: React.FC = () => {
              >
                 {isDarkMode ? <Sun size={20} className="text-brand-orange" /> : <Moon size={20} />}
              </button>
+
+             {/* Notifications */}
+             <NotificationBell />
 
              {/* Sync & Connectivity Status */}
              <div className="flex items-center gap-2 md:gap-3">
