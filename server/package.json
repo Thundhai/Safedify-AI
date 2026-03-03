@@ -4,8 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --experimental-sqlite --import tsx index.ts",
-    "start": "NODE_ENV=production node --experimental-sqlite --import tsx index.ts",
-    "start:win": "set NODE_ENV=production && node --experimental-sqlite --import tsx index.ts"
+    "start": "node --experimental-sqlite --import tsx index.ts"
   },
   "dependencies": {
     "@google/genai": "^1.32.0",
@@ -19,6 +18,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.1",
     "nodemailer": "^8.0.1",
+    "tsx": "^4.19.0",
     "uuid": "^10.0.0"
   },
   "devDependencies": {
@@ -30,7 +30,6 @@
     "@types/morgan": "^1.9.10",
     "@types/nodemailer": "^7.0.11",
     "@types/uuid": "^10.0.0",
-    "tsx": "^4.19.0",
     "typescript": "~5.8.2"
   }
 }

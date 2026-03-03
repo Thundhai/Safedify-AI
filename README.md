@@ -86,70 +86,95 @@ Visit [http://localhost:3000](http://localhost:3000)
 
 | Email | Password | Role | Tier |
 |-------|----------|------|------|
-| admin@safedify.com | password | Manager | Enterprise |
-| supervisor@safedify.com | password | Supervisor | Pro |
+| admin@safedify.com | password | Admin | Enterprise |
+| supervisor@safedify.com | password | HSE Supervisor | Pro |
 | worker@safedify.com | password | Worker | Free |
 
 ## Production Deployment
 
-### Option 1: Direct (Node.js)
+### Option 1: Docker (Recommended)
+
+```bash
+# 1. Create environment file in project root
+cat > .env << EOF
+JWT_SECRET=$(openssl rand -base64 48)
+GEMINI_API_KEY=your-gemini-api-key
+OPENWEATHER_API_KEY=your-openweather-key
+SEED_DEMO_USERS=true
+EOF
+
+# 2. Build & start
+docker compose up -d --build
+
+# 3. Check health
+curl http://localhost:4000/api/health
+```
+
+The app runs on port **4000** — serves both the API and frontend.
+
+### Option 2: Direct (Node.js)
 
 ```bash
 # 1. Build frontend
 npm run build
 
 # 2. Install server production dependencies
-cd server && npm install --production && cd ..
+cd server && npm install --omit=dev && cd ..
 
 # 3. Configure production environment
 cp server/.env.example server/.env
 # Edit server/.env:
 #   NODE_ENV=production
-#   JWT_SECRET=<strong-random-string>
+#   JWT_SECRET=<strong-random-string>  (64+ chars)
 #   GEMINI_API_KEY=<your-key>
 
 # 4. Start production server
-npm start
-# Or on Windows:
-npm run start:win
-```
-
-The server runs on port 4000 and serves both the API and the frontend.
-
-### Option 2: Docker
-
-```bash
-# Build & run with docker-compose
-# First, create a .env file with your secrets:
-cp .env.example .env
-# Edit .env with your GEMINI_API_KEY, JWT_SECRET, VITE_GEMINI_API_KEY
-
-docker compose up -d
+NODE_ENV=production npm start
 ```
 
 ### Option 3: Docker Build Manually
 
 ```bash
-docker build \
-  --build-arg VITE_GEMINI_API_KEY=your-key \
-  -t safedify-ai .
+docker build -t safedify-ai .
 
 docker run -d \
   -p 4000:4000 \
+  -e NODE_ENV=production \
   -e GEMINI_API_KEY=your-key \
-  -e JWT_SECRET=your-secret \
+  -e JWT_SECRET=$(openssl rand -base64 48) \
+  -e SEED_DEMO_USERS=true \
   -v safedify-data:/data \
   safedify-ai
 ```
 
+### Reverse Proxy (Production)
+
+In production, use a reverse proxy (nginx, Caddy, Traefik) for TLS:
+
+```nginx
+# nginx example
+server {
+    listen 443 ssl;
+    server_name safedify.yourdomain.com;
+    ssl_certificate /etc/ssl/certs/safedify.pem;
+    ssl_certificate_key /etc/ssl/private/safedify.key;
+
+    location / {
+        proxy_pass http://localhost:4000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
 ## Environment Variables
 
-### Frontend (.env.local)
+### Frontend (.env.local) — Development only
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `VITE_GEMINI_API_KEY` | Yes | Google Gemini API key for client-side AI features |
-| `VITE_API_URL` | No | Backend API URL (default: `/api` — same-origin) |
+| `VITE_API_URL` | No | Backend API URL (default: `/api` — proxied by Vite) |
 
 ### Backend (server/.env)
 
@@ -157,10 +182,21 @@ docker run -d \
 |----------|----------|---------|-------------|
 | `NODE_ENV` | No | `development` | `development` or `production` |
 | `PORT` | No | `4000` | Server port |
-| `JWT_SECRET` | **Yes** | — | Secret key for JWT tokens. **Change in production!** |
-| `GEMINI_API_KEY` | Yes | — | Google Gemini API key for AI agent |
+| `JWT_SECRET` | **Yes** | — | Secret for JWT tokens (64+ chars, **change in production!**) |
+| `GEMINI_API_KEY` | Yes | — | Google Gemini API key for AI features |
+| `OPENWEATHER_API_KEY` | No | — | OpenWeatherMap API key for weather/AQI |
+| `SITE_LATITUDE` | No | `25.2048` | Default site latitude |
+| `SITE_LONGITUDE` | No | `55.2708` | Default site longitude |
 | `ALLOWED_ORIGINS` | No | `localhost` | Comma-separated CORS origins |
 | `DATA_DIR` | No | `server/` | Directory for SQLite database file |
+| `SMTP_HOST` | No | — | SMTP server for password reset emails |
+| `SMTP_PORT` | No | `587` | SMTP port |
+| `SMTP_USER` | No | — | SMTP username |
+| `SMTP_PASS` | No | — | SMTP password |
+| `SMTP_FROM` | No | `noreply@safedify.com` | From address for emails |
+| `APP_URL` | No | `http://localhost:4000` | Public URL (for email links) |
+| `SEED_DEMO_USERS` | No | `false` | Create demo users on first run |
+| `HOST` | No | `0.0.0.0` (prod) | Bind address |
 
 ## Project Structure
 
@@ -186,11 +222,14 @@ Safedify-AI/
 
 ## Security Notes
 
-- **JWT_SECRET**: Always use a strong, unique secret in production (64+ chars recommended)
+- **JWT_SECRET**: Always use a strong, unique secret in production (64+ chars — use `openssl rand -base64 48`)
 - **HTTPS**: Use a reverse proxy (nginx, Caddy) with TLS in production
-- **Rate Limiting**: API routes are rate-limited (100 req/15min in production)
-- **Helmet**: Security headers are applied via helmet middleware
+- **Rate Limiting**: API routes are rate-limited (100 req/15min, AI: 15 req/min in production)
+- **RBAC**: Server-side role-based access control on all write endpoints
+- **Helmet**: Security headers applied via helmet middleware
 - **CORS**: Strict origin validation in production mode
+- **SQL Injection**: Agent SQL queries are read-only with injection hardening
+- **No API Keys in Frontend**: All AI calls proxy through the backend
 
 ## Tech Stack
 

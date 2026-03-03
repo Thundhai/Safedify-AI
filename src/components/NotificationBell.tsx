@@ -64,6 +64,7 @@ export const NotificationBell: React.FC = () => {
   // ── Fetch unread count (polled) ─────────────────────────────
 
   const fetchUnread = useCallback(async () => {
+    if (document.hidden) return; // skip when tab is not visible
     try {
       const data = await apiGetUnreadCount();
       setUnread(data.count || 0);
@@ -72,7 +73,7 @@ export const NotificationBell: React.FC = () => {
 
   useEffect(() => {
     fetchUnread();
-    const interval = setInterval(fetchUnread, 15000); // poll every 15 s
+    const interval = setInterval(fetchUnread, 30000); // poll every 30s
     return () => clearInterval(interval);
   }, [fetchUnread]);
 

@@ -41,6 +41,10 @@ const aiGenerate = async (params: { model?: string; contents: any; config?: any 
     body: JSON.stringify(params),
   });
   if (!res.ok) {
+    if (res.status === 429) {
+      const retryAfter = res.headers.get('Retry-After') || '30';
+      throw new Error(`AI rate limit exceeded. Please wait ${retryAfter} seconds and try again.`);
+    }
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || `AI call failed: ${res.status}`);
   }
@@ -61,6 +65,10 @@ const aiChat = async (params: { model?: string; history: any[]; config?: any; me
     body: JSON.stringify(params),
   });
   if (!res.ok) {
+    if (res.status === 429) {
+      const retryAfter = res.headers.get('Retry-After') || '30';
+      throw new Error(`AI rate limit exceeded. Please wait ${retryAfter} seconds and try again.`);
+    }
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || `AI chat failed: ${res.status}`);
   }

@@ -1,52 +1,64 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-// Providers & Layout
+// Providers & Layout (not lazy — needed immediately)
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
 
-// Pages & Components
+// Auth pages (not lazy — first interaction)
 import { Login } from './components/Login';
 import { Register } from './components/Register';
-import { ForgotPassword } from './components/ForgotPassword';
-import { ResetPassword } from './components/ResetPassword';
 import { LandingPage } from './components/LandingPage';
-import { PublicPricing } from './components/PublicPricing';
-import { Dashboard } from './components/Dashboard';
-import { AnalyticsDashboard } from './components/AnalyticsDashboard';
-import { IncidentReport } from './components/IncidentReport';
-import { IncidentDetail } from './components/IncidentDetail';
-import { IncidentList } from './components/IncidentList';
-import { InspectionForm } from './components/InspectionForm';
-import { AITools } from './components/AITools';
-import { SmartCamera } from './components/SmartCamera';
-import { GeoFencing } from './components/GeoFencing';
-import { Gamification } from './components/Gamification';
-import { RiskAssessmentList } from './components/RiskAssessmentList';
-import { RiskAssessmentForm } from './components/RiskAssessmentForm';
-import { ObservationList } from './components/ObservationList';
-import { ObservationForm } from './components/ObservationForm';
-import { TrainingDashboard } from './components/TrainingDashboard';
-import { WorkerDetail } from './components/WorkerDetail';
-import { WorkersList } from './components/WorkersList';
-import { WorkerForm } from './components/WorkerForm';
-import { PPEDashboard } from './components/PPEDashboard';
-import { PermitList } from './components/PermitList';
-import { PermitForm } from './components/PermitForm';
-import { AssetList } from './components/AssetList';
-import { AssetDetail } from './components/AssetDetail';
-import { ContractorList } from './components/ContractorList';
-import { ContractorDetail } from './components/ContractorDetail';
-import { DocumentList } from './components/DocumentList';
-import { DocumentForm } from './components/DocumentForm';
-import { EmergencyDashboard } from './components/EmergencyDashboard';
-import { RegulatoryNews } from './components/RegulatoryNews';
-import { PricingPlans } from './components/PricingPlans';
-import { RoleManagement } from './components/RoleManagement';
-import { ProfileSettings } from './components/ProfileSettings';
-import { EnvironmentalLogPage } from './components/EnvironmentalLogPage';
-import { ActionList } from './components/ActionList';
+
+// Lazy-loaded pages (split into separate chunks)
+const ForgotPassword = React.lazy(() => import('./components/ForgotPassword').then(m => ({ default: m.ForgotPassword })));
+const ResetPassword = React.lazy(() => import('./components/ResetPassword').then(m => ({ default: m.ResetPassword })));
+const PublicPricing = React.lazy(() => import('./components/PublicPricing').then(m => ({ default: m.PublicPricing })));
+const Dashboard = React.lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
+const AnalyticsDashboard = React.lazy(() => import('./components/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
+const IncidentReport = React.lazy(() => import('./components/IncidentReport').then(m => ({ default: m.IncidentReport })));
+const IncidentDetail = React.lazy(() => import('./components/IncidentDetail').then(m => ({ default: m.IncidentDetail })));
+const IncidentList = React.lazy(() => import('./components/IncidentList').then(m => ({ default: m.IncidentList })));
+const InspectionForm = React.lazy(() => import('./components/InspectionForm').then(m => ({ default: m.InspectionForm })));
+const AITools = React.lazy(() => import('./components/AITools').then(m => ({ default: m.AITools })));
+const SmartCamera = React.lazy(() => import('./components/SmartCamera').then(m => ({ default: m.SmartCamera })));
+const GeoFencing = React.lazy(() => import('./components/GeoFencing').then(m => ({ default: m.GeoFencing })));
+const Gamification = React.lazy(() => import('./components/Gamification').then(m => ({ default: m.Gamification })));
+const RiskAssessmentList = React.lazy(() => import('./components/RiskAssessmentList').then(m => ({ default: m.RiskAssessmentList })));
+const RiskAssessmentForm = React.lazy(() => import('./components/RiskAssessmentForm').then(m => ({ default: m.RiskAssessmentForm })));
+const ObservationList = React.lazy(() => import('./components/ObservationList').then(m => ({ default: m.ObservationList })));
+const ObservationForm = React.lazy(() => import('./components/ObservationForm').then(m => ({ default: m.ObservationForm })));
+const TrainingDashboard = React.lazy(() => import('./components/TrainingDashboard').then(m => ({ default: m.TrainingDashboard })));
+const WorkerDetail = React.lazy(() => import('./components/WorkerDetail').then(m => ({ default: m.WorkerDetail })));
+const WorkersList = React.lazy(() => import('./components/WorkersList').then(m => ({ default: m.WorkersList })));
+const WorkerForm = React.lazy(() => import('./components/WorkerForm').then(m => ({ default: m.WorkerForm })));
+const PPEDashboard = React.lazy(() => import('./components/PPEDashboard').then(m => ({ default: m.PPEDashboard })));
+const PermitList = React.lazy(() => import('./components/PermitList').then(m => ({ default: m.PermitList })));
+const PermitForm = React.lazy(() => import('./components/PermitForm').then(m => ({ default: m.PermitForm })));
+const AssetList = React.lazy(() => import('./components/AssetList').then(m => ({ default: m.AssetList })));
+const AssetDetail = React.lazy(() => import('./components/AssetDetail').then(m => ({ default: m.AssetDetail })));
+const ContractorList = React.lazy(() => import('./components/ContractorList').then(m => ({ default: m.ContractorList })));
+const ContractorDetail = React.lazy(() => import('./components/ContractorDetail').then(m => ({ default: m.ContractorDetail })));
+const DocumentList = React.lazy(() => import('./components/DocumentList').then(m => ({ default: m.DocumentList })));
+const DocumentForm = React.lazy(() => import('./components/DocumentForm').then(m => ({ default: m.DocumentForm })));
+const EmergencyDashboard = React.lazy(() => import('./components/EmergencyDashboard').then(m => ({ default: m.EmergencyDashboard })));
+const RegulatoryNews = React.lazy(() => import('./components/RegulatoryNews').then(m => ({ default: m.RegulatoryNews })));
+const PricingPlans = React.lazy(() => import('./components/PricingPlans').then(m => ({ default: m.PricingPlans })));
+const RoleManagement = React.lazy(() => import('./components/RoleManagement').then(m => ({ default: m.RoleManagement })));
+const ProfileSettings = React.lazy(() => import('./components/ProfileSettings').then(m => ({ default: m.ProfileSettings })));
+const EnvironmentalLogPage = React.lazy(() => import('./components/EnvironmentalLogPage').then(m => ({ default: m.EnvironmentalLogPage })));
+const ActionList = React.lazy(() => import('./components/ActionList').then(m => ({ default: m.ActionList })));
+
+/* --- LOADING FALLBACK --- */
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-[60vh]">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-10 h-10 border-4 border-slate-200 border-t-brand-orange rounded-full animate-spin" />
+      <span className="text-sm text-slate-500 font-medium">Loading…</span>
+    </div>
+  </div>
+);
 
 /* --- ERROR BOUNDARY --- */
 class ErrorBoundary extends React.Component<
@@ -96,6 +108,7 @@ function App() {
     <ErrorBoundary>
       <AuthProvider>
         <HashRouter>
+          <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/welcome" element={<LandingPage />} />
             <Route path="/plans" element={<PublicPricing />} />
@@ -148,6 +161,7 @@ function App() {
             
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
         </HashRouter>
       </AuthProvider>
     </ErrorBoundary>

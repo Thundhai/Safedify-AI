@@ -104,9 +104,13 @@ export const AIChatAssistant: React.FC = () => {
         const response = await chatSafetyAssistant(currentInput, messages, selectedImage || undefined, systemContext);
         setMessages(prev => [...prev, { role: 'model', text: response }]);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      setMessages(prev => [...prev, { role: 'model', text: "I'm having trouble connecting. Please try again." }]);
+      const isRateLimit = e?.message?.includes('rate limit') || e?.message?.includes('429');
+      setMessages(prev => [...prev, { role: 'model', text: isRateLimit
+        ? '**Rate limit reached.** The AI service is temporarily throttled. Please wait 30 seconds and try again.'
+        : "I'm having trouble connecting. Please try again."
+      }]);
     } finally {
       setIsLoading(false);
     }

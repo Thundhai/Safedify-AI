@@ -21,6 +21,7 @@ import agentRoutes from './routes/agentRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import environmentalRoutes from './routes/environmentalRoutes.js';
+import uploadRoutes from './routes/uploadRoutes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -55,6 +56,14 @@ const authLimiter = rateLimit({
   message: { error: 'Too many login attempts, please try again later.' },
 });
 
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,  // 1 minute
+  max: isProduction ? 15 : 60,
+  message: { error: 'Too many AI requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // ---------- CORS ----------
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
@@ -71,6 +80,7 @@ app.use(cors({
       }
     : ALLOWED_ORIGINS,
   credentials: true,
+  exposedHeaders: ['X-Total-Count', 'X-Page', 'X-Per-Page', 'X-Total-Pages', 'Retry-After'],
 }));
 
 // ---------- Body Parsing ----------
@@ -100,10 +110,11 @@ app.get('/api/health', (_req, res) => {
 // ---------- API Routes ----------
 app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api', apiLimiter, dataRoutes);
-app.use('/api/agent', apiLimiter, agentRoutes);
-app.use('/api/ai', apiLimiter, aiRoutes);
+app.use('/api/agent', aiLimiter, agentRoutes);
+app.use('/api/ai', aiLimiter, aiRoutes);
 app.use('/api/notifications', apiLimiter, notificationRoutes);
 app.use('/api/environmental', apiLimiter, environmentalRoutes);
+app.use('/api/uploads', apiLimiter, uploadRoutes);
 
 // ---------- SPA Fallback (Production) ----------
 if (isProduction) {

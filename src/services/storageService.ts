@@ -39,9 +39,28 @@ import {
   apiGetRoles, apiCreateRole, apiDeleteRole as apiDeleteRoleApi,
   apiGetSafetyZones, apiCreateSafetyZone, apiDeleteSafetyZone as apiDeleteSafetyZoneApi,
   apiGetMetrics,
+  apiUploadImage, apiUploadImages,
 } from './apiService';
 
 // ---------- Helper: map API snake_case to frontend camelCase ----------
+
+/**
+ * Upload base64 data URIs to file storage, returning URL paths.
+ * Already-uploaded URLs (not starting with 'data:') are kept as-is.
+ */
+const uploadImagesIfNeeded = async (images: string[]): Promise<string[]> => {
+  if (!images || images.length === 0) return [];
+  const base64Images = images.filter(img => img.startsWith('data:'));
+  const urlImages = images.filter(img => !img.startsWith('data:'));
+  if (base64Images.length === 0) return images;
+  try {
+    const uploaded = await apiUploadImages(base64Images);
+    return [...urlImages, ...uploaded.map(u => u.url)];
+  } catch (err) {
+    console.warn('[Upload] Image upload failed, falling back to inline:', err);
+    return images; // fallback: keep base64 if upload fails
+  }
+};
 
 const parseJson = (val: any, fallback: any = []) => {
   if (!val) return fallback;
@@ -397,10 +416,16 @@ export const getIncidentById = async (id: string): Promise<Incident | undefined>
 };
 
 export const saveIncident = async (incident: Incident): Promise<void> => {
+  if (incident.images?.length) {
+    incident = { ...incident, images: await uploadImagesIfNeeded(incident.images) };
+  }
   await apiCreateIncident(incidentToApi(incident));
 };
 
 export const updateIncident = async (incident: Incident): Promise<void> => {
+  if (incident.images?.length) {
+    incident = { ...incident, images: await uploadImagesIfNeeded(incident.images) };
+  }
   await apiUpdateIncident(incident.id, incidentToApi(incident));
 };
 
@@ -510,10 +535,16 @@ export const getObservations = async (): Promise<Observation[]> => {
 };
 
 export const saveObservation = async (obs: Observation): Promise<void> => {
+  if (obs.images?.length) {
+    obs = { ...obs, images: await uploadImagesIfNeeded(obs.images) };
+  }
   await apiCreateObservation(observationToApi(obs));
 };
 
 export const updateObservation = async (obs: Observation): Promise<void> => {
+  if (obs.images?.length) {
+    obs = { ...obs, images: await uploadImagesIfNeeded(obs.images) };
+  }
   await apiUpdateObservation(obs.id, observationToApi(obs));
 };
 

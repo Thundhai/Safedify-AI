@@ -198,6 +198,30 @@ export const apiGetAgentConversations = () => apiFetch('/agent/conversations');
 export const apiGetAgentConversation = (id: string) => apiFetch(`/agent/conversations/${id}`);
 export const apiDeleteAgentConversation = (id: string) => apiFetch(`/agent/conversations/${id}`, { method: 'DELETE' });
 
+// ---------- File Upload API ----------
+
+/**
+ * Upload a base64 data URI to the server and get back a URL path.
+ * Returns { id, url, filename, size, mimeType }
+ */
+export const apiUploadImage = async (dataUri: string): Promise<{ id: string; url: string; filename: string; size: number; mimeType: string }> => {
+  return apiFetch('/uploads', {
+    method: 'POST',
+    body: JSON.stringify({ data: dataUri }),
+  });
+};
+
+/**
+ * Upload multiple base64 data URIs at once.
+ * Returns array of { id, url, filename, size, mimeType }
+ */
+export const apiUploadImages = async (dataUris: string[]): Promise<Array<{ id: string; url: string; filename: string; size: number; mimeType: string }>> => {
+  return apiFetch('/uploads', {
+    method: 'POST',
+    body: JSON.stringify({ files: dataUris }),
+  });
+};
+
 // ---------- Health Check ----------
 
 export const apiHealthCheck = async (): Promise<boolean> => {

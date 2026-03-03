@@ -12,3 +12,8 @@ server/safedify.db-wal
 .git
 .vscode
 *.log
+.gitignore
+.dockerignore
+docker-compose.yml
+README.md
+*.md

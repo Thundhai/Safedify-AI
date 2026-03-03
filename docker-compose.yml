@@ -4,8 +4,6 @@ services:
   safedify:
     build:
       context: .
-      args:
-        VITE_GEMINI_API_KEY: ${VITE_GEMINI_API_KEY}
     container_name: safedify-ai
     restart: unless-stopped
     ports:
@@ -13,8 +11,19 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=4000
-      - JWT_SECRET=${JWT_SECRET:-change-me-to-a-long-random-string}
+      - JWT_SECRET=${JWT_SECRET}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-}
+      - SITE_LATITUDE=${SITE_LATITUDE:-25.2048}
+      - SITE_LONGITUDE=${SITE_LONGITUDE:-55.2708}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - SMTP_FROM=${SMTP_FROM:-noreply@safedify.com}
+      - APP_URL=${APP_URL:-http://localhost:4000}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+      - SEED_DEMO_USERS=${SEED_DEMO_USERS:-false}
       - DATA_DIR=/data
     volumes:
       - safedify-data:/data
@@ -22,7 +31,13 @@ services:
       test: ["CMD", "node", "-e", "fetch('http://localhost:4000/api/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
+      start_period: 10s
       retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   safedify-data:

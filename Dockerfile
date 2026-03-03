@@ -23,9 +23,9 @@ FROM node:22-slim AS production
 
 WORKDIR /app/server
 
-# Install server dependencies
+# Install server dependencies (tsx is now in dependencies)
 COPY server/package.json server/package-lock.json ./
-RUN npm ci --production
+RUN npm ci --omit=dev
 
 # Copy server source
 COPY server/ ./
@@ -46,7 +46,7 @@ ENV DATA_DIR=/data
 
 EXPOSE 4000
 
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:4000/api/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
 
 CMD ["node", "--experimental-sqlite", "--import", "tsx", "index.ts"]

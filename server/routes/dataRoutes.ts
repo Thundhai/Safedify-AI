@@ -9,11 +9,29 @@ const router = Router();
 // All routes require auth
 router.use(authenticate);
 
+// ---------- PAGINATION HELPER ----------
+function paginate(req: AuthRequest, res: Response, table: string, orderBy = 'created_at DESC', where = '', whereParams: any[] = []) {
+  const page = Math.max(1, parseInt(req.query.page as string) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+  const offset = (page - 1) * limit;
+
+  const whereClause = where ? `WHERE ${where}` : '';
+  const countRow = db.prepare(`SELECT COUNT(*) as total FROM ${table} ${whereClause}`).get(...whereParams) as any;
+  const total = countRow?.total || 0;
+  const rows = db.prepare(`SELECT * FROM ${table} ${whereClause} ORDER BY ${orderBy} LIMIT ? OFFSET ?`)
+    .all(...whereParams, limit, offset);
+
+  res.set('X-Total-Count', String(total));
+  res.set('X-Page', String(page));
+  res.set('X-Per-Page', String(limit));
+  res.set('X-Total-Pages', String(Math.ceil(total / limit)));
+  res.json(rows);
+}
+
 // ---------- INCIDENTS ----------
 
 router.get('/incidents', (req: AuthRequest, res: Response) => {
-  const rows = db.prepare('SELECT * FROM incidents ORDER BY created_at DESC').all();
-  res.json(rows);
+  paginate(req, res, 'incidents');
 });
 
 router.get('/incidents/:id', (req: AuthRequest, res: Response) => {
@@ -115,7 +133,7 @@ router.delete('/incidents/:id', requirePermission('manage_incidents'), (req: Aut
 // ---------- ACTIONS ----------
 
 router.get('/actions', (req: AuthRequest, res: Response) => {
-  res.json(db.prepare('SELECT * FROM actions ORDER BY created_at DESC').all());
+  paginate(req, res, 'actions');
 });
 
 router.post('/actions', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
@@ -179,7 +197,7 @@ router.delete('/actions/:id', requirePermission('manage_incidents'), (req: AuthR
 // ---------- OBSERVATIONS ----------
 
 router.get('/observations', (req: AuthRequest, res: Response) => {
-  res.json(db.prepare('SELECT * FROM observations ORDER BY created_at DESC').all());
+  paginate(req, res, 'observations');
 });
 
 router.post('/observations', requirePermission('create_incident'), (req: AuthRequest, res: Response) => {
@@ -209,7 +227,7 @@ router.delete('/observations/:id', requirePermission('manage_incidents'), (req: 
 // ---------- INSPECTIONS ----------
 
 router.get('/inspections', (req: AuthRequest, res: Response) => {
-  res.json(db.prepare('SELECT * FROM inspections ORDER BY created_at DESC').all());
+  paginate(req, res, 'inspections');
 });
 
 router.post('/inspections', requirePermission('perform_inspection'), (req: AuthRequest, res: Response) => {
@@ -224,7 +242,7 @@ router.post('/inspections', requirePermission('perform_inspection'), (req: AuthR
 // ---------- PERMITS ----------
 
 router.get('/permits', (req: AuthRequest, res: Response) => {
-  res.json(db.prepare('SELECT * FROM permits ORDER BY created_at DESC').all());
+  paginate(req, res, 'permits');
 });
 
 router.post('/permits', requirePermission('create_permit'), (req: AuthRequest, res: Response) => {
@@ -273,7 +291,7 @@ router.put('/permits/:id', requirePermission('approve_permit'), (req: AuthReques
 // ---------- WORKERS ----------
 
 router.get('/workers', (req: AuthRequest, res: Response) => {
-  res.json(db.prepare('SELECT * FROM workers ORDER BY created_at DESC').all());
+  paginate(req, res, 'workers');
 });
 
 router.get('/workers/:id', (req: AuthRequest, res: Response) => {
@@ -307,7 +325,7 @@ router.delete('/workers/:id', requirePermission('manage_users'), (req: AuthReque
 // ---------- CONTRACTORS ----------
 
 router.get('/contractors', (req: AuthRequest, res: Response) => {
-  res.json(db.prepare('SELECT * FROM contractors ORDER BY created_at DESC').all());
+  paginate(req, res, 'contractors');
 });
 
 router.get('/contractors/:id', (req: AuthRequest, res: Response) => {
@@ -328,7 +346,7 @@ router.post('/contractors', requirePermission('manage_users'), (req: AuthRequest
 // ---------- ASSETS ----------
 
 router.get('/assets', (req: AuthRequest, res: Response) => {
-  res.json(db.prepare('SELECT * FROM assets ORDER BY created_at DESC').all());
+  paginate(req, res, 'assets');
 });
 
 router.get('/assets/:id', (req: AuthRequest, res: Response) => {
@@ -349,7 +367,7 @@ router.post('/assets', requirePermission('manage_incidents'), (req: AuthRequest,
 // ---------- DOCUMENTS ----------
 
 router.get('/documents', (req: AuthRequest, res: Response) => {
-  res.json(db.prepare('SELECT * FROM documents ORDER BY created_at DESC').all());
+  paginate(req, res, 'documents');
 });
 
 router.get('/documents/:id', (req: AuthRequest, res: Response) => {
@@ -443,7 +461,16 @@ router.post('/emergency/drills', requirePermission('manage_incidents'), (req: Au
 // ---------- RISK ASSESSMENTS ----------
 
 router.get('/risk-assessments', (req: AuthRequest, res: Response) => {
-  const rows = db.prepare('SELECT * FROM risk_assessments ORDER BY created_at DESC').all();
+  const page = Math.max(1, parseInt(req.query.page as string) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+  const offset = (page - 1) * limit;
+  const countRow = db.prepare('SELECT COUNT(*) as total FROM risk_assessments').get() as any;
+  const total = countRow?.total || 0;
+  const rows = db.prepare('SELECT * FROM risk_assessments ORDER BY created_at DESC LIMIT ? OFFSET ?').all(limit, offset);
+  res.set('X-Total-Count', String(total));
+  res.set('X-Page', String(page));
+  res.set('X-Per-Page', String(limit));
+  res.set('X-Total-Pages', String(Math.ceil(total / limit)));
   res.json(rows.map((r: any) => ({ ...r, hazards: JSON.parse(r.hazards || '[]') })));
 });
 

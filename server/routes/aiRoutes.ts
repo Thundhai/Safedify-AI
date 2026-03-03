@@ -44,6 +44,14 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
 
     res.json({ text: response.text || '' });
   } catch (err: any) {
+    // Forward 429 rate-limit status properly
+    if (err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED')) {
+      const retryMatch = err.message.match(/retry in ([\d.]+)s/i);
+      const retryAfter = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : 30;
+      res.set('Retry-After', String(retryAfter));
+      res.status(429).json({ error: 'AI rate limit exceeded. Please wait a moment and try again.', retryAfter });
+      return;
+    }
     console.error('[AI Proxy] Generate error:', err.message);
     res.status(500).json({ error: err.message || 'AI generation failed' });
   }
@@ -78,6 +86,14 @@ router.post('/chat', async (req: AuthRequest, res: Response) => {
     const result = await chat.sendMessage({ message });
     res.json({ text: result.text || '' });
   } catch (err: any) {
+    // Forward 429 rate-limit status properly
+    if (err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED')) {
+      const retryMatch = err.message.match(/retry in ([\d.]+)s/i);
+      const retryAfter = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : 30;
+      res.set('Retry-After', String(retryAfter));
+      res.status(429).json({ error: 'AI rate limit exceeded. Please wait a moment and try again.', retryAfter });
+      return;
+    }
     console.error('[AI Proxy] Chat error:', err.message);
     res.status(500).json({ error: err.message || 'AI chat failed' });
   }
