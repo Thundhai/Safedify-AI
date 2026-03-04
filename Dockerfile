@@ -1,37 +1,34 @@
 # ==========================================
-# Stage 1: Build Frontend
+# Safedify AI - Production Docker Image
 # ==========================================
-FROM node:22-slim AS frontend-build
-
-WORKDIR /app
-
-# Install frontend dependencies
-COPY package.json package-lock.json ./
-RUN npm ci
-
-# Copy frontend source & build
-COPY index.html vite.config.ts tsconfig.json tsconfig.node.json tailwind.config.js postcss.config.js ./
-COPY public/ public/
-COPY src/ src/
-
-RUN npm run build
-
+# Build locally first, then copy into Docker:
+#   npm ci && npm run build
+#   cd server && npm ci --omit=dev
+#   docker build -t safedify-ai .
 # ==========================================
-# Stage 2: Production Server
-# ==========================================
-FROM node:22-slim AS production
+FROM node:22-slim
 
 WORKDIR /app/server
 
-# Install server dependencies (tsx is now in dependencies)
+# Copy package files and install deps inside container
+# (needed because native binaries like esbuild are platform-specific)
 COPY server/package.json server/package-lock.json ./
-RUN npm ci --omit=dev
+
+# Configure npm for slower/unreliable networks inside Docker
+RUN npm config set fetch-retries 5 \
+ && npm config set fetch-retry-mintimeout 60000 \
+ && npm config set fetch-retry-maxtimeout 300000 \
+ && npm config set fetch-timeout 600000
+
+# Copy node_modules from host, then rebuild native modules for Linux
+COPY server/node_modules/ ./node_modules/
+RUN npm rebuild
 
 # Copy server source
 COPY server/ ./
 
-# Copy frontend build from stage 1
-COPY --from=frontend-build /app/dist /app/dist
+# Copy pre-built frontend (built on host via `npm run build`)
+COPY dist/ /app/dist/
 
 # Create data directory
 RUN mkdir -p /data && chown -R node:node /data
@@ -49,4 +46,4 @@ EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://localhost:4000/api/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
 
-CMD ["node", "--experimental-sqlite", "--import", "tsx", "index.ts"]
+CMD ["node", "--import", "tsx", "index.ts"]

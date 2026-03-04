@@ -1,17 +1,20 @@
-import { DatabaseSync } from 'node:sqlite';
+import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { mkdirSync } from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = process.env.DATA_DIR || __dirname;
+
+// On Vercel serverless, only /tmp is writable
+const isVercel = !!process.env.VERCEL;
+const DATA_DIR = process.env.DATA_DIR || (isVercel ? '/tmp' : __dirname);
 
 // Ensure data directory exists
 try { mkdirSync(DATA_DIR, { recursive: true }); } catch {}
 
 const DB_PATH = path.join(DATA_DIR, 'safedify.db');
 
-const db = new DatabaseSync(DB_PATH);
+const db = new Database(DB_PATH);
 
 // Enable WAL mode for better concurrency
 db.exec('PRAGMA journal_mode = WAL');

@@ -91,7 +91,8 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
 app.use(cors({
   origin: isProduction
     ? (origin, callback) => {
-        if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        // On Vercel, API and frontend are same-origin (no origin header)
+        if (!origin || ALLOWED_ORIGINS.includes(origin) || process.env.VERCEL) {
           callback(null, true);
         } else {
           callback(new Error('Not allowed by CORS'));
@@ -166,19 +167,23 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   });
 });
 
-// ---------- Start ----------
+// ---------- Seed on load (for serverless cold starts) ----------
+seedDefaultUsers().catch(console.error);
+
+// ---------- Export for Vercel serverless ----------
+export default app;
+
+// ---------- Start (standalone / Docker) ----------
 async function start() {
   // --- JWT Secret Validation ---
   const jwtSecret = process.env.JWT_SECRET || '';
   const DEFAULT_SECRETS = ['safedify-secret-key-change-in-production', 'change-me-to-a-long-random-string', ''];
-  if (isProduction && DEFAULT_SECRETS.includes(jwtSecret)) {
+  if (isProduction && !process.env.VERCEL && DEFAULT_SECRETS.includes(jwtSecret)) {
     console.error('\n\x1b[31m[FATAL] JWT_SECRET is not set or uses a default value.\x1b[0m');
     console.error('Set a strong, unique JWT_SECRET environment variable before running in production.');
     console.error('Example: JWT_SECRET=$(openssl rand -base64 48)\n');
     process.exit(1);
   }
-
-  await seedDefaultUsers();
 
   // In production/Docker, bind to 0.0.0.0 to accept external connections
   // In development, bind to 127.0.0.1 for security
@@ -208,4 +213,7 @@ async function start() {
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-start().catch(console.error);
+// Only start the HTTP server when running standalone (not on Vercel)
+if (!process.env.VERCEL) {
+  start().catch(console.error);
+}
