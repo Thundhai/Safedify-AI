@@ -168,7 +168,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 });
 
 // ---------- Seed on load (for serverless cold starts) ----------
-seedDefaultUsers().catch(console.error);
+seedDefaultUsers();
 
 // ---------- Export for Vercel serverless ----------
 export default app;

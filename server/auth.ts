@@ -105,14 +105,15 @@ export const requirePermission = (...permissions: string[]) => {
 
 // ---------- Seed default admin (only when SEED_DEMO_USERS=true) ----------
 
-export const seedDefaultUsers = async () => {
+export const seedDefaultUsers = () => {
   if (process.env.SEED_DEMO_USERS !== 'true') {
     // Skip seeding demo users in production — set SEED_DEMO_USERS=true in .env to enable
     return;
   }
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get('admin@safedify.com');
   if (!existing) {
-    const hash = await hashPassword('password');
+    // Use synchronous hash so users are guaranteed to exist before any request
+    const hash = bcrypt.hashSync('password', 10);
     const users = [
       { id: uuid(), name: 'John Doe', email: 'admin@safedify.com', role: 'Admin', tier: 'Enterprise', avatar: 'JD' },
       { id: uuid(), name: 'Robert Fox', email: 'worker@safedify.com', role: 'Worker', tier: 'Free', avatar: 'RF' },
