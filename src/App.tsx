@@ -54,6 +54,7 @@ const EnvironmentalLogPage = React.lazy(() => import('./components/Environmental
 const ActionList = React.lazy(() => import('./components/ActionList').then(m => ({ default: m.ActionList })));
 const PredictiveIntelligence = React.lazy(() => import('./components/PredictiveIntelligence').then(m => ({ default: m.PredictiveIntelligence })));
 const LegalPage = React.lazy(() => import('./components/LegalPage').then(m => ({ default: m.LegalPage })));
+const SiteManagement = React.lazy(() => import('./components/SiteManagement').then(m => ({ default: m.SiteManagement })));
 
 /* --- LOADING FALLBACK --- */
 const PageLoader = () => (
@@ -180,6 +181,7 @@ function App() {
               <Route path="roles" element={<RoleManagement />} />
               <Route path="profile" element={<ProfileSettings />} />
               <Route path="regulatory-news" element={<RegulatoryNews />} />
+              <Route path="sites" element={<SiteManagement />} />
             </Route>
             
             <Route path="*" element={<Navigate to="/" replace />} />

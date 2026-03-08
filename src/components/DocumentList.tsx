@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getDocuments, deleteDocument } from '../services/storageService';
 import { HSEDocument, DocumentCategory } from '../types';
-import { Plus, FileText, Search, Filter, Shield, Book, FileBarChart, AlertCircle, Trash2 } from 'lucide-react';
+import { Plus, FileText, Search, Filter, Shield, Book, FileBarChart, AlertCircle, Trash2, Clock } from 'lucide-react';
 import { Pagination } from './Pagination';
 import toast from 'react-hot-toast';
 
@@ -135,8 +135,24 @@ export const DocumentList: React.FC = () => {
                         </div>
                         
                         <h3 className="font-bold text-slate-800 line-clamp-1 mb-1 group-hover:text-blue-600 transition-colors">{doc.title}</h3>
-                        <p className="text-xs text-slate-500 mb-4 font-mono">{doc.version} • {new Date(doc.uploadDate).toLocaleDateString()}</p>
+                        <p className="text-xs text-slate-500 mb-2 font-mono">{doc.version} • {new Date(doc.uploadDate).toLocaleDateString()}</p>
                         
+                        {doc.expiryDate && new Date(doc.expiryDate) <= new Date(Date.now() + 30 * 86400000) && (
+                            <div className={`flex items-center gap-1 text-[10px] font-bold mb-2 ${new Date(doc.expiryDate) < new Date() ? 'text-red-600' : 'text-yellow-600'}`}>
+                                <Clock size={10} />
+                                {new Date(doc.expiryDate) < new Date() ? 'EXPIRED' : 'Expiring'} {new Date(doc.expiryDate).toLocaleDateString()}
+                            </div>
+                        )}
+
+                        {(doc.tags || []).length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                                {doc.tags!.slice(0, 3).map(tag => (
+                                    <span key={tag} className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[10px] rounded font-medium">{tag}</span>
+                                ))}
+                                {doc.tags!.length > 3 && <span className="text-[10px] text-slate-400">+{doc.tags!.length - 3}</span>}
+                            </div>
+                        )}
+
                         <p className="text-sm text-slate-600 line-clamp-2 mb-4 flex-1">{doc.description}</p>
 
                         <div className="border-t border-slate-100 pt-4 flex justify-between items-center text-xs text-slate-400">

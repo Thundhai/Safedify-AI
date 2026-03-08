@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { 
     ArrowLeft, Save, Upload, QrCode, Sparkles, Loader2, CheckCircle, 
-    XCircle, FileText, Calendar, User
+    XCircle, FileText, Calendar, User, Clock, Tag, History
 } from 'lucide-react';
 
 export const DocumentForm: React.FC = () => {
@@ -25,11 +25,16 @@ export const DocumentForm: React.FC = () => {
         status: 'Draft',
         uploadDate: new Date().toISOString().split('T')[0],
         author: user?.name || 'Unknown',
-        description: ''
+        description: '',
+        expiryDate: '',
+        reviewer: '',
+        tags: [],
+        versionHistory: [],
     });
 
     const [isUploading, setIsUploading] = useState(false);
     const [isSummarizing, setIsSummarizing] = useState(false);
+    const [tagInput, setTagInput] = useState('');
 
     useEffect(() => {
         if (!isNew && id) {
@@ -76,14 +81,33 @@ export const DocumentForm: React.FC = () => {
     };
 
     const handleApprove = async () => {
+        const historyEntry = {
+            version: doc.version,
+            date: new Date().toISOString().split('T')[0],
+            author: user?.name || 'Unknown',
+            changes: `Approved by ${user?.name || 'Unknown'}`
+        };
         const updated = { 
             ...doc, 
             status: 'Approved' as const, 
             approvedBy: user?.name || 'Unknown', 
-            approvalDate: new Date().toISOString().split('T')[0] 
+            approvalDate: new Date().toISOString().split('T')[0],
+            versionHistory: [...(doc.versionHistory || []), historyEntry],
         };
         setDoc(updated);
         await saveDocument(updated);
+    };
+
+    const addTag = () => {
+        const tag = tagInput.trim().toLowerCase();
+        if (tag && !(doc.tags || []).includes(tag)) {
+            setDoc(prev => ({ ...prev, tags: [...(prev.tags || []), tag] }));
+        }
+        setTagInput('');
+    };
+
+    const removeTag = (tag: string) => {
+        setDoc(prev => ({ ...prev, tags: (prev.tags || []).filter(t => t !== tag) }));
     };
 
     const categories: DocumentCategory[] = ['Policy', 'SOP', 'MSDS', 'Work Instruction', 'Report', 'Training Material'];
@@ -152,6 +176,25 @@ export const DocumentForm: React.FC = () => {
                                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
                                 />
                              </div>
+                             <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1"><Clock size={14} /> Expiry Date</label>
+                                <input 
+                                    type="date" 
+                                    value={doc.expiryDate || ''}
+                                    onChange={(e) => setDoc({...doc, expiryDate: e.target.value})}
+                                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
+                                />
+                             </div>
+                             <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Reviewer</label>
+                                <input 
+                                    type="text" 
+                                    value={doc.reviewer || ''}
+                                    onChange={(e) => setDoc({...doc, reviewer: e.target.value})}
+                                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
+                                    placeholder="Assigned reviewer"
+                                />
+                             </div>
                         </div>
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-1">Description</label>
@@ -162,6 +205,28 @@ export const DocumentForm: React.FC = () => {
                                 onValueChange={(v) => setDoc(d => ({...d, description: v}))}
                                 className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
                             />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1"><Tag size={14} /> Tags</label>
+                            <div className="flex flex-wrap gap-1.5 mb-2">
+                                {(doc.tags || []).map(tag => (
+                                    <span key={tag} className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-xs font-medium border border-blue-100">
+                                        {tag}
+                                        <button type="button" onClick={() => removeTag(tag)} className="hover:text-red-500"><XCircle size={12} /></button>
+                                    </span>
+                                ))}
+                            </div>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    value={tagInput}
+                                    onChange={e => setTagInput(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(); } }}
+                                    className="flex-1 border border-slate-300 rounded-lg p-2 text-sm"
+                                    placeholder="Add tag and press Enter"
+                                />
+                                <button type="button" onClick={addTag} className="px-3 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm hover:bg-slate-200">Add</button>
+                            </div>
                         </div>
                     </div>
 
@@ -257,6 +322,40 @@ export const DocumentForm: React.FC = () => {
                         </div>
                         <p className="text-xs text-slate-500">Scan to access this document on site</p>
                     </div>
+
+                    {/* Version History */}
+                    {(doc.versionHistory || []).length > 0 && (
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <History size={18} /> Version History
+                            </h3>
+                            <div className="space-y-3">
+                                {[...(doc.versionHistory || [])].reverse().map((v, i) => (
+                                    <div key={i} className="border-l-2 border-blue-200 pl-3 py-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-bold text-blue-600">{v.version}</span>
+                                            <span className="text-[10px] text-slate-400">{v.date}</span>
+                                        </div>
+                                        <p className="text-xs text-slate-600 mt-0.5">{v.changes}</p>
+                                        <p className="text-[10px] text-slate-400">by {v.author}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Expiry Warning */}
+                    {doc.expiryDate && new Date(doc.expiryDate) <= new Date(Date.now() + 30 * 86400000) && (
+                        <div className={`p-4 rounded-xl border ${new Date(doc.expiryDate) < new Date() ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'}`}>
+                            <div className="flex items-center gap-2">
+                                <Clock size={16} className={new Date(doc.expiryDate) < new Date() ? 'text-red-500' : 'text-yellow-600'} />
+                                <span className={`text-sm font-bold ${new Date(doc.expiryDate) < new Date() ? 'text-red-700' : 'text-yellow-700'}`}>
+                                    {new Date(doc.expiryDate) < new Date() ? 'Document Expired' : 'Expiring Soon'}
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">Expiry: {new Date(doc.expiryDate).toLocaleDateString()}</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

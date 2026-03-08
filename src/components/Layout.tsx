@@ -40,7 +40,8 @@ import {
   Globe,
   Users,
   Leaf,
-  Brain
+  Brain,
+  Building2
 } from 'lucide-react';
 import { SkipLink } from '../utils/accessibility';
 import { getSyncQueue, processSyncQueue } from '../services/offlineService';
@@ -203,6 +204,7 @@ export const Layout: React.FC = () => {
         { to: '/actions', icon: CheckSquare, label: 'Action Items' },
         { to: '/documents', icon: FileText, label: 'Documents' },
         { to: '/gamification', icon: Trophy, label: 'Safety Champions' },
+        { to: '/sites', icon: Building2, label: 'Sites & Teams' },
       ]
     }
   ];
@@ -224,6 +226,7 @@ export const Layout: React.FC = () => {
     if (location.pathname === '/pricing') return 'Subscription Plans';
     if (location.pathname === '/roles') return 'Role Management';
     if (location.pathname === '/profile') return 'Account Settings';
+    if (location.pathname === '/sites') return 'Site & Team Management';
     return current ? current.label : 'Safedify';
   };
 
@@ -278,7 +281,7 @@ export const Layout: React.FC = () => {
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 overflow-hidden print:h-auto print:overflow-visible">
       <SkipLink />
-      {/* Sidebar - Desktop */
+      {/* Sidebar - Desktop */}
       <aside className="hidden md:flex md:flex-col md:w-64 bg-brand-navy text-white shadow-2xl z-20 border-r border-slate-800 print:hidden">
         <div className="p-6 border-b border-slate-800">
           <div className="flex items-center gap-2">

@@ -3,8 +3,9 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { changePassword } from '../services/authService';
 import { getStorageUsage, clearUserData } from '../services/storageService';
+import { apiGetNotificationPreferences, apiUpdateNotificationPreferences } from '../services/apiService';
 import { SubscriptionTier } from '../types';
-import { User, Shield, HardDrive, AlertTriangle, Trash2, Pencil, Lock, Check, X } from 'lucide-react';
+import { User, Shield, HardDrive, AlertTriangle, Trash2, Pencil, Lock, Check, X, Bell, Mail } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 const TwoFactorSetup = lazy(() => import('./TwoFactorSetup'));
@@ -27,6 +28,19 @@ export const ProfileSettings: React.FC = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [changingPassword, setChangingPassword] = useState(false);
 
+    // Notification preferences
+    const [notifPrefs, setNotifPrefs] = useState({
+        email_incidents: true,
+        email_permits: true,
+        email_actions: true,
+        email_training: true,
+        email_observations: false,
+        email_digest: true,
+        in_app_all: true,
+    });
+    const [loadingPrefs, setLoadingPrefs] = useState(true);
+    const [savingPrefs, setSavingPrefs] = useState(false);
+
     const LIMIT_FREE = 5 * 1024 * 1024;
     const LIMIT_PRO = 100 * 1024 * 1024;
 
@@ -36,6 +50,28 @@ export const ProfileSettings: React.FC = () => {
         const limit = user?.tier === SubscriptionTier.FREE ? LIMIT_FREE : LIMIT_PRO;
         setUsagePercent(Math.min(100, (bytes / limit) * 100));
     }, [user]);
+
+    useEffect(() => {
+        apiGetNotificationPreferences()
+            .then(prefs => setNotifPrefs(prefs))
+            .catch(() => {})
+            .finally(() => setLoadingPrefs(false));
+    }, []);
+
+    const handleSavePrefs = async () => {
+        setSavingPrefs(true);
+        try {
+            await apiUpdateNotificationPreferences(notifPrefs);
+            toast.success('Notification preferences saved');
+        } catch {
+            toast.error('Failed to save preferences');
+        }
+        setSavingPrefs(false);
+    };
+
+    const togglePref = (key: keyof typeof notifPrefs) => {
+        setNotifPrefs(prev => ({ ...prev, [key]: !prev[key] }));
+    };
 
     const formatBytes = (bytes: number, decimals = 2) => {
         if (bytes === 0) return '0 Bytes';
@@ -260,6 +296,75 @@ export const ProfileSettings: React.FC = () => {
             <Suspense fallback={<div className="animate-pulse bg-slate-100 rounded-xl h-40" />}>
               <TwoFactorSetup />
             </Suspense>
+
+            {/* Notification Preferences */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <Bell size={16} /> Notification Preferences
+                </h3>
+                {loadingPrefs ? (
+                    <div className="animate-pulse space-y-3">
+                        {[...Array(7)].map((_, i) => <div key={i} className="h-8 bg-slate-100 rounded" />)}
+                    </div>
+                ) : (
+                    <div className="space-y-1">
+                        <p className="text-xs text-slate-500 mb-3 flex items-center gap-1"><Mail size={12} /> Email Notifications</p>
+                        {([
+                            { key: 'email_incidents' as const, label: 'Incident Reports', desc: 'Get notified when incidents are created or updated' },
+                            { key: 'email_permits' as const, label: 'Permit Alerts', desc: 'Permit expiry reminders and status changes' },
+                            { key: 'email_actions' as const, label: 'Action Items', desc: 'When actions are assigned or due' },
+                            { key: 'email_training' as const, label: 'Training Reminders', desc: 'Upcoming training sessions and certifications' },
+                            { key: 'email_observations' as const, label: 'Observation Reports', desc: 'Safety observation summaries' },
+                            { key: 'email_digest' as const, label: 'Daily Digest', desc: 'Daily summary of all HSE activity' },
+                        ]).map(item => (
+                            <label key={item.key} className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                                <div>
+                                    <p className="text-sm font-medium text-slate-700">{item.label}</p>
+                                    <p className="text-xs text-slate-400">{item.desc}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={notifPrefs[item.key]}
+                                    onClick={() => togglePref(item.key)}
+                                    className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${notifPrefs[item.key] ? 'bg-blue-600' : 'bg-slate-200'}`}
+                                >
+                                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notifPrefs[item.key] ? 'translate-x-5' : 'translate-x-0'}`} />
+                                </button>
+                            </label>
+                        ))}
+
+                        <div className="border-t border-slate-100 mt-3 pt-3">
+                            <p className="text-xs text-slate-500 mb-2 flex items-center gap-1"><Bell size={12} /> In-App Notifications</p>
+                            <label className="flex items-center justify-between py-2.5 px-3 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors">
+                                <div>
+                                    <p className="text-sm font-medium text-slate-700">All In-App Alerts</p>
+                                    <p className="text-xs text-slate-400">Show notification bell and banners</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={notifPrefs.in_app_all}
+                                    onClick={() => togglePref('in_app_all')}
+                                    className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${notifPrefs.in_app_all ? 'bg-blue-600' : 'bg-slate-200'}`}
+                                >
+                                    <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${notifPrefs.in_app_all ? 'translate-x-5' : 'translate-x-0'}`} />
+                                </button>
+                            </label>
+                        </div>
+
+                        <div className="pt-4">
+                            <button
+                                onClick={handleSavePrefs}
+                                disabled={savingPrefs}
+                                className="px-5 py-2 bg-blue-600 text-white text-sm rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                            >
+                                {savingPrefs ? 'Saving...' : 'Save Preferences'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

@@ -49,7 +49,55 @@ export interface AuthUser {
   tier: SubscriptionTier;
   avatar?: string;
   companyId?: string;
+  siteId?: string; // Current active site
   // Permissions are loaded at runtime based on role
+}
+
+// --- Multi-Site & Team Management Types ---
+
+export interface Site {
+  id: string;
+  name: string;
+  code: string; // Short code e.g. "DXB-01"
+  location: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  companyId: string;
+  status: 'Active' | 'Inactive' | 'Under Construction';
+  contactPerson?: string;
+  contactPhone?: string;
+  createdAt: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  siteId: string;
+  leaderId?: string; // User ID of team leader
+  leaderName?: string;
+  department: string;
+  memberCount: number;
+  members?: TeamMember[];
+  createdAt: string;
+}
+
+export interface TeamMember {
+  userId: string;
+  name: string;
+  role: string;
+  joinedAt: string;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  siteId: string;
+  description?: string;
+  startDate: string;
+  endDate?: string;
+  status: 'Planning' | 'Active' | 'On Hold' | 'Completed';
+  teamIds: string[];
 }
 
 export enum IncidentSeverity {
@@ -597,6 +645,18 @@ export interface HSEDocument {
   approvedBy?: string;
   approvalDate?: string;
   aiSummary?: string; // Generated summary
+  expiryDate?: string; // Document expiry / review due date
+  reviewDate?: string; // Next review date
+  reviewer?: string; // Assigned reviewer
+  tags?: string[]; // Searchable tags
+  versionHistory?: DocumentVersion[];
+}
+
+export interface DocumentVersion {
+  version: string;
+  date: string;
+  author: string;
+  changes: string;
 }
 
 // --- Emergency Response Types ---

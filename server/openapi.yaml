@@ -1,10 +1,14 @@
 openapi: '3.1.0'
 info:
   title: Safedify AI — HSE Management Platform API
-  version: '1.0.0'
+  version: '2.0.0'
   description: |
     REST API for the Safedify AI Health, Safety & Environment management platform.
     All authenticated endpoints require `Authorization: Bearer <token>` header.
+    
+    ## Changelog
+    - **v2.0.0** — Phase 5: Notification preferences, bulk ops, 2FA, profile update, password change, environmental data, admin routes
+    - **v1.0.0** — Initial release: Auth, CRUD, search, export, agent, uploads, notifications
   contact:
     name: Safedify AI
     url: https://github.com/Thundhai/Safedify-AI
@@ -483,3 +487,282 @@ paths:
                 type: object
                 properties:
                   count: { type: integer }
+
+  /notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Marked as read }
+
+  /notifications/preferences:
+    get:
+      tags: [Notifications]
+      summary: Get notification preferences
+      responses:
+        '200':
+          description: User notification preferences
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  email_incidents: { type: boolean }
+                  email_permits: { type: boolean }
+                  email_actions: { type: boolean }
+                  email_training: { type: boolean }
+                  email_observations: { type: boolean }
+                  email_digest: { type: boolean }
+                  in_app_all: { type: boolean }
+    put:
+      tags: [Notifications]
+      summary: Update notification preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email_incidents: { type: boolean }
+                email_permits: { type: boolean }
+                email_actions: { type: boolean }
+                email_training: { type: boolean }
+                email_observations: { type: boolean }
+                email_digest: { type: boolean }
+                in_app_all: { type: boolean }
+      responses:
+        '200': { description: Preferences updated }
+
+  /auth/profile:
+    put:
+      tags: [Auth]
+      summary: Update user profile (name)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, minLength: 2 }
+      responses:
+        '200': { description: Profile updated }
+
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Change password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { type: string, minLength: 8 }
+      responses:
+        '200': { description: Password changed }
+        '401': { description: Current password incorrect }
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200': { description: Reset email sent (if account exists) }
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password with token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 8 }
+      responses:
+        '200': { description: Password reset successful }
+
+  /2fa/setup:
+    post:
+      tags: [Two-Factor Auth]
+      summary: Generate 2FA setup (QR code / secret)
+      responses:
+        '200':
+          description: TOTP setup data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret: { type: string }
+                  qrCodeUrl: { type: string }
+
+  /2fa/verify:
+    post:
+      tags: [Two-Factor Auth]
+      summary: Verify and enable 2FA
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        '200': { description: 2FA enabled }
+        '400': { description: Invalid token }
+
+  /2fa/disable:
+    post:
+      tags: [Two-Factor Auth]
+      summary: Disable 2FA
+      responses:
+        '200': { description: 2FA disabled }
+
+  /bulk/delete:
+    post:
+      tags: [Bulk Operations]
+      summary: Bulk delete records
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entity, ids]
+              properties:
+                entity: { type: string, enum: [incidents, observations, actions] }
+                ids: { type: array, items: { type: string } }
+      responses:
+        '200':
+          description: Bulk delete result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: integer }
+
+  /bulk/status:
+    post:
+      tags: [Bulk Operations]
+      summary: Bulk update status
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entity, ids, status]
+              properties:
+                entity: { type: string, enum: [incidents, observations, actions] }
+                ids: { type: array, items: { type: string } }
+                status: { type: string }
+      responses:
+        '200':
+          description: Bulk status update result
+
+  /bulk/export:
+    post:
+      tags: [Bulk Operations]
+      summary: Bulk export selected records
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entity, ids]
+              properties:
+                entity: { type: string }
+                ids: { type: array, items: { type: string } }
+                format: { type: string, enum: [csv, json], default: csv }
+      responses:
+        '200': { description: Exported data }
+
+  /environmental:
+    get:
+      tags: [Environmental]
+      summary: List environmental data logs (paginated)
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200': { description: Paginated environmental logs }
+    post:
+      tags: [Environmental]
+      summary: Create environmental data log
+      responses:
+        '201': { description: Created }
+
+  /environmental/weather:
+    get:
+      tags: [Environmental]
+      summary: Get current weather data
+      parameters:
+        - name: lat
+          in: query
+          schema: { type: number }
+        - name: lon
+          in: query
+          schema: { type: number }
+      responses:
+        '200': { description: Weather data }
+
+  /ai/summarize:
+    post:
+      tags: [AI]
+      summary: AI-powered text summarization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text: { type: string }
+      responses:
+        '200':
+          description: Summary result
+
+  /ai/risk-predict:
+    post:
+      tags: [AI]
+      summary: AI risk prediction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data: { type: object }
+      responses:
+        '200': { description: Prediction result }

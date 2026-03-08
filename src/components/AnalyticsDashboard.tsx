@@ -1,13 +1,14 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { 
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-    BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, Legend, RadialBarChart, RadialBar 
+    BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, Legend, RadialBarChart, RadialBar,
+    ScatterChart, Scatter, ZAxis, ComposedChart
 } from 'recharts';
 import { 
     AlertTriangle, TrendingUp, Activity, CheckSquare, Sparkles, Loader2, 
-    FileText, Calendar, Users, MapPin, Plus, X, Calculator, Lock
+    FileText, Calendar, Users, MapPin, Plus, X, Calculator, Lock, BarChart3, Shield
 } from 'lucide-react';
 import { calculateHSEMetrics, getIncidents, saveStatsLog } from '../services/storageService';
 import { generateExecutiveReportAI } from '../services/geminiService';
@@ -20,7 +21,7 @@ export const AnalyticsDashboard: React.FC = () => {
     const navigate = useNavigate();
     const [metrics, setMetrics] = useState<HSEMetrics | null>(null);
     const [incidents, setIncidents] = useState<Incident[]>([]);
-    const [activeTab, setActiveTab] = useState<'kpi' | 'trends' | 'ai'>('kpi');
+    const [activeTab, setActiveTab] = useState<'kpi' | 'trends' | 'risk' | 'ai'>('kpi');
     
     // AI State
     const [aiReport, setAiReport] = useState<any>(null);
@@ -136,6 +137,62 @@ export const AnalyticsDashboard: React.FC = () => {
     }, {} as Record<string, number>);
 
     const locationChartData = Object.keys(locationData).map(k => ({ name: k, count: locationData[k] }));
+
+    // Monthly trend data grouped by month
+    const monthlyTrendData = useMemo(() => {
+        const months: Record<string, { total: number; lti: number; nm: number; fac: number; mtc: number }> = {};
+        incidents.forEach(inc => {
+            const d = new Date(inc.date);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            if (!months[key]) months[key] = { total: 0, lti: 0, nm: 0, fac: 0, mtc: 0 };
+            months[key].total++;
+            if (inc.category === 'Lost Time Injury') months[key].lti++;
+            if (inc.category === 'Near Miss') months[key].nm++;
+            if (inc.category === 'First Aid Case') months[key].fac++;
+            if (inc.category === 'Medical Treatment Case') months[key].mtc++;
+        });
+        return Object.entries(months)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .slice(-6)
+            .map(([month, data]) => ({ month, ...data }));
+    }, [incidents]);
+
+    // Severity rate
+    const severityRate = metrics.totalManHours > 0
+        ? ((metrics.ltiCount * 200000) / metrics.totalManHours)
+        : 0;
+
+    // Risk matrix data: 5x5 grid (likelihood x severity)
+    const riskMatrixData = useMemo(() => {
+        const severityMap: Record<string, number> = { 'Low': 1, 'Medium': 2, 'High': 3, 'Critical': 4 };
+        const likelihoodMap: Record<string, number> = { 'Near Miss': 4, 'First Aid Case': 3, 'Medical Treatment Case': 2, 'Lost Time Injury': 1 };
+        const grid: Record<string, number> = {};
+        incidents.forEach(inc => {
+            const sev = severityMap[inc.severity] || 2;
+            const lik = likelihoodMap[inc.category] || 2;
+            const key = `${lik}-${sev}`;
+            grid[key] = (grid[key] || 0) + 1;
+        });
+        const result: Array<{ likelihood: number; severity: number; count: number; riskLevel: string }> = [];
+        for (let l = 1; l <= 5; l++) {
+            for (let s = 1; s <= 5; s++) {
+                const count = grid[`${l}-${s}`] || 0;
+                const score = l * s;
+                const riskLevel = score >= 15 ? 'Critical' : score >= 10 ? 'High' : score >= 5 ? 'Medium' : 'Low';
+                result.push({ likelihood: l, severity: s, count, riskLevel });
+            }
+        }
+        return result;
+    }, [incidents]);
+
+    // Leading vs lagging comparison
+    const leadingVsLagging = [
+        { name: 'Near Misses', value: metrics.nmCount, type: 'Leading' },
+        { name: 'Inspections', value: Math.round(metrics.inspectionCompliance), type: 'Leading' },
+        { name: 'First Aid', value: metrics.facCount, type: 'Lagging' },
+        { name: 'Medical Tx', value: metrics.mtcCount, type: 'Lagging' },
+        { name: 'LTI', value: metrics.ltiCount, type: 'Lagging' },
+    ];
 
     const COLORS = ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#8b5cf6'];
 
@@ -300,6 +357,12 @@ export const AnalyticsDashboard: React.FC = () => {
                     <TrendingUp size={16} /> Trends & Heatmaps
                 </button>
                 <button 
+                    onClick={() => setActiveTab('risk')}
+                    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'risk' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    <Shield size={16} /> Risk Matrix
+                </button>
+                <button 
                     onClick={() => setActiveTab('ai')}
                     className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ai' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                 >
@@ -311,7 +374,7 @@ export const AnalyticsDashboard: React.FC = () => {
             {activeTab === 'kpi' && (
                 <div className="space-y-6 animate-in fade-in">
                     {/* Top Level Metrics */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
                             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">TRIR</p>
                             <h3 className={`text-3xl font-bold mt-1 ${metrics.trir === 0 ? 'text-green-600' : metrics.trir < 3 ? 'text-yellow-600' : 'text-red-600'}`}>
@@ -330,6 +393,16 @@ export const AnalyticsDashboard: React.FC = () => {
                             <p className="text-xs text-slate-400 mt-2">Target: 0.0</p>
                             <div className="absolute -right-4 -bottom-4 opacity-10 text-slate-500">
                                 <AlertTriangle size={80} />
+                            </div>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Severity Rate</p>
+                            <h3 className={`text-3xl font-bold mt-1 ${severityRate === 0 ? 'text-green-600' : severityRate < 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                {severityRate.toFixed(1)}
+                            </h3>
+                            <p className="text-xs text-slate-400 mt-2">Lost days per 200k hrs</p>
+                            <div className="absolute -right-4 -bottom-4 opacity-10 text-slate-500">
+                                <Shield size={80} />
                             </div>
                         </div>
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
@@ -416,23 +489,38 @@ export const AnalyticsDashboard: React.FC = () => {
                 <div className="space-y-6 animate-in fade-in">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                            <h3 className="font-bold text-slate-800 mb-2">Rolling 6-Month TRIR Trend</h3>
-                            <p className="text-xs text-slate-400 mb-6">Total Recordable Incident Rate over time</p>
+                            <h3 className="font-bold text-slate-800 mb-2">Monthly Incident Trend</h3>
+                            <p className="text-xs text-slate-400 mb-6">Incident breakdown by type over recent months</p>
                             <div className="h-72">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={incidentTrendData}>
-                                        <defs>
-                                            <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                                            </linearGradient>
-                                        </defs>
-                                        <XAxis dataKey="month" />
-                                        <YAxis />
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                        <Tooltip />
-                                        <Area type="monotone" dataKey="count" stroke="#3b82f6" fillOpacity={1} fill="url(#colorCount)" />
-                                    </AreaChart>
+                                    {monthlyTrendData.length > 0 ? (
+                                        <ComposedChart data={monthlyTrendData}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                                            <YAxis allowDecimals={false} />
+                                            <Tooltip />
+                                            <Legend />
+                                            <Bar dataKey="nm" name="Near Miss" fill="#22c55e" stackId="a" radius={[0, 0, 0, 0]} />
+                                            <Bar dataKey="fac" name="First Aid" fill="#eab308" stackId="a" />
+                                            <Bar dataKey="mtc" name="Medical Tx" fill="#f97316" stackId="a" />
+                                            <Bar dataKey="lti" name="LTI" fill="#ef4444" stackId="a" radius={[4, 4, 0, 0]} />
+                                            <Line type="monotone" dataKey="total" name="Total" stroke="#3b82f6" strokeWidth={2} dot={{ r: 4 }} />
+                                        </ComposedChart>
+                                    ) : (
+                                        <AreaChart data={incidentTrendData}>
+                                            <defs>
+                                                <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                                                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                                                </linearGradient>
+                                            </defs>
+                                            <XAxis dataKey="month" />
+                                            <YAxis />
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <Tooltip />
+                                            <Area type="monotone" dataKey="count" stroke="#3b82f6" fillOpacity={1} fill="url(#colorCount)" />
+                                        </AreaChart>
+                                    )}
                                 </ResponsiveContainer>
                             </div>
                         </div>
@@ -450,6 +538,139 @@ export const AnalyticsDashboard: React.FC = () => {
                                         <Bar dataKey="count" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={20} />
                                     </BarChart>
                                 </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Leading vs Lagging Indicators */}
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                        <h3 className="font-bold text-slate-800 mb-2">Leading vs Lagging Indicators</h3>
+                        <p className="text-xs text-slate-400 mb-6">Proactive (leading) vs reactive (lagging) safety metrics</p>
+                        <div className="h-72">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={leadingVsLagging}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                                    <YAxis allowDecimals={false} />
+                                    <Tooltip />
+                                    <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                        {leadingVsLagging.map((entry, i) => (
+                                            <Cell key={i} fill={entry.type === 'Leading' ? '#22c55e' : '#ef4444'} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                        <div className="flex items-center gap-6 mt-3 justify-center">
+                            <span className="flex items-center gap-2 text-xs text-slate-500"><span className="w-3 h-3 rounded bg-green-500 inline-block" /> Leading (Proactive)</span>
+                            <span className="flex items-center gap-2 text-xs text-slate-500"><span className="w-3 h-3 rounded bg-red-500 inline-block" /> Lagging (Reactive)</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* RISK MATRIX VIEW */}
+            {activeTab === 'risk' && (
+                <div className="space-y-6 animate-in fade-in">
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                        <h3 className="font-bold text-slate-800 mb-2">5×5 Risk Assessment Matrix</h3>
+                        <p className="text-xs text-slate-400 mb-6">Likelihood vs Severity — click cells to see incident count</p>
+                        
+                        <div className="overflow-x-auto">
+                            <table className="w-full max-w-2xl mx-auto border-collapse">
+                                <thead>
+                                    <tr>
+                                        <th className="p-2 text-xs text-slate-500 font-medium w-24"></th>
+                                        {['Negligible', 'Minor', 'Moderate', 'Major', 'Catastrophic'].map((s, i) => (
+                                            <th key={s} className="p-2 text-xs text-slate-600 font-bold text-center">{s}</th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {['Almost Certain', 'Likely', 'Possible', 'Unlikely', 'Rare'].map((likLabel, li) => (
+                                        <tr key={likLabel}>
+                                            <td className="p-2 text-xs text-slate-600 font-bold text-right pr-3">{likLabel}</td>
+                                            {[1, 2, 3, 4, 5].map(sev => {
+                                                const lik = 5 - li;
+                                                const cell = riskMatrixData.find(c => c.likelihood === lik && c.severity === sev);
+                                                const score = lik * sev;
+                                                const bg = score >= 15 ? 'bg-red-500 text-white' : score >= 10 ? 'bg-orange-400 text-white' : score >= 5 ? 'bg-yellow-300 text-slate-800' : 'bg-green-300 text-slate-800';
+                                                return (
+                                                    <td key={sev} className={`p-3 text-center rounded-sm border border-white/50 ${bg} cursor-default transition-transform hover:scale-105`}>
+                                                        <div className="text-lg font-bold">{score}</div>
+                                                        {(cell?.count ?? 0) > 0 && (
+                                                            <div className="text-[10px] font-medium opacity-80 mt-0.5">
+                                                                {cell!.count} incident{cell!.count > 1 ? 's' : ''}
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="flex items-center gap-4 mt-6 justify-center text-xs text-slate-500">
+                            <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-green-300 inline-block border border-green-400" /> Low (1-4)</span>
+                            <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-yellow-300 inline-block border border-yellow-400" /> Medium (5-9)</span>
+                            <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-orange-400 inline-block border border-orange-500" /> High (10-14)</span>
+                            <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-red-500 inline-block border border-red-600" /> Critical (15-25)</span>
+                        </div>
+                    </div>
+
+                    {/* Risk Distribution */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                            <h3 className="font-bold text-slate-800 mb-4">Risk Distribution by Severity</h3>
+                            <div className="h-64">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={[
+                                                { name: 'Low', value: incidents.filter(i => i.severity === 'Low').length || 0 },
+                                                { name: 'Medium', value: incidents.filter(i => i.severity === 'Medium').length || 0 },
+                                                { name: 'High', value: incidents.filter(i => i.severity === 'High').length || 0 },
+                                                { name: 'Critical', value: incidents.filter(i => i.severity === 'Critical').length || 0 },
+                                            ].filter(d => d.value > 0)}
+                                            innerRadius={50}
+                                            outerRadius={80}
+                                            paddingAngle={5}
+                                            dataKey="value"
+                                        >
+                                            <Cell fill="#22c55e" />
+                                            <Cell fill="#eab308" />
+                                            <Cell fill="#f97316" />
+                                            <Cell fill="#ef4444" />
+                                        </Pie>
+                                        <Tooltip />
+                                        <Legend />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                            <h3 className="font-bold text-slate-800 mb-4">Incident Severity Summary</h3>
+                            <div className="space-y-4 mt-6">
+                                {[
+                                    { label: 'Critical', count: incidents.filter(i => i.severity === 'Critical').length, color: 'bg-red-500', textColor: 'text-red-700' },
+                                    { label: 'High', count: incidents.filter(i => i.severity === 'High').length, color: 'bg-orange-500', textColor: 'text-orange-700' },
+                                    { label: 'Medium', count: incidents.filter(i => i.severity === 'Medium').length, color: 'bg-yellow-500', textColor: 'text-yellow-700' },
+                                    { label: 'Low', count: incidents.filter(i => i.severity === 'Low').length, color: 'bg-green-500', textColor: 'text-green-700' },
+                                ].map(item => (
+                                    <div key={item.label} className="flex items-center gap-3">
+                                        <span className={`w-3 h-3 rounded-full ${item.color} shrink-0`} />
+                                        <span className="text-sm font-medium text-slate-700 w-16">{item.label}</span>
+                                        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                            <div
+                                                className={`h-full ${item.color} transition-all`}
+                                                style={{ width: `${incidents.length ? (item.count / incidents.length) * 100 : 0}%` }}
+                                            />
+                                        </div>
+                                        <span className={`text-sm font-bold ${item.textColor} w-8 text-right`}>{item.count}</span>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
