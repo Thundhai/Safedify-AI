@@ -1,17 +1,26 @@
 # ==========================================
 # Safedify AI - Production Docker Image
+# Multi-stage build: builds frontend + server in container
 # ==========================================
-# Build locally first, then copy into Docker:
-#   npm ci && npm run build
-#   cd server && npm ci --omit=dev
-#   docker build -t safedify-ai .
+# Usage: docker build -t safedify-ai .
 # ==========================================
+
+# --- Stage 1: Build frontend ---
+FROM node:22-slim AS frontend-build
+WORKDIR /build
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY tsconfig.json tsconfig.node.json vite.config.ts tailwind.config.js postcss.config.js index.html ./
+COPY src/ ./src/
+COPY public/ ./public/
+RUN npm run build
+
+# --- Stage 2: Production server ---
 FROM node:22-slim
 
 WORKDIR /app/server
 
-# Copy package files and install deps inside container
-# (needed because native binaries like esbuild are platform-specific)
+# Copy server package files
 COPY server/package.json server/package-lock.json ./
 
 # Configure npm for slower/unreliable networks inside Docker
@@ -20,15 +29,14 @@ RUN npm config set fetch-retries 5 \
  && npm config set fetch-retry-maxtimeout 300000 \
  && npm config set fetch-timeout 600000
 
-# Copy node_modules from host, then rebuild native modules for Linux
-COPY server/node_modules/ ./node_modules/
-RUN npm rebuild
+# Install production server dependencies
+RUN npm ci --omit=dev
 
 # Copy server source
 COPY server/ ./
 
-# Copy pre-built frontend (built on host via `npm run build`)
-COPY dist/ /app/dist/
+# Copy pre-built frontend from stage 1
+COPY --from=frontend-build /build/dist/ /app/dist/
 
 # Create data directory
 RUN mkdir -p /data && chown -R node:node /data
