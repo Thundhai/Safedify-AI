@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getDocuments } from '../services/storageService';
+import { getDocuments, deleteDocument } from '../services/storageService';
 import { HSEDocument, DocumentCategory } from '../types';
-import { Plus, FileText, Search, Filter, Shield, Book, FileBarChart, AlertCircle } from 'lucide-react';
+import { Plus, FileText, Search, Filter, Shield, Book, FileBarChart, AlertCircle, Trash2 } from 'lucide-react';
+import { Pagination } from './Pagination';
+import toast from 'react-hot-toast';
 
 export const DocumentList: React.FC = () => {
     const [documents, setDocuments] = useState<HSEDocument[]>([]);
@@ -25,6 +27,15 @@ export const DocumentList: React.FC = () => {
         return matchesCategory && matchesSearch;
     });
 
+    const PAGE_SIZE = 10;
+    const [currentPage, setCurrentPage] = useState(1);
+    const totalPages = Math.ceil(filteredDocs.length / PAGE_SIZE);
+    const paginatedDocs = filteredDocs.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filterCategory, search]);
+
     const getIcon = (cat: DocumentCategory) => {
         switch(cat) {
             case 'Policy': return <Shield size={20} className="text-purple-600" />;
@@ -36,6 +47,15 @@ export const DocumentList: React.FC = () => {
     };
 
     const categories: DocumentCategory[] = ['Policy', 'SOP', 'MSDS', 'Work Instruction', 'Report', 'Training Material'];
+
+    const handleDelete = async (e: React.MouseEvent, id: string, title: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!confirm(`Delete document "${title}"? This cannot be undone.`)) return;
+        await deleteDocument(id);
+        setDocuments(prev => prev.filter(d => d.id !== id));
+        toast.success('Document deleted');
+    };
 
     if (loading) return (
       <div className="flex items-center justify-center h-64">
@@ -93,8 +113,15 @@ export const DocumentList: React.FC = () => {
 
             {/* Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredDocs.map(doc => (
-                    <Link to={`/documents/${doc.id}`} key={doc.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all group flex flex-col h-full">
+                {paginatedDocs.map(doc => (
+                    <Link to={`/documents/${doc.id}`} key={doc.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all group flex flex-col h-full relative">
+                        <button
+                            onClick={(e) => handleDelete(e, doc.id, doc.title)}
+                            className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
+                            title="Delete document"
+                        >
+                            <Trash2 size={14} />
+                        </button>
                         <div className="flex justify-between items-start mb-4">
                             <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center group-hover:bg-slate-100 transition-colors">
                                 {getIcon(doc.category)}
@@ -126,6 +153,14 @@ export const DocumentList: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={filteredDocs.length}
+                pageSize={PAGE_SIZE}
+            />
         </div>
     );
 };

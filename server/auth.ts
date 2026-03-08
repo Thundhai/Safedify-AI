@@ -4,7 +4,13 @@ import { v4 as uuid } from 'uuid';
 import { Request, Response, NextFunction } from 'express';
 import db from './db.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'safedify-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL: JWT_SECRET environment variable must be set in production');
+  }
+  console.warn('\x1b[33m[WARN] Using default JWT_SECRET — set JWT_SECRET env var for production\x1b[0m');
+  return 'safedify-dev-secret-not-for-production';
+})();
 const JWT_EXPIRES = '7d';
 
 export interface AuthUser {

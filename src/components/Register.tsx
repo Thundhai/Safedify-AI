@@ -189,7 +189,7 @@ export const Register: React.FC = () => {
                 className="mt-1"
               />
               <span className="text-xs text-slate-500">
-                  I agree to the <a href="/#/terms" className="text-blue-600 hover:underline">Terms of Service</a> and <a href="/#/privacy" className="text-blue-600 hover:underline">Privacy Policy</a>.
+                  I agree to the <a href="#/terms" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Terms of Service</a> and <a href="#/privacy" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Privacy Policy</a>.
               </span>
           </label>
 

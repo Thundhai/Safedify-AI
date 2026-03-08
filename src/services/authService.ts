@@ -6,7 +6,7 @@
  */
 
 import { AuthUser, UserRole, SubscriptionTier } from "../types";
-import { apiLogin, apiRegister, apiGetMe, setAuthToken, getAuthToken, apiLoginWith2FA } from './apiService';
+import { apiLogin, apiRegister, apiGetMe, setAuthToken, getAuthToken, apiLoginWith2FA, apiUpdateProfile, apiChangePassword } from './apiService';
 
 const AUTH_KEY = 'hse_auth_user';
 
@@ -132,4 +132,26 @@ export const verifySession = async (): Promise<AuthUser | null> => {
         // Token expired or invalid — keep local user for now
     }
     return getCurrentUser();
+};
+
+export const updateProfile = async (data: { name: string }): Promise<AuthUser | null> => {
+    const result = await apiUpdateProfile(data);
+    if (result.user) {
+        const user: AuthUser = {
+            id: result.user.id,
+            name: result.user.name,
+            email: result.user.email,
+            role: result.user.role,
+            tier: (result.user.tier as SubscriptionTier) || SubscriptionTier.FREE,
+            avatar: result.user.avatar,
+        };
+        localStorage.setItem(AUTH_KEY, JSON.stringify(user));
+        return user;
+    }
+    return null;
+};
+
+export const changePassword = async (currentPassword: string, newPassword: string): Promise<string> => {
+    const result = await apiChangePassword(currentPassword, newPassword);
+    return result.message;
 };

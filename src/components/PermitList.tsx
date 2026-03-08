@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getPermits } from '../services/storageService';
+import { getPermits, deletePermit } from '../services/storageService';
 import { Permit, PermitStatus } from '../types';
-import { Plus, FileSignature, Clock, CheckCircle2, AlertTriangle, Calendar, MapPin, Ban } from 'lucide-react';
+import { Plus, FileSignature, Clock, CheckCircle2, AlertTriangle, Calendar, MapPin, Ban, Trash2 } from 'lucide-react';
+import { Pagination } from './Pagination';
+import toast from 'react-hot-toast';
 
 export const PermitList: React.FC = () => {
     const [permits, setPermits] = useState<Permit[]>([]);
@@ -40,6 +42,24 @@ export const PermitList: React.FC = () => {
     };
 
     const filteredPermits = permits.filter(p => filter === 'All' || p.status === filter);
+
+    const handleDelete = async (e: React.MouseEvent, id: string, type: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!confirm(`Delete permit "${type}" (${id})? This cannot be undone.`)) return;
+        await deletePermit(id);
+        setPermits(prev => prev.filter(p => p.id !== id));
+        toast.success('Permit deleted');
+    };
+
+    const PAGE_SIZE = 10;
+    const [currentPage, setCurrentPage] = useState(1);
+    const totalPages = Math.ceil(filteredPermits.length / PAGE_SIZE);
+    const paginatedPermits = filteredPermits.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filter]);
 
     if (loading) return (
       <div className="flex items-center justify-center h-64">
@@ -98,8 +118,15 @@ export const PermitList: React.FC = () => {
 
             {/* Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {filteredPermits.map(permit => (
-                    <Link to={`/permits/${permit.id}`} key={permit.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all group">
+                {paginatedPermits.map(permit => (
+                    <Link to={`/permits/${permit.id}`} key={permit.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all group relative">
+                        <button
+                            onClick={(e) => handleDelete(e, permit.id, permit.type)}
+                            className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50 z-10"
+                            title="Delete permit"
+                        >
+                            <Trash2 size={14} />
+                        </button>
                         <div className="flex justify-between items-start mb-4">
                             <div>
                                 <h3 className="text-lg font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
@@ -139,6 +166,14 @@ export const PermitList: React.FC = () => {
                      </div>
                 )}
             </div>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={filteredPermits.length}
+                pageSize={PAGE_SIZE}
+            />
         </div>
     );
 };

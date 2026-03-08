@@ -5,6 +5,7 @@ import { Plus, Eye, CheckCircle, Sparkles, Loader2, Camera, Trash2, Edit2, X, Sa
 import { getObservations, deleteObservation, updateObservation } from '../services/storageService';
 import { analyzeObservationTrendsAI } from '../services/geminiService';
 import { Observation, ObservationType } from '../types';
+import { Pagination } from './Pagination';
 
 export const ObservationList: React.FC = () => {
     const [observations, setObservations] = useState<Observation[]>([]);
@@ -84,6 +85,15 @@ export const ObservationList: React.FC = () => {
         const matchStatus = filterStatus === 'All' || obs.status === filterStatus;
         return matchType && matchCategory && matchStatus;
     });
+
+    const PAGE_SIZE = 10;
+    const [currentPage, setCurrentPage] = useState(1);
+    const totalPages = Math.ceil(filteredObservations.length / PAGE_SIZE);
+    const paginatedObservations = filteredObservations.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filterType, filterCategory, filterStatus]);
 
     const stats = {
         total: observations.length,
@@ -266,7 +276,7 @@ export const ObservationList: React.FC = () => {
                     {filteredObservations.length === 0 ? (
                         <div className="p-8 text-center text-slate-400">No observations found matching filters.</div>
                     ) : (
-                        filteredObservations.map(obs => (
+                        paginatedObservations.map(obs => (
                             <div key={obs.id} className="p-4 hover:bg-slate-50 transition-colors group">
                                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-2 mb-2">
                                     <div className="flex items-center gap-2">
@@ -325,6 +335,14 @@ export const ObservationList: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={filteredObservations.length}
+                pageSize={PAGE_SIZE}
+            />
 
             {/* Print Table - Visible only on Print */}
             <div className="hidden print:block">

@@ -7,6 +7,7 @@ import {
   CheckCircle, AlertTriangle, User, Filter, MoreVertical
 } from 'lucide-react';
 import { EmptyState } from './EmptyState';
+import { Pagination } from './Pagination';
 
 export const WorkersList: React.FC = () => {
   const [workers, setWorkers] = useState<WorkerProfile[]>([]);
@@ -44,6 +45,15 @@ export const WorkersList: React.FC = () => {
     
     return true;
   });
+
+  const PAGE_SIZE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+  const totalPages = Math.ceil(filteredWorkers.length / PAGE_SIZE);
+  const paginatedWorkers = filteredWorkers.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterBy]);
 
   const getPointsColor = (points: number = 0) => {
     if (points >= 150) return 'text-yellow-600 bg-yellow-50 border-yellow-200';
@@ -219,7 +229,7 @@ export const WorkersList: React.FC = () => {
               No workers match your search criteria.
             </div>
           ) : (
-            filteredWorkers.map((worker) => (
+            paginatedWorkers.map((worker) => (
               <div key={worker.id} className="p-4 hover:bg-slate-50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
@@ -308,6 +318,14 @@ export const WorkersList: React.FC = () => {
           )}
         </div>
       </div>
+
+      <Pagination
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPageChange={setCurrentPage}
+        totalItems={filteredWorkers.length}
+        pageSize={PAGE_SIZE}
+      />
     </div>
   );
 };

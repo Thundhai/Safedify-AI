@@ -1,8 +1,10 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, AlertTriangle, Printer, Plus } from 'lucide-react';
-import { getIncidents } from '../services/storageService';
+import { Search, AlertTriangle, Printer, Plus, Trash2 } from 'lucide-react';
+import { getIncidents, deleteIncident } from '../services/storageService';
 import { Incident, IncidentSeverity, IncidentCategory } from '../types';
+import { Pagination } from './Pagination';
+import toast from 'react-hot-toast';
 
 export const IncidentList: React.FC = () => {
     const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -33,6 +35,24 @@ export const IncidentList: React.FC = () => {
         result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         return result;
     }, [incidents, searchTerm, statusFilter, severityFilter, categoryFilter]);
+
+    const PAGE_SIZE = 10;
+    const [currentPage, setCurrentPage] = useState(1);
+    const totalPages = Math.ceil(filteredAndSortedIncidents.length / PAGE_SIZE);
+    const paginatedIncidents = filteredAndSortedIncidents.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, statusFilter, severityFilter, categoryFilter]);
+
+    const handleDelete = async (e: React.MouseEvent, id: string, desc: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!confirm(`Delete incident "${desc}"? This cannot be undone.`)) return;
+        await deleteIncident(id);
+        setIncidents(prev => prev.filter(i => i.id !== id));
+        toast.success('Incident deleted');
+    };
 
     if (loading) return (
       <div className="flex items-center justify-center h-64">
@@ -111,22 +131,39 @@ export const IncidentList: React.FC = () => {
                             </div>
                         )
                     ) : (
-                        filteredAndSortedIncidents.map(inc => (
+                        paginatedIncidents.map(inc => (
                             <Link to={`/incidents/${inc.id}`} key={inc.id} className="block p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                 <div className="flex justify-between items-start">
                                     <div>
                                         <p className="font-semibold text-slate-800 dark:text-slate-100">{inc.description}</p>
                                         <p className="text-xs text-slate-500">{inc.category && <span className="font-medium text-slate-600 dark:text-slate-400">{inc.category} • </span>}{inc.location} • {new Date(inc.date).toLocaleDateString()}</p>
                                     </div>
-                                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${inc.severity === 'Critical' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
-                                        {inc.severity}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={(e) => handleDelete(e, inc.id, inc.description)}
+                                            className="p-1 text-slate-300 hover:text-red-600 transition-colors rounded"
+                                            title="Delete incident"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${inc.severity === 'Critical' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'}`}>
+                                            {inc.severity}
+                                        </span>
+                                    </div>
                                 </div>
                             </Link>
                         ))
                     )}
                 </div>
             </div>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={filteredAndSortedIncidents.length}
+                pageSize={PAGE_SIZE}
+            />
         </div>
     );
 };

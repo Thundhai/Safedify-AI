@@ -22,15 +22,15 @@ import {
   apiGetActions, apiCreateAction, apiUpdateAction, apiDeleteAction,
   apiGetObservations, apiCreateObservation, apiUpdateObservation, apiDeleteObservation,
   apiGetInspections, apiCreateInspection,
-  apiGetPermits, apiGetPermit, apiCreatePermit, apiUpdatePermit,
+  apiGetPermits, apiGetPermit, apiCreatePermit, apiUpdatePermit, apiDeletePermit,
   apiGetWorkers, apiGetWorker, apiCreateWorker, apiUpdateWorker, apiDeleteWorker,
-  apiGetContractors, apiGetContractor, apiCreateContractor,
-  apiGetAssets, apiGetAsset, apiCreateAsset,
-  apiGetDocuments, apiGetDocument, apiCreateDocument,
+  apiGetContractors, apiGetContractor, apiCreateContractor, apiUpdateContractor, apiDeleteContractor,
+  apiGetAssets, apiGetAsset, apiCreateAsset, apiUpdateAsset, apiDeleteAsset,
+  apiGetDocuments, apiGetDocument, apiCreateDocument, apiUpdateDocument, apiDeleteDocument,
   apiGetStats, apiLogStats,
-  apiGetEmergencyContacts, apiCreateEmergencyContact,
+  apiGetEmergencyContacts, apiCreateEmergencyContact, apiDeleteEmergencyContact,
   apiGetEmergencyDrills, apiCreateEmergencyDrill,
-  apiGetRiskAssessments, apiGetRiskAssessment, apiCreateRiskAssessment, apiUpdateRiskAssessment,
+  apiGetRiskAssessments, apiGetRiskAssessment, apiCreateRiskAssessment, apiUpdateRiskAssessment, apiDeleteRiskAssessment,
   apiGetInspectionTemplates, apiCreateInspectionTemplate,
   apiGetTrainingModules, apiCreateTrainingModule,
   apiGetTrainingRecords, apiCreateTrainingRecord,
@@ -429,6 +429,10 @@ export const updateIncident = async (incident: Incident): Promise<void> => {
   await apiUpdateIncident(incident.id, incidentToApi(incident));
 };
 
+export const deleteIncident = async (id: string): Promise<void> => {
+  try { await apiDeleteIncident(id); } catch { /* offline */ }
+};
+
 // ---------- Inspections ----------
 
 export const getInspections = async (): Promise<Inspection[]> => {
@@ -485,6 +489,10 @@ export const updateAction = async (action: ActionItem): Promise<void> => {
   await apiUpdateAction(action.id, actionToApi(action));
 };
 
+export const deleteAction = async (id: string): Promise<void> => {
+  try { await apiDeleteAction(id); } catch { /* offline */ }
+};
+
 // ---------- Risk Assessments ----------
 
 export const getRiskAssessments = async (): Promise<RiskAssessment[]> => {
@@ -523,6 +531,10 @@ export const saveRiskAssessment = async (ra: RiskAssessment): Promise<void> => {
       status: ra.status,
     });
   }
+};
+
+export const deleteRiskAssessment = async (id: string): Promise<void> => {
+  try { await apiDeleteRiskAssessment(id); } catch { /* offline */ }
 };
 
 // ---------- Observations ----------
@@ -761,6 +773,10 @@ export const savePermit = async (permit: Permit): Promise<void> => {
   }
 };
 
+export const deletePermit = async (id: string): Promise<void> => {
+  await apiDeletePermit(id);
+};
+
 // ---------- Assets ----------
 
 export const getAssets = async (): Promise<Asset[]> => {
@@ -779,16 +795,32 @@ export const getAssetById = async (id: string): Promise<Asset | undefined> => {
 
 export const saveAsset = async (asset: Asset): Promise<void> => {
   try {
-    await apiCreateAsset({
-      name: asset.name,
-      category: asset.category,
-      model_number: asset.modelNumber,
-      serial_number: asset.serialNumber,
-      location: asset.location,
-      status: asset.status,
-      next_inspection_date: asset.nextInspectionDate,
-    });
+    if (asset.id && asset.id.length > 10) {
+      await apiUpdateAsset(asset.id, {
+        name: asset.name,
+        category: asset.category,
+        model_number: asset.modelNumber,
+        serial_number: asset.serialNumber,
+        location: asset.location,
+        status: asset.status,
+        next_inspection_date: asset.nextInspectionDate,
+      });
+    } else {
+      await apiCreateAsset({
+        name: asset.name,
+        category: asset.category,
+        model_number: asset.modelNumber,
+        serial_number: asset.serialNumber,
+        location: asset.location,
+        status: asset.status,
+        next_inspection_date: asset.nextInspectionDate,
+      });
+    }
   } catch (e) { console.error('Save asset error:', e); }
+};
+
+export const deleteAsset = async (id: string): Promise<void> => {
+  await apiDeleteAsset(id);
 };
 
 // ---------- Contractors ----------
@@ -808,13 +840,27 @@ export const getContractorById = async (id: string): Promise<Contractor | undefi
 };
 
 export const saveContractor = async (contractor: Contractor): Promise<void> => {
-  await apiCreateContractor({
-    name: contractor.name,
-    contact_person: contractor.contactPerson,
-    email: contractor.email,
-    phone: contractor.phone,
-    status: contractor.status,
-  });
+  if (contractor.id && contractor.id.length > 10) {
+    await apiUpdateContractor(contractor.id, {
+      name: contractor.name,
+      contact_person: contractor.contactPerson,
+      email: contractor.email,
+      phone: contractor.phone,
+      status: contractor.status,
+    });
+  } else {
+    await apiCreateContractor({
+      name: contractor.name,
+      contact_person: contractor.contactPerson,
+      email: contractor.email,
+      phone: contractor.phone,
+      status: contractor.status,
+    });
+  }
+};
+
+export const deleteContractor = async (id: string): Promise<void> => {
+  await apiDeleteContractor(id);
 };
 
 // ---------- Documents ----------
@@ -834,12 +880,25 @@ export const getDocumentById = async (id: string): Promise<HSEDocument | undefin
 };
 
 export const saveDocument = async (doc: HSEDocument): Promise<void> => {
-  await apiCreateDocument({
-    title: doc.title,
-    category: doc.category,
-    content: doc.contentUrl || doc.description,
-    status: doc.status,
-  });
+  if (doc.id && doc.id.length > 10) {
+    await apiUpdateDocument(doc.id, {
+      title: doc.title,
+      category: doc.category,
+      content: doc.contentUrl || doc.description,
+      status: doc.status,
+    });
+  } else {
+    await apiCreateDocument({
+      title: doc.title,
+      category: doc.category,
+      content: doc.contentUrl || doc.description,
+      status: doc.status,
+    });
+  }
+};
+
+export const deleteDocument = async (id: string): Promise<void> => {
+  await apiDeleteDocument(id);
 };
 
 // ---------- Emergency ----------
@@ -861,8 +920,8 @@ export const saveEmergencyContact = async (contact: EmergencyContact): Promise<v
   });
 };
 
-export const deleteEmergencyContact = async (_id: string): Promise<void> => {
-  console.warn('Emergency contact delete not yet supported');
+export const deleteEmergencyContact = async (id: string): Promise<void> => {
+  await apiDeleteEmergencyContact(id);
 };
 
 export const getEmergencyDrills = async (): Promise<EmergencyDrill[]> => {

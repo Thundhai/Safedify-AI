@@ -51,6 +51,7 @@ const ProfileSettings = React.lazy(() => import('./components/ProfileSettings').
 const EnvironmentalLogPage = React.lazy(() => import('./components/EnvironmentalLogPage').then(m => ({ default: m.EnvironmentalLogPage })));
 const ActionList = React.lazy(() => import('./components/ActionList').then(m => ({ default: m.ActionList })));
 const PredictiveIntelligence = React.lazy(() => import('./components/PredictiveIntelligence').then(m => ({ default: m.PredictiveIntelligence })));
+const LegalPage = React.lazy(() => import('./components/LegalPage').then(m => ({ default: m.LegalPage })));
 
 /* --- LOADING FALLBACK --- */
 const PageLoader = () => (
@@ -127,6 +128,8 @@ function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/terms" element={<LegalPage />} />
+            <Route path="/privacy" element={<LegalPage />} />
 
             <Route path="/" element={
               <ProtectedRoute>

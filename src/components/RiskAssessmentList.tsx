@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getRiskAssessments } from '../services/storageService';
+import { getRiskAssessments, deleteRiskAssessment } from '../services/storageService';
 import { RiskAssessment } from '../types';
-import { ShieldAlert, Plus, Calendar, FileText, Search, Filter, Printer } from 'lucide-react';
+import { ShieldAlert, Plus, Calendar, FileText, Search, Filter, Printer, Trash2 } from 'lucide-react';
+import { Pagination } from './Pagination';
+import toast from 'react-hot-toast';
 
 export const RiskAssessmentList: React.FC = () => {
     const [assessments, setAssessments] = useState<RiskAssessment[]>([]);
@@ -28,6 +30,24 @@ export const RiskAssessmentList: React.FC = () => {
         
         return matchesSearch && matchesType && matchesStatus;
     });
+
+    const PAGE_SIZE = 10;
+    const [currentPage, setCurrentPage] = useState(1);
+    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+    const paginatedAssessments = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm, typeFilter, statusFilter]);
+
+    const handleDelete = async (e: React.MouseEvent, id: string, title: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!confirm(`Delete risk assessment "${title}"? This cannot be undone.`)) return;
+        await deleteRiskAssessment(id);
+        setAssessments(prev => prev.filter(a => a.id !== id));
+        toast.success('Risk assessment deleted');
+    };
 
     if (loading) return (
       <div className="flex items-center justify-center h-64">
@@ -113,8 +133,15 @@ export const RiskAssessmentList: React.FC = () => {
 
             {/* Results Grid - Screen View */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 print:hidden">
-                {filtered.map(item => (
-                    <Link to={`/risk-assessments/${item.id}`} key={item.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all group">
+                {paginatedAssessments.map(item => (
+                    <Link to={`/risk-assessments/${item.id}`} key={item.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all group relative">
+                        <button
+                            onClick={(e) => handleDelete(e, item.id, item.title)}
+                            className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
+                            title="Delete risk assessment"
+                        >
+                            <Trash2 size={14} />
+                        </button>
                         <div className="flex justify-between items-start mb-4">
                             <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-100 transition-colors">
                                 <ShieldAlert size={20} />
@@ -156,6 +183,14 @@ export const RiskAssessmentList: React.FC = () => {
                      </div>
                 )}
             </div>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={filtered.length}
+                pageSize={PAGE_SIZE}
+            />
 
             {/* Print Table - Visible Only in Print */}
             <div className="hidden print:block">

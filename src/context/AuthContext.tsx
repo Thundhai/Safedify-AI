@@ -1,7 +1,7 @@
 
 import React, { createContext, useState, useContext, useEffect, useRef, ReactNode } from 'react';
 import { AuthUser, UserRole, Permission, UserRoles } from '../types';
-import { getCurrentUser, login as authLogin, logout as authLogout, register as authRegister, verifySession, completeLoginWith2FA } from '../services/authService';
+import { getCurrentUser, login as authLogin, logout as authLogout, register as authRegister, verifySession, completeLoginWith2FA, updateProfile as authUpdateProfile } from '../services/authService';
 import { getRoles } from '../services/storageService';
 
 interface AuthContextType {
@@ -13,6 +13,7 @@ interface AuthContextType {
   logout: () => void;
   loading: boolean;
   checkPermission: (permission: Permission) => boolean;
+  updateProfile: (data: { name: string }) => Promise<boolean>;
 }
 
 // Persist context across Vite HMR to prevent "useAuth must be used within AuthProvider" errors
@@ -93,6 +94,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
   };
 
+  const updateProfile = async (data: { name: string }): Promise<boolean> => {
+    const updated = await authUpdateProfile(data);
+    if (updated) {
+      setUser(updated);
+      return true;
+    }
+    return false;
+  };
+
   const logout = () => {
     authLogout();
     setUser(null);
@@ -116,7 +126,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, loginWith2FA, register, logout, loading, checkPermission }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, loginWith2FA, register, logout, loading, checkPermission, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

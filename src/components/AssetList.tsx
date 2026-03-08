@@ -2,9 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
-import { getAssets, saveAsset } from '../services/storageService';
+import { getAssets, saveAsset, deleteAsset } from '../services/storageService';
 import { Asset, AssetCategory } from '../types';
-import { Plus, Wrench, Search, Truck, Zap, Flame, Settings, X } from 'lucide-react';
+import { Plus, Wrench, Search, Truck, Zap, Flame, Settings, X, Trash2 } from 'lucide-react';
+import { Pagination } from './Pagination';
 
 export const AssetList: React.FC = () => {
     const [assets, setAssets] = useState<Asset[]>([]);
@@ -37,6 +38,15 @@ export const AssetList: React.FC = () => {
                               a.id.toLowerCase().includes(search.toLowerCase());
         return matchesCategory && matchesSearch;
     });
+
+    const PAGE_SIZE = 10;
+    const [currentPage, setCurrentPage] = useState(1);
+    const totalPages = Math.ceil(filteredAssets.length / PAGE_SIZE);
+    const paginatedAssets = filteredAssets.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [filter, search]);
 
     const getIcon = (category: string) => {
         switch(category) {
@@ -84,6 +94,15 @@ export const AssetList: React.FC = () => {
             nextInspectionDate: ''
         });
         toast.success("Asset Added Successfully!");
+    };
+
+    const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!confirm(`Delete asset "${name}"? This cannot be undone.`)) return;
+        await deleteAsset(id);
+        setAssets(prev => prev.filter(a => a.id !== id));
+        toast.success('Asset deleted');
     };
 
     if (loading) return (
@@ -137,8 +156,15 @@ export const AssetList: React.FC = () => {
 
             {/* Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredAssets.map(asset => (
-                    <Link to={`/assets/${asset.id}`} key={asset.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all group">
+                {paginatedAssets.map(asset => (
+                    <Link to={`/assets/${asset.id}`} key={asset.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all group relative">
+                        <button
+                            onClick={(e) => handleDelete(e, asset.id, asset.name)}
+                            className="absolute top-3 right-3 p-1.5 text-slate-300 hover:text-red-600 transition-colors rounded-lg hover:bg-red-50"
+                            title="Delete asset"
+                        >
+                            <Trash2 size={14} />
+                        </button>
                         <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600 group-hover:bg-blue-100 transition-colors">
@@ -180,6 +206,14 @@ export const AssetList: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={filteredAssets.length}
+                pageSize={PAGE_SIZE}
+            />
 
             {/* Add Asset Modal */}
             {showModal && (

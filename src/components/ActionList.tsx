@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, X, Calendar, User, Link as LinkIcon } from 'lucide-react';
-import { getActions, getIncidents, saveAction } from '../services/storageService';
+import { Plus, X, Calendar, User, Link as LinkIcon, Trash2 } from 'lucide-react';
+import { getActions, getIncidents, saveAction, deleteAction } from '../services/storageService';
 import { Incident, ActionItem } from '../types';
+import { Pagination } from './Pagination';
+import toast from 'react-hot-toast';
 
 export const ActionList: React.FC = () => {
     const [actions, setActions] = useState<ActionItem[]>([]);
@@ -25,6 +27,18 @@ export const ActionList: React.FC = () => {
         };
         load();
     }, []);
+
+    const PAGE_SIZE = 10;
+    const [currentPage, setCurrentPage] = useState(1);
+    const totalPages = Math.ceil(actions.length / PAGE_SIZE);
+    const paginatedActions = actions.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    const handleDelete = async (id: string, title: string) => {
+        if (!confirm(`Delete action "${title}"? This cannot be undone.`)) return;
+        await deleteAction(id);
+        setActions(prev => prev.filter(a => a.id !== id));
+        toast.success('Action deleted');
+    };
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -70,7 +84,7 @@ export const ActionList: React.FC = () => {
 
             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
                 <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {actions.map(action => {
+                    {paginatedActions.map(action => {
                         const linkedIncident = incidents.find(i => i.id === action.relatedIncidentId);
                         return (
                             <div key={action.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
@@ -95,18 +109,35 @@ export const ActionList: React.FC = () => {
                                         )}
                                     </div>
                                 </div>
-                                <span className={`px-2 py-1 text-xs rounded-full font-medium self-start sm:self-center ${
-                                    action.status === 'Done' ? 'bg-green-100 text-green-700' :
-                                    action.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
-                                }`}>
-                                    {action.status}
-                                </span>
+                                <div className="flex items-center gap-2 self-start sm:self-center">
+                                    <button
+                                        onClick={() => handleDelete(action.id, action.title)}
+                                        className="p-1.5 text-slate-300 hover:text-red-600 transition-colors rounded"
+                                        title="Delete action"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                    <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+                                        action.status === 'Done' ? 'bg-green-100 text-green-700' :
+                                        action.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                                    }`}>
+                                        {action.status}
+                                    </span>
+                                </div>
                             </div>
                         );
                     })}
                     {actions.length === 0 && <p className="p-6 text-center text-slate-400">No actions found.</p>}
                 </div>
             </div>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={actions.length}
+                pageSize={PAGE_SIZE}
+            />
 
             {showModal && (
                 <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">

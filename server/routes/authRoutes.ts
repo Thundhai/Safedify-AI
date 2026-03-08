@@ -264,4 +264,57 @@ router.post('/reset-password', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// PUT /api/auth/profile — Update name/avatar
+router.put('/profile', authenticate, (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { name } = req.body;
+    if (!name || typeof name !== 'string' || name.trim().length < 2) {
+      res.status(400).json({ error: 'Name must be at least 2 characters' });
+      return;
+    }
+    const trimmed = name.trim();
+    const avatar = trimmed.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
+    db.prepare('UPDATE users SET name = ?, avatar = ? WHERE id = ?').run(trimmed, avatar, userId);
+    const updated = db.prepare('SELECT id, name, email, role, tier, avatar FROM users WHERE id = ?').get(userId) as any;
+    const token = generateToken(updated);
+    logAudit(req, { action: 'profile_update', entityType: 'user', entityId: userId, details: `Profile updated: name → ${trimmed}` });
+    res.json({ token, user: updated });
+  } catch (err: any) {
+    console.error('[Auth] Profile update error:', err.message);
+    res.status(500).json({ error: 'Failed to update profile.' });
+  }
+});
+
+// PUT /api/auth/change-password — Change password (requires current password)
+router.put('/change-password', authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ error: 'Current and new password required' });
+      return;
+    }
+    if (newPassword.length < 8) {
+      res.status(400).json({ error: 'New password must be at least 8 characters' });
+      return;
+    }
+    const row = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId) as any;
+    if (!row) { res.status(404).json({ error: 'User not found' }); return; }
+
+    const valid = await comparePassword(currentPassword, row.password_hash);
+    if (!valid) {
+      res.status(401).json({ error: 'Current password is incorrect' });
+      return;
+    }
+    const hash = await hashPassword(newPassword);
+    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId);
+    logAudit(req, { action: 'password_change', entityType: 'user', entityId: userId, details: 'Password changed via profile' });
+    res.json({ message: 'Password changed successfully.' });
+  } catch (err: any) {
+    console.error('[Auth] Change password error:', err.message);
+    res.status(500).json({ error: 'Failed to change password.' });
+  }
+});
+
 export default router;

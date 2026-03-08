@@ -88,6 +88,15 @@ export const apiRegister = async (name: string, email: string, password: string,
 
 export const apiGetMe = () => apiFetch('/auth/me');
 
+export const apiUpdateProfile = async (data: { name: string }) => {
+  const result = await apiFetch('/auth/profile', { method: 'PUT', body: JSON.stringify(data) });
+  if (result.token) setAuthToken(result.token);
+  return result;
+};
+
+export const apiChangePassword = (currentPassword: string, newPassword: string) =>
+  apiFetch('/auth/change-password', { method: 'PUT', body: JSON.stringify({ currentPassword, newPassword }) });
+
 // ---------- Data API ----------
 
 export const apiGetIncidents = () => apiFetch('/incidents');
@@ -113,6 +122,7 @@ export const apiGetPermits = () => apiFetch('/permits');
 export const apiGetPermit = (id: string) => apiFetch(`/permits/${id}`);
 export const apiCreatePermit = (data: any) => apiFetch('/permits', { method: 'POST', body: JSON.stringify(data) });
 export const apiUpdatePermit = (id: string, data: any) => apiFetch(`/permits/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const apiDeletePermit = (id: string) => apiFetch(`/permits/${id}`, { method: 'DELETE' });
 
 export const apiGetWorkers = () => apiFetch('/workers');
 export const apiGetWorker = (id: string) => apiFetch(`/workers/${id}`);
@@ -123,20 +133,27 @@ export const apiDeleteWorker = (id: string) => apiFetch(`/workers/${id}`, { meth
 export const apiGetContractors = () => apiFetch('/contractors');
 export const apiGetContractor = (id: string) => apiFetch(`/contractors/${id}`);
 export const apiCreateContractor = (data: any) => apiFetch('/contractors', { method: 'POST', body: JSON.stringify(data) });
+export const apiUpdateContractor = (id: string, data: any) => apiFetch(`/contractors/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const apiDeleteContractor = (id: string) => apiFetch(`/contractors/${id}`, { method: 'DELETE' });
 
 export const apiGetAssets = () => apiFetch('/assets');
 export const apiGetAsset = (id: string) => apiFetch(`/assets/${id}`);
 export const apiCreateAsset = (data: any) => apiFetch('/assets', { method: 'POST', body: JSON.stringify(data) });
+export const apiUpdateAsset = (id: string, data: any) => apiFetch(`/assets/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const apiDeleteAsset = (id: string) => apiFetch(`/assets/${id}`, { method: 'DELETE' });
 
 export const apiGetDocuments = () => apiFetch('/documents');
 export const apiGetDocument = (id: string) => apiFetch(`/documents/${id}`);
 export const apiCreateDocument = (data: any) => apiFetch('/documents', { method: 'POST', body: JSON.stringify(data) });
+export const apiUpdateDocument = (id: string, data: any) => apiFetch(`/documents/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const apiDeleteDocument = (id: string) => apiFetch(`/documents/${id}`, { method: 'DELETE' });
 
 export const apiGetStats = () => apiFetch('/stats');
 export const apiLogStats = (data: any) => apiFetch('/stats/log', { method: 'POST', body: JSON.stringify(data) });
 
 export const apiGetEmergencyContacts = () => apiFetch('/emergency/contacts');
 export const apiCreateEmergencyContact = (data: any) => apiFetch('/emergency/contacts', { method: 'POST', body: JSON.stringify(data) });
+export const apiDeleteEmergencyContact = (id: string) => apiFetch(`/emergency/contacts/${id}`, { method: 'DELETE' });
 
 export const apiGetEmergencyDrills = () => apiFetch('/emergency/drills');
 export const apiCreateEmergencyDrill = (data: any) => apiFetch('/emergency/drills', { method: 'POST', body: JSON.stringify(data) });
@@ -147,6 +164,7 @@ export const apiGetRiskAssessments = () => apiFetch('/risk-assessments');
 export const apiGetRiskAssessment = (id: string) => apiFetch(`/risk-assessments/${id}`);
 export const apiCreateRiskAssessment = (data: any) => apiFetch('/risk-assessments', { method: 'POST', body: JSON.stringify(data) });
 export const apiUpdateRiskAssessment = (id: string, data: any) => apiFetch(`/risk-assessments/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const apiDeleteRiskAssessment = (id: string) => apiFetch(`/risk-assessments/${id}`, { method: 'DELETE' });
 
 // ---------- Inspection Templates API ----------
 

@@ -288,6 +288,11 @@ router.put('/permits/:id', requirePermission('approve_permit'), (req: AuthReques
   }
 });
 
+router.delete('/permits/:id', requirePermission('approve_permit'), (req: AuthRequest, res: Response) => {
+  db.prepare('DELETE FROM permits WHERE id = ?').run(req.params.id);
+  res.json({ message: 'Deleted' });
+});
+
 // ---------- WORKERS ----------
 
 router.get('/workers', (req: AuthRequest, res: Response) => {
@@ -343,6 +348,21 @@ router.post('/contractors', requirePermission('manage_users'), (req: AuthRequest
   res.status(201).json({ id });
 });
 
+router.put('/contractors/:id', requirePermission('manage_users'), (req: AuthRequest, res: Response) => {
+  const { name, contact_person, email, phone, status } = req.body;
+  db.prepare(
+    `UPDATE contractors SET name=COALESCE(?,name), contact_person=COALESCE(?,contact_person),
+     email=COALESCE(?,email), phone=COALESCE(?,phone), status=COALESCE(?,status),
+     updated_at=datetime('now') WHERE id=?`
+  ).run(name, contact_person, email, phone, status, req.params.id);
+  res.json({ message: 'Updated' });
+});
+
+router.delete('/contractors/:id', requirePermission('manage_users'), (req: AuthRequest, res: Response) => {
+  db.prepare('DELETE FROM contractors WHERE id = ?').run(req.params.id);
+  res.json({ message: 'Deleted' });
+});
+
 // ---------- ASSETS ----------
 
 router.get('/assets', (req: AuthRequest, res: Response) => {
@@ -364,6 +384,23 @@ router.post('/assets', requirePermission('manage_incidents'), (req: AuthRequest,
   res.status(201).json({ id });
 });
 
+router.put('/assets/:id', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
+  const { name, category, model_number, serial_number, location, status, next_inspection_date } = req.body;
+  db.prepare(
+    `UPDATE assets SET name=COALESCE(?,name), category=COALESCE(?,category),
+     model_number=COALESCE(?,model_number), serial_number=COALESCE(?,serial_number),
+     location=COALESCE(?,location), status=COALESCE(?,status),
+     next_inspection_date=COALESCE(?,next_inspection_date),
+     updated_at=datetime('now') WHERE id=?`
+  ).run(name, category, model_number, serial_number, location, status, next_inspection_date, req.params.id);
+  res.json({ message: 'Updated' });
+});
+
+router.delete('/assets/:id', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
+  db.prepare('DELETE FROM assets WHERE id = ?').run(req.params.id);
+  res.json({ message: 'Deleted' });
+});
+
 // ---------- DOCUMENTS ----------
 
 router.get('/documents', (req: AuthRequest, res: Response) => {
@@ -383,6 +420,21 @@ router.post('/documents', requirePermission('manage_documents'), (req: AuthReque
     'INSERT INTO documents (id, title, category, content, status, uploaded_by) VALUES (?,?,?,?,?,?)'
   ).run(id, title, category, content, status || 'Draft', req.user?.id);
   res.status(201).json({ id });
+});
+
+router.put('/documents/:id', requirePermission('manage_documents'), (req: AuthRequest, res: Response) => {
+  const { title, category, content, status } = req.body;
+  db.prepare(
+    `UPDATE documents SET title=COALESCE(?,title), category=COALESCE(?,category),
+     content=COALESCE(?,content), status=COALESCE(?,status),
+     updated_at=datetime('now') WHERE id=?`
+  ).run(title, category, content, status, req.params.id);
+  res.json({ message: 'Updated' });
+});
+
+router.delete('/documents/:id', requirePermission('manage_documents'), (req: AuthRequest, res: Response) => {
+  db.prepare('DELETE FROM documents WHERE id = ?').run(req.params.id);
+  res.json({ message: 'Deleted' });
 });
 
 // ---------- STATS ----------
@@ -445,6 +497,11 @@ router.post('/emergency/contacts', requirePermission('manage_incidents'), (req: 
   res.status(201).json({ id });
 });
 
+router.delete('/emergency/contacts/:id', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
+  db.prepare('DELETE FROM emergency_contacts WHERE id = ?').run(req.params.id);
+  res.json({ message: 'Deleted' });
+});
+
 router.get('/emergency/drills', (req: AuthRequest, res: Response) => {
   res.json(db.prepare('SELECT * FROM emergency_drills ORDER BY created_at DESC').all());
 });
@@ -497,6 +554,11 @@ router.put('/risk-assessments/:id', requirePermission('manage_incidents'), (req:
      updated_at=datetime('now') WHERE id=?`
   ).run(title, task_description || taskDescription, type, date, hazards ? JSON.stringify(hazards) : null, status, req.params.id);
   res.json({ message: 'Updated' });
+});
+
+router.delete('/risk-assessments/:id', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
+  db.prepare('DELETE FROM risk_assessments WHERE id = ?').run(req.params.id);
+  res.json({ message: 'Deleted' });
 });
 
 // ---------- INSPECTION TEMPLATES ----------

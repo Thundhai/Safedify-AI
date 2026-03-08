@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getContractors } from '../services/storageService';
+import { getContractors, deleteContractor } from '../services/storageService';
 import { Contractor } from '../types';
-import { Plus, Users, ShieldCheck, AlertCircle, Briefcase, ChevronRight } from 'lucide-react';
+import { Plus, Users, ShieldCheck, AlertCircle, Briefcase, ChevronRight, Trash2 } from 'lucide-react';
+import { Pagination } from './Pagination';
+import toast from 'react-hot-toast';
 
 export const ContractorList: React.FC = () => {
     const [contractors, setContractors] = useState<Contractor[]>([]);
@@ -16,6 +18,20 @@ export const ContractorList: React.FC = () => {
         };
         load();
     }, []);
+
+    const PAGE_SIZE = 10;
+    const [currentPage, setCurrentPage] = useState(1);
+    const totalPages = Math.ceil(contractors.length / PAGE_SIZE);
+    const paginatedContractors = contractors.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+    const handleDelete = async (e: React.MouseEvent, id: string, name: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!confirm(`Delete contractor "${name}"? This cannot be undone.`)) return;
+        await deleteContractor(id);
+        setContractors(prev => prev.filter(c => c.id !== id));
+        toast.success('Contractor deleted');
+    };
 
     const getStatusColor = (status: string) => {
         switch(status) {
@@ -56,7 +72,7 @@ export const ContractorList: React.FC = () => {
 
             {/* Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {contractors.map(contractor => (
+                {paginatedContractors.map(contractor => (
                     <Link to={`/contractors/${contractor.id}`} key={contractor.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:shadow-md transition-all group flex flex-col">
                         <div className="flex justify-between items-start mb-4">
                             <div className="w-12 h-12 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-100 transition-colors">
@@ -96,9 +112,18 @@ export const ContractorList: React.FC = () => {
                                  <ShieldCheck size={14} className={contractor.documents.some(d => d.status === 'Expired') ? 'text-red-500' : 'text-green-500'} />
                                  {contractor.documents.length} Docs
                              </span>
-                             <span className="flex items-center gap-1 text-blue-600 font-medium group-hover:underline">
-                                 View Details <ChevronRight size={14} />
-                             </span>
+                             <div className="flex items-center gap-3">
+                                 <button
+                                     onClick={(e) => handleDelete(e, contractor.id, contractor.name)}
+                                     className="text-slate-400 hover:text-red-600 transition-colors"
+                                     title="Delete contractor"
+                                 >
+                                     <Trash2 size={14} />
+                                 </button>
+                                 <span className="flex items-center gap-1 text-blue-600 font-medium group-hover:underline">
+                                     View Details <ChevronRight size={14} />
+                                 </span>
+                             </div>
                         </div>
                     </Link>
                 ))}
@@ -110,6 +135,14 @@ export const ContractorList: React.FC = () => {
                      </div>
                 )}
             </div>
+
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalItems={contractors.length}
+                pageSize={PAGE_SIZE}
+            />
         </div>
     );
 };
