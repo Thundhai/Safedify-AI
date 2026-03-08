@@ -46,11 +46,10 @@ export const AnalyticsDashboard: React.FC = () => {
         refreshData();
     }, []);
 
-    // Auto-calculate Man Hours based on formula: Manpower * Hours * Days
-    useEffect(() => {
+    // Derived: Man Hours = Manpower × Hours × Days (useMemo avoids render loops)
+    const calculatedManHours = useMemo(() => {
         const workers = Number(statsEntry.activeWorkers) || 0;
-        const total = workers * hoursPerDay * daysWorked;
-        setStatsEntry(prev => ({ ...prev, manHours: total }));
+        return workers * hoursPerDay * daysWorked;
     }, [statsEntry.activeWorkers, hoursPerDay, daysWorked]);
 
     const refreshData = async () => {
@@ -66,7 +65,7 @@ export const AnalyticsDashboard: React.FC = () => {
             id: `log-${Date.now()}`,
             date: statsEntry.date!,
             period: statsEntry.period as any,
-            manHours: Number(statsEntry.manHours), // Calculated value
+            manHours: calculatedManHours,
             activeWorkers: Number(statsEntry.activeWorkers),
             remarks: statsEntry.remarks
         };
@@ -306,7 +305,7 @@ export const AnalyticsDashboard: React.FC = () => {
                                     <div className="col-span-2">
                                         <div className="bg-blue-100 p-3 rounded-lg border border-blue-200 text-center">
                                             <span className="block text-xs text-blue-700 uppercase font-bold mb-1">Total Safe Man-Hours</span>
-                                            <span className="text-2xl font-bold text-blue-900">{statsEntry.manHours?.toLocaleString()}</span>
+                                            <span className="text-2xl font-bold text-blue-900">{calculatedManHours.toLocaleString()}</span>
                                         </div>
                                     </div>
                                 </div>
