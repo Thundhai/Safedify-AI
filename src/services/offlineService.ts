@@ -5,7 +5,13 @@
  * Two queues:
  *  1. OFFLINE_QUEUE_KEY  — machine-readable API requests to replay
  *  2. SYNC_QUEUE_KEY     — human-readable log entries shown in the UI
+ *
+ * IndexedDB cache:
+ *  - Automatically migrates legacy localStorage data on first run
+ *  - Provides offline read access to all major data types
  */
+
+import { migrateFromLocalStorage, isIndexedDBAvailable } from './indexedDBService';
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -36,8 +42,16 @@ export const SYNC_QUEUE_KEY = 'hse_sync_queue';
 
 /**
  * Initialize service worker message listener for background sync
+ * and migrate localStorage data to IndexedDB.
  */
 export const initOfflineSync = () => {
+  // Migrate localStorage → IndexedDB (one-time, non-blocking)
+  if (isIndexedDBAvailable()) {
+    migrateFromLocalStorage().catch(err => {
+      console.warn('[Offline] IndexedDB migration error (non-fatal):', err);
+    });
+  }
+
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', (event) => {
       if (event.data?.type === 'SYNC_REQUESTED') {

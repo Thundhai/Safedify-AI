@@ -50,6 +50,8 @@ import { NotificationBell } from './NotificationBell';
 import GlobalSearch from './GlobalSearch';
 import { useAuth } from '../context/AuthContext';
 import { SubscriptionTier } from '../types';
+import { useTranslation } from 'react-i18next';
+import { supportedLanguages } from '../i18n';
 
 export const Layout: React.FC = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -57,7 +59,9 @@ export const Layout: React.FC = () => {
   const [syncing, setSyncing] = useState(false);
   const [pendingSyncs, setPendingSyncs] = useState(0);
   const { user, logout, checkPermission } = useAuth();
+  const { i18n } = useTranslation();
   const navigate = useNavigate();
+  const [showLangMenu, setShowLangMenu] = useState(false);
   
   // Mobile FAB State & PWA
   const [isFabOpen, setIsFabOpen] = useState(false);
@@ -433,6 +437,35 @@ export const Layout: React.FC = () => {
              >
                 {isDarkMode ? <Sun size={20} className="text-brand-orange" /> : <Moon size={20} />}
              </button>
+
+             {/* Language Switcher */}
+             <div className="relative">
+               <button
+                 onClick={() => setShowLangMenu(!showLangMenu)}
+                 className="p-2 rounded-full text-brand-grey hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors flex items-center gap-1"
+                 title="Change language"
+                 aria-label="Change language"
+               >
+                 <Globe size={20} />
+                 <span className="text-xs font-bold uppercase hidden sm:inline">{i18n.language?.substring(0, 2)}</span>
+               </button>
+               {showLangMenu && (
+                 <div className="absolute right-0 top-full mt-1 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-slate-200 dark:border-slate-700 py-1 z-50 min-w-[140px]">
+                   {supportedLanguages.map((lang) => (
+                     <button
+                       key={lang.code}
+                       onClick={() => { i18n.changeLanguage(lang.code); setShowLangMenu(false); }}
+                       className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${
+                         i18n.language?.startsWith(lang.code) ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-700 dark:text-slate-300'
+                       }`}
+                     >
+                       <span>{lang.flag}</span>
+                       <span>{lang.name}</span>
+                     </button>
+                   ))}
+                 </div>
+               )}
+             </div>
 
              {/* Notifications */}
              <NotificationBell />

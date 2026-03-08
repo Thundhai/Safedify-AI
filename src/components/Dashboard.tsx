@@ -1,12 +1,14 @@
 
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle, Clock, TrendingUp, ClipboardCheck, Sparkles, BarChart2, Zap, ShieldCheck, X, ChevronRight, Calendar, ArrowUpRight, Target, Eye } from 'lucide-react';
-import { getIncidents, getActions, calculateSiteSafetyScore, getInspections, getRiskAssessments, getObservations } from '../services/storageService';
-import { IncidentSeverity, SiteSafetyScore, SubscriptionTier } from '../types';
+import { AlertTriangle, CheckCircle, Clock, TrendingUp, ClipboardCheck, Sparkles, BarChart2, Zap, ShieldCheck, X, ChevronRight, Calendar, ArrowUpRight, Target, Eye, TrendingDown, Activity } from 'lucide-react';
+import { getIncidents, getActions, calculateSiteSafetyScore, getInspections, getRiskAssessments, getObservations, calculateHSEMetrics } from '../services/storageService';
+import { IncidentSeverity, SiteSafetyScore, SubscriptionTier, HSEMetrics } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { WelcomeScreen } from './WelcomeScreen';
 import { EmptyState } from './EmptyState';
+import { AreaChart, Area, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
+import { generateSafetyReport } from '../services/pdfExportService';
 
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -33,7 +35,10 @@ export const Dashboard: React.FC = () => {
     monthlyTrends: [] as { name: string; incidents: number; observations: number }[]
   });
   const [siteScore, setSiteScore] = useState<SiteSafetyScore | null>(null);
+  const [hseMetrics, setHseMetrics] = useState<HSEMetrics | null>(null);
   const [hasData, setHasData] = useState(false);
+  const [rawIncidents, setRawIncidents] = useState<any[]>([]);
+  const [rawActions, setRawActions] = useState<any[]>([]);
 
   // Onboarding State
   const [showOnboarding, setShowOnboarding] = useState(true);
@@ -60,6 +65,8 @@ export const Dashboard: React.FC = () => {
 
         const anyData = incidents.length > 0 || actions.length > 0 || inspections.length > 0 || risks.length > 0;
         setHasData(anyData);
+        setRawIncidents(incidents);
+        setRawActions(actions);
 
         // Skip further processing if showing welcome screen
         if (isFirstTimeUser && !anyData) return;
@@ -82,6 +89,9 @@ export const Dashboard: React.FC = () => {
 
         // Calculate Site Score
         setSiteScore(await calculateSiteSafetyScore());
+
+        // Calculate HSE Metrics (TRIR, LTIFR etc.)
+        setHseMetrics(await calculateHSEMetrics());
 
         // Calculate Severity Breakdown
         const severityCounts: Record<string, number> = {};
@@ -195,7 +205,36 @@ export const Dashboard: React.FC = () => {
       return 'from-red-500 to-rose-600';
   };
 
+  const SEVERITY_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#6366f1'];
+
   const closureRate = stats.totalActions > 0 ? Math.round((stats.closedActions / stats.totalActions) * 100) : 0;
+
+  const handleExportPDF = () => {
+    const now = new Date();
+    const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+    generateSafetyReport({
+      title: 'HSE Safety Report',
+      dateRange: {
+        from: sixMonthsAgo.toISOString().split('T')[0],
+        to: now.toISOString().split('T')[0],
+      },
+      siteName: 'Main Site',
+      generatedBy: user?.name || user?.email || 'System',
+      safetyScore: siteScore,
+      hseMetrics,
+      incidents: rawIncidents,
+      actions: rawActions,
+      stats: {
+        totalIncidents: stats.totalIncidents,
+        openActions: stats.openActions,
+        closedActions: stats.closedActions,
+        totalActions: stats.totalActions,
+        daysSinceLastIncident: stats.daysSinceLastIncident,
+        inspectionCount: stats.inspectionCount,
+        totalObservations: stats.totalObservations,
+      },
+    });
+  };
 
   // Show welcome screen for first-time users (AFTER all hooks)
   if (isFirstTimeUser && !hasData) {
@@ -326,6 +365,13 @@ export const Dashboard: React.FC = () => {
               className="ml-auto flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 rounded-lg transition"
             >
               Full Analytics <ArrowUpRight size={14} />
+            </button>
+            <button
+              onClick={handleExportPDF}
+              className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 rounded-lg transition"
+              title="Download PDF Safety Report"
+            >
+              Export PDF ↓
             </button>
         </div>
 
@@ -516,6 +562,176 @@ export const Dashboard: React.FC = () => {
               <p className={`text-2xl font-black ${getScoreColor(siteScore?.score || 0)}`}>{siteScore ? `${siteScore.score}%` : '—'}</p>
               <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">Compliance Rate</p>
             </button>
+        </div>
+      </section>
+
+      {/* SECTION 1B: LEADING INDICATORS & TREND WIDGETS */}
+      <section>
+        <div className="flex items-center gap-3 mb-6 pt-4 border-t border-slate-200/50 dark:border-slate-700/50">
+            <div className="p-2 bg-emerald-600 rounded-lg shadow-sm">
+                <Activity className="text-white" size={24} />
+            </div>
+            <div>
+                <h2 className="text-xl font-bold text-slate-800 dark:text-white">Leading Indicators & Trends</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Key safety rates, severity breakdown, and monthly trends</p>
+            </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            {/* TRIR Card */}
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1.5 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                  <AlertTriangle className="text-red-500" size={16} />
+                </div>
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">TRIR</p>
+              </div>
+              <p className={`text-3xl font-black ${!hseMetrics || hseMetrics.trir === 0 ? 'text-green-600' : hseMetrics.trir < 3 ? 'text-yellow-600' : 'text-red-600'}`}>
+                {hseMetrics ? hseMetrics.trir.toFixed(2) : '0.00'}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1">Total Recordable Incident Rate</p>
+              <p className="text-[10px] text-slate-400">per 200,000 man-hours</p>
+            </div>
+
+            {/* LTIFR Card */}
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1.5 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                  <TrendingDown className="text-orange-500" size={16} />
+                </div>
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">LTIFR</p>
+              </div>
+              <p className={`text-3xl font-black ${!hseMetrics || hseMetrics.ltifr === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {hseMetrics ? hseMetrics.ltifr.toFixed(2) : '0.00'}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1">Lost Time Injury Frequency Rate</p>
+              <p className="text-[10px] text-slate-400">per 1,000,000 man-hours</p>
+            </div>
+
+            {/* Action Closure Rate Card */}
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1.5 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <CheckCircle className="text-blue-500" size={16} />
+                </div>
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Action Closure</p>
+              </div>
+              <p className={`text-3xl font-black ${closureRate >= 80 ? 'text-green-600' : closureRate >= 50 ? 'text-yellow-600' : 'text-red-600'}`}>
+                {closureRate}%
+              </p>
+              <div className="mt-2 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-full bg-blue-500 rounded-full transition-all duration-700" style={{ width: `${closureRate}%` }} />
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">{stats.closedActions} of {stats.totalActions} actions closed</p>
+            </div>
+
+            {/* Near Miss Reporting Rate */}
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-1.5 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <Eye className="text-purple-500" size={16} />
+                </div>
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Near Miss Rate</p>
+              </div>
+              <p className="text-3xl font-black text-slate-800 dark:text-white">
+                {hseMetrics ? hseMetrics.nearMissReportingRate.toFixed(1) : '0.0'}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1">Near miss reports per incident</p>
+              <p className="text-[10px] text-slate-400">{hseMetrics && hseMetrics.nearMissReportingRate >= 5 ? 'Strong safety culture' : 'Target: 5+ per incident'}</p>
+            </div>
+        </div>
+
+        {/* Charts Row: Monthly Trend & Severity Breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Monthly Trend Sparkline */}
+            <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-slate-800 dark:text-white text-sm">Monthly Trend</h3>
+                  <p className="text-xs text-slate-400">Incidents vs Observations (last 6 months)</p>
+                </div>
+                <button onClick={() => navigate('/analytics')} className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">
+                  Full Analytics →
+                </button>
+              </div>
+              <div className="h-48">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={stats.monthlyTrends} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+                    <defs>
+                      <linearGradient id="incidentGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                      </linearGradient>
+                      <linearGradient id="observationGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', fontSize: '12px', color: '#fff' }}
+                      itemStyle={{ color: '#fff' }}
+                    />
+                    <Area type="monotone" dataKey="incidents" stroke="#ef4444" strokeWidth={2} fill="url(#incidentGrad)" name="Incidents" />
+                    <Area type="monotone" dataKey="observations" stroke="#3b82f6" strokeWidth={2} fill="url(#observationGrad)" name="Observations" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex items-center gap-4 mt-2 justify-center">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-0.5 bg-red-500 rounded" />
+                  <span className="text-[10px] text-slate-400">Incidents</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-3 h-0.5 bg-blue-500 rounded" />
+                  <span className="text-[10px] text-slate-400">Observations</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Severity Breakdown Donut */}
+            <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+              <h3 className="font-bold text-slate-800 dark:text-white text-sm mb-1">Severity Breakdown</h3>
+              <p className="text-xs text-slate-400 mb-4">Incidents by severity level</p>
+              {stats.severityBreakdown.some(s => s.value > 0) ? (
+                <>
+                  <div className="h-40">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={stats.severityBreakdown.filter(s => s.value > 0)}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={65}
+                          paddingAngle={3}
+                          dataKey="value"
+                        >
+                          {stats.severityBreakdown.filter(s => s.value > 0).map((_, idx) => (
+                            <Cell key={idx} fill={SEVERITY_COLORS[idx % SEVERITY_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', fontSize: '12px', color: '#fff' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex flex-wrap gap-2 justify-center mt-2">
+                    {stats.severityBreakdown.filter(s => s.value > 0).map((entry, idx) => (
+                      <div key={entry.name} className="flex items-center gap-1">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SEVERITY_COLORS[idx % SEVERITY_COLORS.length] }} />
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400">{entry.name} ({entry.value})</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <div className="h-40 flex items-center justify-center">
+                  <p className="text-sm text-slate-400 italic">No incident data yet</p>
+                </div>
+              )}
+            </div>
         </div>
       </section>
 

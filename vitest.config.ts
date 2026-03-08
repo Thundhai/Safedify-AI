@@ -18,8 +18,9 @@ export default defineConfig({
     ],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'lcov'],
-      include: ['src/services/**', 'src/context/**', 'server/**'],
+      reporter: ['text', 'lcov', 'json-summary'],
+      include: ['src/components/**', 'src/services/**', 'src/context/**', 'server/**'],
+      exclude: ['**/*.test.{ts,tsx}', '**/__tests__/**'],
     },
   },
 });

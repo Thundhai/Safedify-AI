@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Search, AlertTriangle, Printer, Plus, Trash2, Download, CheckSquare, Square, X } from 'lucide-react';
 import { getIncidents, deleteIncident } from '../services/storageService';
 import { apiExportData, apiBulkDeleteIncidents, apiBulkUpdateIncidentStatus } from '../services/apiService';
+import { exportIncidentsPDF } from '../services/pdfExportService';
 import { Incident, IncidentSeverity, IncidentCategory } from '../types';
 import { Pagination } from './Pagination';
 import toast from 'react-hot-toast';
@@ -92,7 +93,7 @@ export const IncidentList: React.FC = () => {
     const handleBulkStatus = async (status: string) => {
         try {
             await apiBulkUpdateIncidentStatus(Array.from(selectedIds), status);
-            setIncidents(prev => prev.map(i => selectedIds.has(i.id) ? { ...i, status } : i));
+            setIncidents(prev => prev.map(i => selectedIds.has(i.id) ? { ...i, status: status as Incident['status'] } : i));
             setSelectedIds(new Set());
             toast.success(`${selectedIds.size} incident(s) updated to ${status}`);
         } catch (err) {
@@ -116,6 +117,12 @@ export const IncidentList: React.FC = () => {
                         className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 flex items-center gap-2"
                     >
                         <Download size={18} /> Export CSV
+                    </button>
+                    <button 
+                        onClick={() => { exportIncidentsPDF(incidents, 'Main Site'); toast.success('PDF downloaded'); }}
+                        className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 flex items-center gap-2"
+                    >
+                        <Download size={18} /> Export PDF
                     </button>
                     <button onClick={() => window.print()} className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 flex items-center gap-2">
                         <Printer size={18} /> Print

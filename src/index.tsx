@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css'; // This must point to your Tailwind CSS file
+import './i18n'; // Initialize i18next before App renders
 import App from './App';
 
 /**
