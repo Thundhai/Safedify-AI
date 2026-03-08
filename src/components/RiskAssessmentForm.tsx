@@ -9,6 +9,7 @@ import { identifyHazardsAI, suggestControlsAI, explainRiskScoreAI, reviewRiskAss
 import { SmartTextArea } from './SmartTextInput';
 import { RiskAssessment, RiskHazard, RiskControl, RiskControlType, SubscriptionTier } from '../types';
 import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 export const RiskAssessmentForm: React.FC = () => {
   const { user } = useAuth();
@@ -48,8 +49,8 @@ export const RiskAssessmentForm: React.FC = () => {
   }, [id, isNew]);
 
   const handleSuggestHazards = async () => {
-    if (isFree) return alert("Upgrade to Pro to use AI Hazard Identification.");
-    if (!formData.taskDescription) return alert("Please enter a task description first.");
+    if (isFree) return toast("Upgrade to Pro to use AI Hazard Identification.", { icon: '🔒' });
+    if (!formData.taskDescription) return toast.error("Please enter a task description first.");
     setLoadingHazards(true);
     try {
         const result = await identifyHazardsAI(formData.taskDescription, formData.type);
@@ -66,17 +67,17 @@ export const RiskAssessmentForm: React.FC = () => {
         }
     } catch (e) {
         console.error(e);
-        alert("Failed to suggest hazards.");
+        toast.error("Failed to suggest hazards.");
     } finally {
         setLoadingHazards(false);
     }
   };
 
   const handleSuggestControls = async (hazardIndex: number) => {
-    if (isFree) return alert("Upgrade to Pro for AI Controls.");
+    if (isFree) return toast("Upgrade to Pro for AI Controls.", { icon: '🔒' });
     const hazard = formData.hazards[hazardIndex];
     if (!hazard.description || hazard.description.trim().length < 3) {
-      alert("Please enter a hazard description before generating controls.");
+      toast.error("Please enter a hazard description before generating controls.");
       return;
     }
 
@@ -94,19 +95,19 @@ export const RiskAssessmentForm: React.FC = () => {
             updatedHazards[hazardIndex].controls = [...updatedHazards[hazardIndex].controls, ...newControls];
             setFormData({ ...formData, hazards: updatedHazards });
         } else {
-          alert("AI could not generate specific controls for this hazard. Please try refining the description.");
+          toast.error("AI could not generate specific controls for this hazard. Please try refining the description.");
         }
     } catch (e) {
         console.error(e);
-        alert("Failed to suggest controls. Please check your connection.");
+        toast.error("Failed to suggest controls. Please check your connection.");
     } finally {
         setLoadingControls(null);
     }
   };
 
   const handleReviewRiskAssessment = async () => {
-      if (isFree) return alert("Upgrade to Pro for AI Review.");
-      if (!formData.taskDescription) return alert("Task description required for review.");
+      if (isFree) return toast("Upgrade to Pro for AI Review.", { icon: '🔒' });
+      if (!formData.taskDescription) return toast.error("Task description required for review.");
       setLoadingReview(true);
       try {
           const hazardsList = formData.hazards.map(h => h.description);
@@ -120,7 +121,7 @@ export const RiskAssessmentForm: React.FC = () => {
   };
 
   const handleExplainRisk = async (hazard: RiskHazard) => {
-    if (isFree) return alert("Upgrade to Pro for Risk Explanations.");
+    if (isFree) return toast("Upgrade to Pro for Risk Explanations.", { icon: '🔒' });
     if (riskExplanations[hazard.id]) return; // Already loaded or collapsed
     setLoadingExplanation(hazard.id);
     try {
@@ -186,9 +187,9 @@ export const RiskAssessmentForm: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!formData.title) return alert("Title is required");
+    if (!formData.title) return toast.error("Title is required");
     await saveRiskAssessment(formData);
-    alert("Risk Assessment Saved!");
+    toast.success("Risk Assessment Saved!");
     navigate('/risk-assessments');
   };
 

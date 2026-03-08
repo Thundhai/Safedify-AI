@@ -4,6 +4,7 @@ import { Check, X, ShieldCheck, Zap, Building2, Crown, Layers } from 'lucide-rea
 import { useAuth } from '../context/AuthContext';
 import { SubscriptionTier } from '../types';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export const PricingPlans: React.FC = () => {
   const { user } = useAuth();
@@ -18,7 +19,7 @@ export const PricingPlans: React.FC = () => {
       if (tier === SubscriptionTier.ENTERPRISE) {
           window.location.href = 'mailto:sales@safedify.com';
       } else {
-          alert(`Switching to ${tier} plan... (Demo)`);
+          toast(`Switching to ${tier} plan... (Demo)`, { icon: 'ℹ️' });
       }
   };
 

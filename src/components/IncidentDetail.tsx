@@ -9,6 +9,7 @@ import { getIncidentById, getActions, saveAction, updateIncident, updateAction }
 import { analyzeRootCauseAI, generateSpeechAI, playGeneratedAudio } from '../services/geminiService';
 import { Incident, ActionItem, IncidentSeverity, InjuredPerson, IncidentWitness } from '../types';
 import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 export const IncidentDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -105,7 +106,7 @@ export const IncidentDetail: React.FC = () => {
           }
       } catch (e) {
           console.error("TTS Error", e);
-          alert("Unable to play audio briefing.");
+          toast.error("Unable to play audio briefing.");
       } finally {
           setIsSpeaking(false);
       }
@@ -137,7 +138,7 @@ export const IncidentDetail: React.FC = () => {
       if (result.rootCause) setRootCause(result.rootCause);
     } catch (e) {
       console.error(e);
-      alert("AI Analysis failed. Please try again or check connection.");
+      toast.error("AI Analysis failed. Please try again or check connection.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -163,7 +164,7 @@ export const IncidentDetail: React.FC = () => {
   const handleSaveInvestigation = async () => {
     if (!incident) return;
     if (!rootCause.trim()) {
-        alert("Please identify a Root Cause before saving.");
+        toast.error("Please identify a Root Cause before saving.");
         return;
     }
 
@@ -187,7 +188,7 @@ export const IncidentDetail: React.FC = () => {
     
     setIncident(updatedIncident);
     setIsSaving(false);
-    alert(`Investigation saved.${markAsClosed ? ' Incident marked as Closed.' : ''}`);
+    toast.success(`Investigation saved.${markAsClosed ? ' Incident marked as Closed.' : ''}`);
   };
 
   const handleAddAction = async (e: React.FormEvent) => {

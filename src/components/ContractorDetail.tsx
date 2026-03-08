@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getContractorById, saveContractor, getWorkers } from '../services/storageService';
 import { evaluateContractorComplianceAI } from '../services/geminiService';
@@ -44,9 +45,9 @@ export const ContractorDetail: React.FC = () => {
     }, [id, isNew]);
 
     const handleSave = async () => {
-        if (!contractor.name) return alert("Company Name is required");
+        if (!contractor.name) return toast.error("Company Name is required");
         await saveContractor(contractor);
-        alert("Contractor Saved Successfully");
+        toast.success("Contractor Saved Successfully");
         navigate('/contractors');
     };
 
@@ -86,14 +87,14 @@ export const ContractorDetail: React.FC = () => {
                     performanceRating: result.performanceRating || prev.performanceRating
                 }));
                 if (result.issues && result.issues.length > 0) {
-                    alert(`Compliance Check Complete.\nIssues:\n- ${result.issues.join('\n- ')}`);
+                    toast.error(`Compliance Check Complete. Issues: ${result.issues.join(', ')}`);
                 } else {
-                    alert("Compliance Check Complete. Status: Good.");
+                    toast.success("Compliance Check Complete. Status: Good.");
                 }
             }
         } catch (e) {
             console.error(e);
-            alert("AI check failed.");
+            toast.error("AI check failed.");
         } finally {
             setIsAnalyzing(false);
         }

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { getSafetyZones, saveSafetyZone, deleteSafetyZone } from '../services/storageService';
 import { SafetyZone } from '../types';
 import { MapPin, Plus, Trash2, ShieldAlert, Navigation, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export const GeoFencing: React.FC = () => {
     const [zones, setZones] = useState<SafetyZone[]>([]);
@@ -42,7 +43,7 @@ export const GeoFencing: React.FC = () => {
                         case err.POSITION_UNAVAILABLE: msg = "Location signal unavailable."; break;
                         case err.TIMEOUT: msg = "Location request timed out."; break;
                     }
-                    alert(msg);
+                    toast.error(msg);
                 },
                 {
                     enableHighAccuracy: true,
@@ -51,7 +52,7 @@ export const GeoFencing: React.FC = () => {
                 }
             );
         } else {
-            alert("Geolocation not supported by this browser.");
+            toast.error("Geolocation not supported by this browser.");
             setIsLocating(false);
         }
     };

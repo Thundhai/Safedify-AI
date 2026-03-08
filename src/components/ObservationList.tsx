@@ -20,10 +20,12 @@ export const ObservationList: React.FC = () => {
     const [selectedObs, setSelectedObs] = useState<Observation | null>(null);
     const [isEditMode, setIsEditMode] = useState(false);
     const [editForm, setEditForm] = useState<Partial<Observation>>({});
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const load = async () => {
             setObservations(await getObservations());
+            setLoading(false);
         };
         load();
     }, []);
@@ -104,6 +106,12 @@ export const ObservationList: React.FC = () => {
         'PPE', 'Housekeeping', 'Tools & Equipment', 'Working at Height', 
         'Lifting / Manual Handling', 'Electrical', 'Chemicals', 'Traffic / Vehicles'
     ];
+
+    if (loading) return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
 
     return (
         <div className="space-y-6">

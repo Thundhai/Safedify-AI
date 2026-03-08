@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { useParams, Link } from 'react-router-dom';
 import { getAssetById, saveAsset } from '../services/storageService';
 import { extractCertificateDataAI } from '../services/geminiService';
@@ -54,11 +55,11 @@ export const AssetDetail: React.FC = () => {
                     
                     await saveAsset(updatedAsset);
                     setAsset(updatedAsset);
-                    alert("Certificate uploaded and analyzed!");
+                    toast.success("Certificate uploaded and analyzed!");
 
                 } catch (err) {
                     console.error(err);
-                    alert("Failed to analyze document.");
+                    toast.error("Failed to analyze document.");
                 } finally {
                     setIsUploading(false);
                 }
@@ -70,7 +71,7 @@ export const AssetDetail: React.FC = () => {
     const addMaintenanceRecord = (e: React.FormEvent) => {
         e.preventDefault();
         // Simpler implementation for MVP: alert
-        alert("Maintenance record functionality coming in next update.");
+        toast("Maintenance record functionality coming in next update.", { icon: 'ℹ️' });
     };
 
     if (!asset) return <div className="p-8 text-center text-slate-500">Asset not found</div>;
@@ -155,7 +156,12 @@ export const AssetDetail: React.FC = () => {
                         {activeTab === 'overview' && (
                             <div className="space-y-4">
                                 <h3 className="font-bold text-slate-800">Asset Specifications</h3>
-                                <p className="text-slate-500 text-sm">Details specific to {asset.name} would appear here (e.g. Load Capacity, Engine type, Dimensions).</p>
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                    <div className="flex justify-between"><span className="text-slate-500">Category</span><span className="font-medium">{asset.category}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-500">Model</span><span className="font-medium">{asset.modelNumber}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-500">Serial No</span><span className="font-medium">{asset.serialNumber}</span></div>
+                                    <div className="flex justify-between"><span className="text-slate-500">Location</span><span className="font-medium">{asset.location}</span></div>
+                                </div>
                                 
                                 <h3 className="font-bold text-slate-800 mt-6">Recent Activity</h3>
                                 <p className="text-sm text-slate-400 py-4">No recent activity recorded for this asset.</p>

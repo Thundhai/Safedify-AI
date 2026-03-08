@@ -15,11 +15,13 @@ export const ActionList: React.FC = () => {
         dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
         relatedIncidentId: ''
     });
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const load = async () => {
             setActions(await getActions());
             setIncidents(await getIncidents());
+            setLoading(false);
         };
         load();
     }, []);
@@ -47,6 +49,12 @@ export const ActionList: React.FC = () => {
             relatedIncidentId: ''
         });
     };
+
+    if (loading) return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
 
     return (
         <div className="space-y-6">

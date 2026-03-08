@@ -5,6 +5,7 @@ import { summarizeDocumentAI } from '../services/geminiService';
 import { SmartTextInput, SmartTextArea } from './SmartTextInput';
 import { HSEDocument, DocumentCategory } from '../types';
 import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 import { 
     ArrowLeft, Save, Upload, QrCode, Sparkles, Loader2, CheckCircle, 
     XCircle, FileText, Calendar, User
@@ -54,23 +55,23 @@ export const DocumentForm: React.FC = () => {
     };
 
     const handleGenerateSummary = async () => {
-        if (!doc.contentUrl) return alert("Please upload a document first.");
+        if (!doc.contentUrl) return toast.error("Please upload a document first.");
         setIsSummarizing(true);
         try {
             const result = await summarizeDocumentAI(doc.contentUrl, doc.title);
             setDoc(prev => ({ ...prev, aiSummary: result.summary }));
         } catch (e) {
             console.error(e);
-            alert("Failed to summarize.");
+            toast.error("Failed to summarize.");
         } finally {
             setIsSummarizing(false);
         }
     };
 
     const handleSave = async () => {
-        if (!doc.title) return alert("Title required");
+        if (!doc.title) return toast.error("Title required");
         await saveDocument(doc);
-        alert("Document Saved.");
+        toast.success("Document Saved.");
         navigate('/documents');
     };
 

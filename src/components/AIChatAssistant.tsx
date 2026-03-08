@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import ReactMarkdown from 'react-markdown';
 import {
   X, Send, Image, Loader2, Sparkles, Volume2, Lock, Database,
@@ -131,7 +132,7 @@ export const AIChatAssistant: React.FC = () => {
 
   const handleReadAloud = async (text: string, index: number) => {
     if (isReading !== null) return;
-    if (isFree) { alert('Text-to-Speech is a Pro feature.'); return; }
+    if (isFree) { toast.error('Text-to-Speech is a Pro feature.'); return; }
     setIsReading(index);
     try {
       const cleanText = text.replace(/\*\*/g, '');

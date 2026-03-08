@@ -6,6 +6,7 @@ import { HazardDetection, Observation, SubscriptionTier } from '../types';
 import { saveObservation } from '../services/storageService';
 import { Link, useNavigate } from 'react-router-dom';
 import { FeatureGate } from './FeatureGate';
+import toast from 'react-hot-toast';
 
 export const SmartCamera: React.FC = () => {
   const navigate = useNavigate();
@@ -42,7 +43,7 @@ export const SmartCamera: React.FC = () => {
       }
     } catch (e) {
       console.error(e);
-      alert("AI analysis failed to identify hazards.");
+      toast.error("AI analysis failed to identify hazards.");
     } finally {
       setIsAnalyzing(false);
     }
@@ -72,7 +73,7 @@ export const SmartCamera: React.FC = () => {
 
       await saveObservation(newObs);
       
-      alert("Hazard logged to Observations successfully.");
+      toast.success("Hazard logged to Observations successfully.");
       setLoggingHazard(null); // Close modal
   };
 

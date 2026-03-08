@@ -7,10 +7,12 @@ import { Plus, Users, ShieldCheck, AlertCircle, Briefcase, ChevronRight } from '
 
 export const ContractorList: React.FC = () => {
     const [contractors, setContractors] = useState<Contractor[]>([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const load = async () => {
             setContractors(await getContractors());
+            setLoading(false);
         };
         load();
     }, []);
@@ -33,6 +35,12 @@ export const ContractorList: React.FC = () => {
             default: return 'bg-slate-300';
         }
     };
+
+    if (loading) return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
 
     return (
         <div className="space-y-6">

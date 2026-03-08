@@ -23,7 +23,7 @@ const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 try { mkdirSync(UPLOADS_DIR, { recursive: true }); } catch {}
 
 const ALLOWED_TYPES = new Set([
-  'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml',
+  'image/jpeg', 'image/png', 'image/webp', 'image/gif',
   'application/pdf', 'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]);
@@ -105,9 +105,9 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
 
 /**
  * GET /api/uploads/:filename
- * Serve a stored file
+ * Serve a stored file (requires authentication)
  */
-router.get('/:filename', (req: AuthRequest, res: Response) => {
+router.get('/:filename', authenticate, (req: AuthRequest, res: Response) => {
   // Sanitize filename to prevent path traversal
   const filename = path.basename(req.params.filename as string);
   const filePath = path.join(UPLOADS_DIR, filename);

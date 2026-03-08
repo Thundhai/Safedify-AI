@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { analyzePPEStockAI } from '../services/geminiService';
+import toast from 'react-hot-toast';
 
 export const PPEDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'inventory' | 'issuance'>('inventory');
@@ -76,7 +77,7 @@ export const PPEDashboard: React.FC = () => {
     if (!worker || !item) return;
 
     if (item.stockQuantity <= 0) {
-        alert("Item is out of stock!");
+        toast.error("Item is out of stock!");
         return;
     }
 
@@ -100,7 +101,7 @@ export const PPEDashboard: React.FC = () => {
     setExpiryDate('');
     setSignatureImage(null);
     await refreshData();
-    alert("PPE Issued Successfully");
+    toast.success("PPE Issued Successfully");
   };
 
   const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -150,7 +151,7 @@ export const PPEDashboard: React.FC = () => {
 
   const handleAddItem = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!newItem.category) return alert("Please select a category");
+      if (!newItem.category) return toast.error("Please select a category");
       const item: PPEItem = {
           id: `ppe-${Date.now()}`,
           name: newItem.name,
@@ -163,7 +164,7 @@ export const PPEDashboard: React.FC = () => {
       setShowAddItemModal(false);
       setNewItem({ name: '', category: '', stockQuantity: 0, minStockThreshold: 5, description: '' });
       await refreshData();
-      alert("New PPE Item Added to Inventory");
+      toast.success("New PPE Item Added to Inventory");
   };
 
   // Alerts
@@ -297,7 +298,7 @@ export const PPEDashboard: React.FC = () => {
                                       )}
                                   </td>
                                   <td className="px-6 py-4 text-right">
-                                      <button className="text-slate-400 hover:text-blue-600" title="View QR Code">
+                                      <button onClick={() => toast("QR scanning coming soon!", { icon: 'ℹ️' })} className="text-slate-400 hover:text-blue-600" title="View QR Code">
                                           <QrCode size={18} />
                                       </button>
                                   </td>

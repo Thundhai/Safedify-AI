@@ -7,6 +7,7 @@ import { WorkerProfile, TrainingRecord } from '../types';
 import { 
     ArrowLeft, Upload, Loader2, Award, Calendar, AlertTriangle, Sparkles, CheckCircle, FileText
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export const WorkerDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -61,7 +62,7 @@ export const WorkerDetail: React.FC = () => {
                     }
                 } catch (err) {
                     console.error(err);
-                    alert("Failed to parse certificate.");
+                    toast.error("Failed to parse certificate.");
                 } finally {
                     setIsUploading(false);
                     setUploadPreview(null);
@@ -86,7 +87,7 @@ export const WorkerDetail: React.FC = () => {
             setGapAnalysis(result);
         } catch (e) {
             console.error(e);
-            alert("Analysis failed.");
+            toast.error("Analysis failed.");
         } finally {
             setIsAnalyzing(false);
         }
@@ -97,7 +98,7 @@ export const WorkerDetail: React.FC = () => {
     return (
         <div className="max-w-4xl mx-auto space-y-6">
             <div className="flex items-center gap-4">
-                <Link to="/training" className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                <Link to="/workers" className="p-2 hover:bg-slate-200 rounded-full transition-colors">
                     <ArrowLeft size={20} className="text-slate-600" />
                 </Link>
                 <h1 className="text-2xl font-bold text-slate-800">Worker Profile</h1>

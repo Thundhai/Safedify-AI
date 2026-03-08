@@ -8,6 +8,7 @@ import {
     Ambulance, Flame, UserCheck, Loader2, CheckCircle, Clock, X, FileText, Upload, List,
     Globe, Plus, Trash2, Search
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 // Comprehensive Global Emergency Numbers
 const GLOBAL_EMERGENCY_DATA: Record<string, EmergencyContact[]> = {
@@ -186,7 +187,7 @@ export const EmergencyDashboard: React.FC = () => {
 
     const handleMusterCheckIn = () => {
         if (!navigator.geolocation) {
-            alert("Geolocation is not supported by your browser");
+            toast.error("Geolocation is not supported by your browser");
             return;
         }
 
@@ -203,7 +204,7 @@ export const EmergencyDashboard: React.FC = () => {
             (error) => {
                 console.error("Error getting location", error.message);
                 setIsLocating(false);
-                alert("Unable to retrieve location. Please check GPS settings.");
+                toast.error("Unable to retrieve location. Please check GPS settings.");
             },
             { enableHighAccuracy: true, timeout: 10000 }
         );
@@ -224,7 +225,7 @@ export const EmergencyDashboard: React.FC = () => {
                 }
             } catch (err) {
                 console.error(err);
-                alert("Upload failed.");
+                toast.error("Upload failed.");
             } finally {
                 setIsUploading(false);
             }
@@ -233,7 +234,7 @@ export const EmergencyDashboard: React.FC = () => {
 
     const handleSaveDrill = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newDrill.location) return alert("Location is required");
+        if (!newDrill.location) return toast.error("Location is required");
         
         let finalCount = Number(newDrill.participantsCount);
         let finalNames: string[] = [];
@@ -270,7 +271,7 @@ export const EmergencyDashboard: React.FC = () => {
         });
         setAttendanceNames('');
         setAttendanceFile(null);
-        alert("Drill Logged Successfully");
+        toast.success("Drill Logged Successfully");
     };
 
     const getContactIcon = (type: string) => {

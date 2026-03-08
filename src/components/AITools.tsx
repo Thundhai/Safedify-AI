@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import toast from 'react-hot-toast';
 import { Camera, HardHat, FileSearch, Loader2, UploadCloud, AlertCircle, CheckCircle2, Sparkles, Volume2, Mic } from 'lucide-react';
 import { detectPPEAI, extractDocumentDataAI, generateSpeechAI, playGeneratedAudio } from '../services/geminiService';
 import { FeatureGate } from './FeatureGate';
@@ -42,7 +43,7 @@ export const AITools: React.FC = () => {
       }
     } catch (e) {
       console.error(e);
-      alert("Analysis failed. Check API configuration.");
+      toast.error("Analysis failed. Check API configuration.");
     } finally {
       setLoading(false);
     }
@@ -58,7 +59,7 @@ export const AITools: React.FC = () => {
           }
       } catch (e) {
           console.error(e);
-          alert("Failed to generate speech.");
+          toast.error("Failed to generate speech.");
       } finally {
           setIsSpeaking(false);
       }
@@ -142,7 +143,7 @@ export const AITools: React.FC = () => {
                     <img src={image} alt="Preview" className="h-full w-full object-contain rounded-lg" />
                     ) : (
                     <div className="space-y-4">
-                        <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-50 mx-auto">
+                        <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 mx-auto">
                         <UploadCloud size={32} />
                         </div>
                         <div>

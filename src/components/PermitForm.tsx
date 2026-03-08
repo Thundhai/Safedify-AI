@@ -9,6 +9,7 @@ import { auditPermitAI } from '../services/geminiService';
 import { SmartTextInput, SmartTextArea } from './SmartTextInput';
 import { Permit, PermitType, PermitStatus, RiskAssessment } from '../types';
 import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 export const PermitForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -109,7 +110,7 @@ export const PermitForm: React.FC = () => {
 
   const performAudit = async (): Promise<boolean> => {
     if (!formData.description) {
-        alert("Please enter a work description.");
+        toast.error("Please enter a work description.");
         return false;
     }
     setLoadingAudit(true);
@@ -139,7 +140,7 @@ export const PermitForm: React.FC = () => {
         }
     } catch (e) {
         console.error(e);
-        alert("AI Audit failed. Proceeding without check.");
+        toast.error("AI Audit failed. Proceeding without check.");
         setLoadingAudit(false);
         return true; // Allow proceed if AI fails (fail open or closed depends on policy, usually open for MVP)
     }
@@ -148,13 +149,13 @@ export const PermitForm: React.FC = () => {
   const handleRequestAudit = async () => {
       const passed = await performAudit();
       if (passed) {
-          alert("AI Compliance Audit Passed: No missing critical controls detected.");
+          toast.success("AI Compliance Audit Passed: No missing critical controls detected.");
       }
   };
 
   const handleSave = async (status: PermitStatus) => {
       if (!formData.description) {
-          alert("Please enter a work description.");
+          toast.error("Please enter a work description.");
           return;
       }
 
@@ -162,14 +163,14 @@ export const PermitForm: React.FC = () => {
       if (status === PermitStatus.PENDING) {
           const passed = await performAudit();
           if (!passed) {
-              alert("Compliance Check Failed. Please address the critical control gaps highlighted below before submitting.");
+              toast.error("Compliance Check Failed. Please address the critical control gaps highlighted below before submitting.");
               return;
           }
       }
 
       const updated = { ...formData, status };
       await savePermit(updated);
-      alert(`Permit ${status === PermitStatus.PENDING ? 'submitted for approval' : 'saved'}.`);
+      toast.success(`Permit ${status === PermitStatus.PENDING ? 'submitted for approval' : 'saved'}.`);
       navigate('/permits');
   };
 
@@ -178,7 +179,7 @@ export const PermitForm: React.FC = () => {
       const updated = { ...formData, status: PermitStatus.APPROVED, approver: user?.name || 'Unknown' };
       await savePermit(updated);
       setFormData(updated);
-      alert("Permit Approved and Active.");
+      toast.success("Permit Approved and Active.");
   };
 
   // Generate QR Code URL if Approved

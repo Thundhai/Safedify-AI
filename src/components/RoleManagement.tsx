@@ -5,6 +5,7 @@ import { Role, Permission, UserRoles } from '../types';
 import { Plus, Trash2, Shield, Check, X, Edit2, Users } from 'lucide-react';
 import { FeatureGate } from './FeatureGate';
 import { SubscriptionTier } from '../types';
+import toast from 'react-hot-toast';
 
 export const RoleManagement: React.FC = () => {
     const [roles, setRoles] = useState<Role[]>([]);
@@ -61,7 +62,7 @@ export const RoleManagement: React.FC = () => {
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!editingRole.name) return alert("Role name is required");
+        if (!editingRole.name) return toast.error("Role name is required");
 
         const role: Role = {
             id: editingRole.id || `role-${Date.now()}`,

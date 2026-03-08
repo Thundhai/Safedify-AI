@@ -1,5 +1,6 @@
 import React, { Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
 // Providers & Layout (not lazy — needed immediately)
 import { AuthProvider } from './context/AuthContext';
@@ -107,6 +108,15 @@ class ErrorBoundary extends React.Component<
 function App() {
   return (
     <ErrorBoundary>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: { borderRadius: '12px', padding: '14px 20px', fontSize: '14px', fontWeight: 500, maxWidth: '420px' },
+          success: { iconTheme: { primary: '#22c55e', secondary: '#fff' } },
+          error: { iconTheme: { primary: '#ef4444', secondary: '#fff' }, duration: 5000 },
+        }}
+      />
       <AuthProvider>
         <HashRouter>
           <Suspense fallback={<PageLoader />}>

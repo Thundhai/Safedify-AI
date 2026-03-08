@@ -133,11 +133,12 @@ router.post('/verify', authenticate, (req: AuthRequest, res: Response) => {
   }
 });
 
-// POST /api/auth/2fa/validate — Validate TOTP code during login
+// POST /api/auth/2fa/validate — Validate TOTP code during login (rate-limited, requires userId + token)
 router.post('/validate', (req: AuthRequest, res: Response) => {
   try {
     const { userId, token } = req.body;
     if (!userId || !token) { res.status(400).json({ error: 'User ID and token are required' }); return; }
+    if (typeof token !== 'string' || token.length > 10) { res.status(400).json({ error: 'Invalid token format' }); return; }
 
     const row = db.prepare('SELECT totp_secret, totp_enabled, totp_backup_codes FROM users WHERE id = ?').get(userId) as any;
     if (!row?.totp_enabled || !row?.totp_secret) {

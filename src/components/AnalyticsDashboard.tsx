@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { 
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
     BarChart, Bar, PieChart, Pie, Cell, LineChart, Line, Legend, RadialBarChart, RadialBar 
@@ -84,7 +85,7 @@ export const AnalyticsDashboard: React.FC = () => {
         setHoursPerDay(10);
         setDaysWorked(1);
         
-        alert("Statistics logged successfully!");
+        toast.success("Statistics logged successfully!");
     };
 
     const handlePeriodChange = (period: string) => {
@@ -107,7 +108,7 @@ export const AnalyticsDashboard: React.FC = () => {
             setAiReport(report);
         } catch (e) {
             console.error(e);
-            alert("Failed to generate AI report.");
+            toast.error("Failed to generate AI report.");
         } finally {
             setLoadingReport(false);
         }

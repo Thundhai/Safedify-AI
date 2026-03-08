@@ -13,6 +13,7 @@ export const WorkersList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterBy, setFilterBy] = useState('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadWorkers();
@@ -20,6 +21,7 @@ export const WorkersList: React.FC = () => {
 
   const loadWorkers = async () => {
     setWorkers(await getWorkers());
+    setLoading(false);
   };
 
   const handleDeleteWorker = async (id: string, name: string) => {
@@ -60,6 +62,12 @@ export const WorkersList: React.FC = () => {
     
     return levelColors[level] || 'bg-gray-400 text-white';
   };
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>
+  );
 
   if (workers.length === 0) {
     return (

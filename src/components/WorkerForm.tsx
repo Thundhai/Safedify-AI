@@ -6,6 +6,7 @@ import {
   User, Building, Calendar, Award, Save, ArrowLeft, 
   Briefcase, Users, Mail, Phone
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export const WorkerForm: React.FC = () => {
   const navigate = useNavigate();
@@ -106,7 +107,7 @@ export const WorkerForm: React.FC = () => {
       navigate('/workers');
     } catch (error) {
       console.error('Error saving worker:', error);
-      alert('Failed to save worker. Please try again.');
+      toast.error('Failed to save worker. Please try again.');
     }
   };
 

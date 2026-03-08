@@ -8,10 +8,12 @@ import { Plus, FileSignature, Clock, CheckCircle2, AlertTriangle, Calendar, MapP
 export const PermitList: React.FC = () => {
     const [permits, setPermits] = useState<Permit[]>([]);
     const [filter, setFilter] = useState<string>('All');
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const load = async () => {
             setPermits(await getPermits());
+            setLoading(false);
         };
         load();
     }, []);
@@ -39,6 +41,12 @@ export const PermitList: React.FC = () => {
 
     const filteredPermits = permits.filter(p => filter === 'All' || p.status === filter);
 
+    if (loading) return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -62,9 +70,9 @@ export const PermitList: React.FC = () => {
                     <h3 className="text-2xl font-bold text-yellow-600">{permits.filter(p => p.status === PermitStatus.PENDING).length}</h3>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-slate-500 text-xs uppercase font-bold">Expiring Today</p>
+                    <p className="text-slate-500 text-xs uppercase font-bold">Expiring Soon</p>
                     <h3 className="text-2xl font-bold text-orange-600">
-                        {permits.filter(p => p.status === PermitStatus.APPROVED && new Date(p.validUntil) < new Date(new Date().setHours(23,59,59,999))).length}
+                        {(() => { const now = new Date(); const in7Days = new Date(); in7Days.setDate(now.getDate() + 7); return permits.filter(p => p.status === PermitStatus.APPROVED && new Date(p.validUntil) > now && new Date(p.validUntil) <= in7Days).length; })()}
                     </h3>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">

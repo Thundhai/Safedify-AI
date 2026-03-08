@@ -11,6 +11,7 @@ import { SmartTextInput } from './SmartTextInput';
 import { compressImage } from '../services/offlineService';
 import { Inspection, InspectionItem, InspectionTemplate } from '../types';
 import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 export const InspectionForm: React.FC = () => {
   const { user } = useAuth();
@@ -73,8 +74,8 @@ export const InspectionForm: React.FC = () => {
   };
 
   const handleSaveTemplate = async () => {
-      if (!newTemplateName.trim()) return alert("Template Name is required");
-      if (newTemplateItems.length === 0) return alert("Add at least one inspection item");
+      if (!newTemplateName.trim()) return toast.error("Template Name is required");
+      if (newTemplateItems.length === 0) return toast.error("Add at least one inspection item");
 
       const template: InspectionTemplate = {
           id: `tmpl-${Date.now()}`,
@@ -85,7 +86,7 @@ export const InspectionForm: React.FC = () => {
       };
 
       await saveInspectionTemplate(template);
-      alert("Template Created Successfully!");
+      toast.success("Template Created Successfully!");
       setView('select-template'); // Go back to selection
   };
 
@@ -134,7 +135,7 @@ export const InspectionForm: React.FC = () => {
               }));
           } catch (err) {
               console.error("Compression failed", err);
-              alert("Photo upload failed");
+              toast.error("Photo upload failed");
           } finally {
               setUploadingItem(null);
           }
@@ -168,7 +169,7 @@ export const InspectionForm: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!location) {
-        alert("Please enter a location.");
+        toast.error("Please enter a location.");
         return;
     }
     const score = calculateScore();
@@ -183,7 +184,7 @@ export const InspectionForm: React.FC = () => {
     await saveInspection(finalInspection);
     
     setCurrentInspection(finalInspection); // Set for report view
-    alert("Inspection completed and saved.");
+    toast.success("Inspection completed and saved.");
     setView('report');
   };
 

@@ -9,10 +9,12 @@ export const DocumentList: React.FC = () => {
     const [documents, setDocuments] = useState<HSEDocument[]>([]);
     const [filterCategory, setFilterCategory] = useState<string>('All');
     const [search, setSearch] = useState('');
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const load = async () => {
             setDocuments(await getDocuments());
+            setLoading(false);
         };
         load();
     }, []);
@@ -33,7 +35,13 @@ export const DocumentList: React.FC = () => {
         }
     };
 
-    const categories: DocumentCategory[] = ['Policy', 'SOP', 'MSDS', 'Work Instruction', 'Report'];
+    const categories: DocumentCategory[] = ['Policy', 'SOP', 'MSDS', 'Work Instruction', 'Report', 'Training Material'];
+
+    if (loading) return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
 
     return (
         <div className="space-y-6">

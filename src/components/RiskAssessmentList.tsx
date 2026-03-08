@@ -10,10 +10,12 @@ export const RiskAssessmentList: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>('All');
     const [statusFilter, setStatusFilter] = useState<string>('All');
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const load = async () => {
             setAssessments(await getRiskAssessments());
+            setLoading(false);
         };
         load();
     }, []);
@@ -26,6 +28,12 @@ export const RiskAssessmentList: React.FC = () => {
         
         return matchesSearch && matchesType && matchesStatus;
     });
+
+    if (loading) return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
 
     return (
         <div className="space-y-6">

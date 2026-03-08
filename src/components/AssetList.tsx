@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { Link } from 'react-router-dom';
 import { getAssets, saveAsset } from '../services/storageService';
 import { Asset, AssetCategory } from '../types';
@@ -9,6 +10,7 @@ export const AssetList: React.FC = () => {
     const [assets, setAssets] = useState<Asset[]>([]);
     const [filter, setFilter] = useState('All');
     const [search, setSearch] = useState('');
+    const [loading, setLoading] = useState(true);
     
     // Modal State
     const [showModal, setShowModal] = useState(false);
@@ -24,6 +26,7 @@ export const AssetList: React.FC = () => {
     useEffect(() => {
         const load = async () => {
             setAssets(await getAssets());
+            setLoading(false);
         };
         load();
     }, []);
@@ -80,8 +83,14 @@ export const AssetList: React.FC = () => {
             location: '',
             nextInspectionDate: ''
         });
-        alert("Asset Added Successfully!");
+        toast.success("Asset Added Successfully!");
     };
+
+    if (loading) return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
 
     return (
         <div className="space-y-6">

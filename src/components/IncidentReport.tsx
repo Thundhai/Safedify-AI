@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import {
   Camera, MapPin, Mic, Loader2, Sparkles, AlertTriangle,
   CheckSquare, StopCircle, ArrowLeft, BrainCircuit, Target,
@@ -135,14 +136,14 @@ export const IncidentReport: React.FC = () => {
           if (ev.results[i].isFinal) t += ev.results[i][0].transcript;
         if (t) setDescription(p => p ? `${p} ${t}` : t);
       };
-      inst.onerror = (ev: any) => { if (ev.error === 'not-allowed') alert('Microphone access denied.'); setIsListening(false); };
+      inst.onerror = (ev: any) => { if (ev.error === 'not-allowed') toast.error('Microphone access denied.'); setIsListening(false); };
       inst.onend = () => setIsListening(false);
       setRecognition(inst);
     }
   }, []);
 
   const toggleListening = () => {
-    if (!recognition) { alert('Voice input not supported.'); return; }
+    if (!recognition) { toast.error('Voice input not supported.'); return; }
     if (isListening) { recognition.stop(); setIsListening(false); }
     else { try { setIsListening(true); recognition.start(); } catch { setIsListening(false); } }
   };
@@ -150,7 +151,7 @@ export const IncidentReport: React.FC = () => {
   /* ── AI Classify ── */
   const handleClassify = async () => {
     if (!isPro) { navigate('/pricing'); return; }
-    if (description.length < 5) { alert('Provide more detail.'); return; }
+    if (description.length < 5) { toast.error('Provide more detail.'); return; }
     setIsClassifying(true); setRecommendations([]); setAiResult(null);
     try {
       const r = await classifyIncidentAI(description);
@@ -158,7 +159,7 @@ export const IncidentReport: React.FC = () => {
       setIncidentType(r.type); setSeverity(r.severity);
       const recs = await getCorrectiveActionsAI(description, r.type, r.severity);
       if (recs?.actions) setRecommendations(recs.actions);
-    } catch { alert('AI Classification failed.'); }
+    } catch { toast.error('AI Classification failed.'); }
     finally { setIsClassifying(false); }
   };
 
@@ -169,7 +170,7 @@ export const IncidentReport: React.FC = () => {
     try {
       const compressed = await Promise.all(Array.from(e.target.files).map(f => compressImage(f)));
       setSelectedImages(p => [...p, ...compressed]);
-    } catch { alert('Image processing failed.'); }
+    } catch { toast.error('Image processing failed.'); }
     finally { setIsCompressing(false); }
   };
 
@@ -192,9 +193,9 @@ export const IncidentReport: React.FC = () => {
   /* ── Submit ── */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description) { alert('Describe the incident.'); return; }
-    if (!location) { alert('Enter the location.'); return; }
-    if (!incidentCategory) { alert('Select incident category.'); return; }
+    if (!description) { toast.error('Describe the incident.'); return; }
+    if (!location) { toast.error('Enter the location.'); return; }
+    if (!incidentCategory) { toast.error('Select incident category.'); return; }
 
     const newInc: Incident = {
       id: `inc-${Date.now()}`,

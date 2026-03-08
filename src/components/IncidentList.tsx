@@ -9,14 +9,13 @@ export const IncidentList: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [severityFilter, setSeverityFilter] = useState('All');
-    const [typeFilter, setTypeFilter] = useState('All');
     const [categoryFilter, setCategoryFilter] = useState('All');
-    const [dateFilter, setDateFilter] = useState('All');
-    const [sortBy, setSortBy] = useState('DateDesc');
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const load = async () => {
             setIncidents(await getIncidents());
+            setLoading(false);
         };
         load();
     }, []);
@@ -30,25 +29,16 @@ export const IncidentList: React.FC = () => {
         if (statusFilter !== 'All') result = result.filter(i => i.status === statusFilter);
         if (severityFilter !== 'All') result = result.filter(i => i.severity === severityFilter);
         if (categoryFilter !== 'All') result = result.filter(i => i.category === categoryFilter);
-        if (typeFilter !== 'All') result = result.filter(i => i.type === typeFilter);
-        if (dateFilter !== 'All') {
-            const now = new Date();
-            result = result.filter(i => {
-                const d = new Date(i.date);
-                if (dateFilter === 'Today') return d.toDateString() === now.toDateString();
-                if (dateFilter === 'This Week') {
-                    const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
-                    return d >= weekAgo;
-                }
-                if (dateFilter === 'This Month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                if (dateFilter === 'This Year') return d.getFullYear() === now.getFullYear();
-                return true;
-            });
-        }
         
-        result.sort((a, b) => sortBy === 'DateDesc' ? new Date(b.date).getTime() - new Date(a.date).getTime() : new Date(a.date).getTime() - new Date(b.date).getTime());
+        result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         return result;
-    }, [incidents, searchTerm, statusFilter, severityFilter, categoryFilter, typeFilter, dateFilter, sortBy]);
+    }, [incidents, searchTerm, statusFilter, severityFilter, categoryFilter]);
+
+    if (loading) return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
 
     return (
         <div className="space-y-4">
@@ -113,8 +103,6 @@ export const IncidentList: React.FC = () => {
                                         setStatusFilter('All');
                                         setSeverityFilter('All');
                                         setCategoryFilter('All');
-                                        setTypeFilter('All');
-                                        setDateFilter('All');
                                     }}
                                     className="mt-2 text-blue-500 hover:text-blue-600 text-sm"
                                 >

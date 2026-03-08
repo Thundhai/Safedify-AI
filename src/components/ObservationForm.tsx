@@ -8,6 +8,7 @@ import { SmartTextInput, SmartTextArea } from './SmartTextInput';
 import { compressImage } from '../services/offlineService';
 import { Observation, ObservationType } from '../types';
 import { useAuth } from '../context/AuthContext';
+import toast from 'react-hot-toast';
 
 export const ObservationForm: React.FC = () => {
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ export const ObservationForm: React.FC = () => {
         setImage(compressed);
       } catch (err) {
         console.error("Compression error", err);
-        alert("Failed to process image.");
+        toast.error("Failed to process image.");
       } finally {
         setIsCompressing(false);
       }
@@ -46,7 +47,7 @@ export const ObservationForm: React.FC = () => {
 
   const handleAIAnalysis = async () => {
     if (!description || description.length < 5) {
-        alert("Please describe the observation first.");
+        toast.error("Please describe the observation first.");
         return;
     }
     setIsAnalyzing(true);
@@ -59,7 +60,7 @@ export const ObservationForm: React.FC = () => {
         }
     } catch (e) {
         console.error(e);
-        alert("AI analysis failed.");
+        toast.error("AI analysis failed.");
     } finally {
         setIsAnalyzing(false);
     }
@@ -83,7 +84,7 @@ export const ObservationForm: React.FC = () => {
 
     await saveObservation(newObs);
     
-    alert("Observation submitted successfully!");
+    toast.success("Observation submitted successfully!");
     navigate('/observations');
   };
 
@@ -103,7 +104,7 @@ export const ObservationForm: React.FC = () => {
       <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-6">
         
         {/* Type Selection */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <button 
             type="button"
             onClick={() => setType('Unsafe Act')}
@@ -133,6 +134,16 @@ export const ObservationForm: React.FC = () => {
           >
             <ShieldCheck size={24} className={type === 'Safe Behavior' ? 'text-green-600' : 'text-slate-400'} />
             Safe Behavior
+          </button>
+          <button 
+            type="button"
+            onClick={() => setType('Near Miss')}
+            className={`p-3 rounded-lg border flex flex-col items-center gap-2 text-sm font-medium transition-all ${
+              type === 'Near Miss' ? 'bg-yellow-50 border-yellow-200 text-yellow-700 ring-1 ring-yellow-300' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            <AlertTriangle size={24} className={type === 'Near Miss' ? 'text-yellow-600' : 'text-slate-400'} />
+            Near Miss
           </button>
         </div>
 
