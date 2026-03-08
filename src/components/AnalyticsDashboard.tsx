@@ -114,19 +114,19 @@ export const AnalyticsDashboard: React.FC = () => {
         }
     };
 
-    if (!metrics) return <div className="p-8"><Loader2 className="animate-spin" /></div>;
+    // --- All useMemo hooks MUST be called unconditionally (before any early return) ---
 
-    // --- Incident Trend Data (Based on Current Data Only) ---
+    // Incident Trend Data (Based on Current Data Only)
     const incidentTrendData = useMemo(() => [
-        { month: 'Current Period', count: incidents.length, lti: metrics.ltiCount },
-    ], [incidents.length, metrics.ltiCount]);
+        { month: 'Current Period', count: incidents.length, lti: metrics?.ltiCount ?? 0 },
+    ], [incidents.length, metrics?.ltiCount]);
 
     const typeData = useMemo(() => [
-        { name: 'Near Miss', value: metrics.nmCount },
-        { name: 'First Aid', value: metrics.facCount },
-        { name: 'Medical Tx', value: metrics.mtcCount },
-        { name: 'LTI', value: metrics.ltiCount },
-    ].filter(d => d.value > 0), [metrics.nmCount, metrics.facCount, metrics.mtcCount, metrics.ltiCount]);
+        { name: 'Near Miss', value: metrics?.nmCount ?? 0 },
+        { name: 'First Aid', value: metrics?.facCount ?? 0 },
+        { name: 'Medical Tx', value: metrics?.mtcCount ?? 0 },
+        { name: 'LTI', value: metrics?.ltiCount ?? 0 },
+    ].filter(d => d.value > 0), [metrics?.nmCount, metrics?.facCount, metrics?.mtcCount, metrics?.ltiCount]);
 
     const locationChartData = useMemo(() => {
         const locationMap = incidents.reduce((acc, curr) => {
@@ -157,9 +157,9 @@ export const AnalyticsDashboard: React.FC = () => {
     }, [incidents]);
 
     // Severity rate
-    const severityRate = useMemo(() => metrics.totalManHours > 0
-        ? ((metrics.ltiCount * 200000) / metrics.totalManHours)
-        : 0, [metrics.ltiCount, metrics.totalManHours]);
+    const severityRate = useMemo(() => (metrics?.totalManHours ?? 0) > 0
+        ? (((metrics?.ltiCount ?? 0) * 200000) / (metrics?.totalManHours ?? 1))
+        : 0, [metrics?.ltiCount, metrics?.totalManHours]);
 
     // Risk matrix data: 5x5 grid (likelihood x severity)
     const riskMatrixData = useMemo(() => {
@@ -186,14 +186,17 @@ export const AnalyticsDashboard: React.FC = () => {
 
     // Leading vs lagging comparison
     const leadingVsLagging = useMemo(() => [
-        { name: 'Near Misses', value: metrics.nmCount, type: 'Leading' },
-        { name: 'Inspections', value: Math.round(metrics.inspectionCompliance), type: 'Leading' },
-        { name: 'First Aid', value: metrics.facCount, type: 'Lagging' },
-        { name: 'Medical Tx', value: metrics.mtcCount, type: 'Lagging' },
-        { name: 'LTI', value: metrics.ltiCount, type: 'Lagging' },
-    ], [metrics.nmCount, metrics.inspectionCompliance, metrics.facCount, metrics.mtcCount, metrics.ltiCount]);
+        { name: 'Near Misses', value: metrics?.nmCount ?? 0, type: 'Leading' },
+        { name: 'Inspections', value: Math.round(metrics?.inspectionCompliance ?? 0), type: 'Leading' },
+        { name: 'First Aid', value: metrics?.facCount ?? 0, type: 'Lagging' },
+        { name: 'Medical Tx', value: metrics?.mtcCount ?? 0, type: 'Lagging' },
+        { name: 'LTI', value: metrics?.ltiCount ?? 0, type: 'Lagging' },
+    ], [metrics?.nmCount, metrics?.inspectionCompliance, metrics?.facCount, metrics?.mtcCount, metrics?.ltiCount]);
 
     const COLORS = ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#8b5cf6'];
+
+    // --- Guard clause: show loader while metrics are loading ---
+    if (!metrics) return <div className="p-8"><Loader2 className="animate-spin" /></div>;
 
     return (
         <div className="space-y-6">
