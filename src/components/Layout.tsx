@@ -42,6 +42,7 @@ import {
   Leaf,
   Brain
 } from 'lucide-react';
+import { SkipLink } from '../utils/accessibility';
 import { getSyncQueue, processSyncQueue } from '../services/offlineService';
 import { AIChatAssistant } from './AIChatAssistant';
 import { NotificationBell } from './NotificationBell';
@@ -276,7 +277,8 @@ export const Layout: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 overflow-hidden print:h-auto print:overflow-visible">
-      {/* Sidebar - Desktop */}
+      <SkipLink />
+      {/* Sidebar - Desktop */
       <aside className="hidden md:flex md:flex-col md:w-64 bg-brand-navy text-white shadow-2xl z-20 border-r border-slate-800 print:hidden">
         <div className="p-6 border-b border-slate-800">
           <div className="flex items-center gap-2">
@@ -399,6 +401,7 @@ export const Layout: React.FC = () => {
             <button
               onClick={() => setIsSidebarOpen(true)}
               className="md:hidden text-brand-navy dark:text-slate-300 p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              aria-label="Open navigation menu"
             >
               <Menu size={24} />
             </button>
@@ -422,7 +425,8 @@ export const Layout: React.FC = () => {
              <button 
                 onClick={toggleDarkMode}
                 className="p-2 rounded-full text-brand-grey hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-colors"
-                title="Toggle Dark Mode"
+                title={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
              >
                 {isDarkMode ? <Sun size={20} className="text-brand-orange" /> : <Moon size={20} />}
              </button>
@@ -462,7 +466,7 @@ export const Layout: React.FC = () => {
         </header>
 
         {/* Scrollable Page Content */}
-        <main className="flex-1 overflow-auto bg-slate-50 dark:bg-slate-950 p-4 md:p-8 print:p-0 print:bg-white print:overflow-visible relative scroll-smooth print:h-auto">
+        <main id="main-content" className="flex-1 overflow-auto bg-slate-50 dark:bg-slate-950 p-4 md:p-8 print:p-0 print:bg-white print:overflow-visible relative scroll-smooth print:h-auto">
           <div className="max-w-7xl mx-auto pb-20 md:pb-0 print:max-w-none print:pb-0 min-h-full">
             <Outlet />
           </div>

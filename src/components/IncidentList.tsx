@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, AlertTriangle, Printer, Plus, Trash2, Download } from 'lucide-react';
+import { Search, AlertTriangle, Printer, Plus, Trash2, Download, CheckSquare, Square, X } from 'lucide-react';
 import { getIncidents, deleteIncident } from '../services/storageService';
-import { apiExportData } from '../services/apiService';
+import { apiExportData, apiBulkDeleteIncidents, apiBulkUpdateIncidentStatus } from '../services/apiService';
 import { Incident, IncidentSeverity, IncidentCategory } from '../types';
 import { Pagination } from './Pagination';
 import toast from 'react-hot-toast';
@@ -14,6 +14,8 @@ export const IncidentList: React.FC = () => {
     const [severityFilter, setSeverityFilter] = useState('All');
     const [categoryFilter, setCategoryFilter] = useState('All');
     const [loading, setLoading] = useState(true);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [bulkAction, setBulkAction] = useState<string>('');
 
     useEffect(() => {
         const load = async () => {
@@ -52,7 +54,50 @@ export const IncidentList: React.FC = () => {
         if (!confirm(`Delete incident "${desc}"? This cannot be undone.`)) return;
         await deleteIncident(id);
         setIncidents(prev => prev.filter(i => i.id !== id));
+        setSelectedIds(prev => { const next = new Set(prev); next.delete(id); return next; });
         toast.success('Incident deleted');
+    };
+
+    const toggleSelect = (e: React.MouseEvent, id: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const selectAll = () => {
+        if (selectedIds.size === paginatedIncidents.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(paginatedIncidents.map(i => i.id)));
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (!confirm(`Delete ${selectedIds.size} incident(s)? This cannot be undone.`)) return;
+        try {
+            await apiBulkDeleteIncidents(Array.from(selectedIds));
+            setIncidents(prev => prev.filter(i => !selectedIds.has(i.id)));
+            setSelectedIds(new Set());
+            toast.success(`${selectedIds.size} incident(s) deleted`);
+        } catch (err) {
+            toast.error('Bulk delete failed');
+        }
+    };
+
+    const handleBulkStatus = async (status: string) => {
+        try {
+            await apiBulkUpdateIncidentStatus(Array.from(selectedIds), status);
+            setIncidents(prev => prev.map(i => selectedIds.has(i.id) ? { ...i, status } : i));
+            setSelectedIds(new Set());
+            toast.success(`${selectedIds.size} incident(s) updated to ${status}`);
+        } catch (err) {
+            toast.error('Bulk update failed');
+        }
     };
 
     if (loading) return (
@@ -100,6 +145,28 @@ export const IncidentList: React.FC = () => {
                         </select>
                     </div>
                 </div>
+                {selectedIds.size > 0 && (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border-b dark:border-slate-700 flex items-center gap-3">
+                        <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{selectedIds.size} selected</span>
+                        <select 
+                            value={bulkAction} 
+                            onChange={e => { if (e.target.value) handleBulkStatus(e.target.value); setBulkAction(''); }}
+                            className="text-xs border border-blue-200 rounded px-2 py-1 bg-white dark:bg-slate-800 dark:text-white dark:border-slate-600"
+                        >
+                            <option value="">Change Status...</option>
+                            <option value="Open">Open</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Resolved">Resolved</option>
+                            <option value="Closed">Closed</option>
+                        </select>
+                        <button onClick={handleBulkDelete} className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1">
+                            <Trash2 size={14} /> Delete
+                        </button>
+                        <button onClick={() => setSelectedIds(new Set())} className="text-xs text-slate-500 hover:text-slate-700 ml-auto flex items-center gap-1">
+                            <X size={14} /> Clear selection
+                        </button>
+                    </div>
+                )}
                 <div className="divide-y dark:divide-slate-800">
                     {filteredAndSortedIncidents.length === 0 ? (
                         incidents.length === 0 ? (
@@ -141,9 +208,18 @@ export const IncidentList: React.FC = () => {
                         paginatedIncidents.map(inc => (
                             <Link to={`/incidents/${inc.id}`} key={inc.id} className="block p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                 <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="font-semibold text-slate-800 dark:text-slate-100">{inc.description}</p>
-                                        <p className="text-xs text-slate-500">{inc.category && <span className="font-medium text-slate-600 dark:text-slate-400">{inc.category} • </span>}{inc.location} • {new Date(inc.date).toLocaleDateString()}</p>
+                                    <div className="flex items-start gap-3">
+                                        <button
+                                            onClick={(e) => toggleSelect(e, inc.id)}
+                                            className="mt-0.5 text-slate-400 hover:text-blue-600 transition-colors"
+                                            aria-label={selectedIds.has(inc.id) ? 'Deselect incident' : 'Select incident'}
+                                        >
+                                            {selectedIds.has(inc.id) ? <CheckSquare size={18} className="text-blue-600" /> : <Square size={18} />}
+                                        </button>
+                                        <div>
+                                            <p className="font-semibold text-slate-800 dark:text-slate-100">{inc.description}</p>
+                                            <p className="text-xs text-slate-500">{inc.category && <span className="font-medium text-slate-600 dark:text-slate-400">{inc.category} • </span>}{inc.location} • {new Date(inc.date).toLocaleDateString()}</p>
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button

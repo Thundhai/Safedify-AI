@@ -357,3 +357,37 @@ export const apiLoginWith2FA = async (userId: string, token: string) => {
   setAuthToken(data.token);
   return data;
 };
+
+// ---------- Bulk Operations API ----------
+
+export const apiBulkDeleteIncidents = (ids: string[]) =>
+  apiFetch('/incidents/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) });
+
+export const apiBulkUpdateIncidentStatus = (ids: string[], status: string) =>
+  apiFetch('/incidents/bulk-status', { method: 'POST', body: JSON.stringify({ ids, status }) });
+
+export const apiBulkDeleteActions = (ids: string[]) =>
+  apiFetch('/actions/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) });
+
+export const apiBulkCompleteActions = (ids: string[]) =>
+  apiFetch('/actions/bulk-complete', { method: 'POST', body: JSON.stringify({ ids }) });
+
+export const apiBulkDeleteObservations = (ids: string[]) =>
+  apiFetch('/observations/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) });
+
+export const apiBulkExport = (entity: string, ids: string[]) =>
+  apiFetch('/bulk-export', { method: 'POST', body: JSON.stringify({ entity, ids }) });
+
+// ---------- Notification Preferences API ----------
+
+export const apiGetNotificationPreferences = () => apiFetch('/notifications/preferences');
+
+export const apiUpdateNotificationPreferences = (prefs: {
+  email_incidents?: boolean;
+  email_permits?: boolean;
+  email_actions?: boolean;
+  email_training?: boolean;
+  email_observations?: boolean;
+  email_digest?: boolean;
+  in_app_all?: boolean;
+}) => apiFetch('/notifications/preferences', { method: 'PUT', body: JSON.stringify(prefs) });

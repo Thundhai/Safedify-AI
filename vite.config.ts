@@ -17,14 +17,25 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    // Performance optimizations
+    target: 'esnext',
+    minify: 'esbuild',
+    cssMinify: true,
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
           charts: ['recharts'],
+          icons: ['lucide-react'],
         },
       },
     },
+    // Report chunk sizes
+    chunkSizeWarningLimit: 500,
+  },
+  // Optimize dependencies
+  optimizeDeps: {
+    include: ['react', 'react-dom', 'react-router-dom', 'lucide-react'],
   },
   resolve: {
     alias: {

@@ -324,6 +324,19 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 
+  CREATE TABLE IF NOT EXISTS notification_preferences (
+    user_id TEXT PRIMARY KEY,
+    email_incidents INTEGER DEFAULT 1,
+    email_permits INTEGER DEFAULT 1,
+    email_actions INTEGER DEFAULT 1,
+    email_training INTEGER DEFAULT 1,
+    email_observations INTEGER DEFAULT 0,
+    email_digest INTEGER DEFAULT 1,
+    in_app_all INTEGER DEFAULT 1,
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
   CREATE TABLE IF NOT EXISTS environmental_readings (
     id TEXT PRIMARY KEY,
     reading_type TEXT NOT NULL,

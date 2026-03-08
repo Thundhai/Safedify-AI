@@ -2,6 +2,7 @@ import React, { Suspense, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { initOfflineSync } from './services/offlineService';
+import { AnnouncerProvider } from './utils/accessibility';
 
 // Providers & Layout (not lazy — needed immediately)
 import { AuthProvider } from './context/AuthContext';
@@ -115,6 +116,7 @@ function App() {
 
   return (
     <ErrorBoundary>
+      <AnnouncerProvider>
       <Toaster
         position="top-right"
         toastOptions={{
@@ -185,6 +187,7 @@ function App() {
           </Suspense>
         </HashRouter>
       </AuthProvider>
+      </AnnouncerProvider>
     </ErrorBoundary>
   );
 }

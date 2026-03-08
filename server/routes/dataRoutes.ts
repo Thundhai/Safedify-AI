@@ -784,4 +784,96 @@ router.get('/metrics', (req: AuthRequest, res: Response) => {
   });
 });
 
+// ============ BULK OPERATIONS ============
+
+// ---------- Bulk Delete Incidents ----------
+router.post('/incidents/bulk-delete', requirePermission('DeleteIncidents'), (req: AuthRequest, res: Response) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids array required' });
+  }
+  if (ids.length > 100) {
+    return res.status(400).json({ error: 'Maximum 100 items per bulk operation' });
+  }
+  const placeholders = ids.map(() => '?').join(',');
+  const result = db.prepare(`DELETE FROM incidents WHERE id IN (${placeholders})`).run(...ids);
+  res.json({ deleted: result.changes, message: `${result.changes} incident(s) deleted` });
+});
+
+// ---------- Bulk Update Incident Status ----------
+router.post('/incidents/bulk-status', requirePermission('EditIncidents'), (req: AuthRequest, res: Response) => {
+  const { ids, status } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids array required' });
+  }
+  if (!['Open', 'In Progress', 'Resolved', 'Closed'].includes(status)) {
+    return res.status(400).json({ error: 'Invalid status' });
+  }
+  if (ids.length > 100) {
+    return res.status(400).json({ error: 'Maximum 100 items per bulk operation' });
+  }
+  const placeholders = ids.map(() => '?').join(',');
+  const result = db.prepare(`UPDATE incidents SET status = ?, updated_at = datetime('now') WHERE id IN (${placeholders})`).run(status, ...ids);
+  res.json({ updated: result.changes, message: `${result.changes} incident(s) updated to ${status}` });
+});
+
+// ---------- Bulk Delete Actions ----------
+router.post('/actions/bulk-delete', requirePermission('DeleteActions'), (req: AuthRequest, res: Response) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids array required' });
+  }
+  if (ids.length > 100) {
+    return res.status(400).json({ error: 'Maximum 100 items per bulk operation' });
+  }
+  const placeholders = ids.map(() => '?').join(',');
+  const result = db.prepare(`DELETE FROM actions WHERE id IN (${placeholders})`).run(...ids);
+  res.json({ deleted: result.changes, message: `${result.changes} action(s) deleted` });
+});
+
+// ---------- Bulk Complete Actions ----------
+router.post('/actions/bulk-complete', requirePermission('EditActions'), (req: AuthRequest, res: Response) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids array required' });
+  }
+  if (ids.length > 100) {
+    return res.status(400).json({ error: 'Maximum 100 items per bulk operation' });
+  }
+  const placeholders = ids.map(() => '?').join(',');
+  const result = db.prepare(`UPDATE actions SET status = 'Completed', completed_date = datetime('now') WHERE id IN (${placeholders}) AND status != 'Completed'`).run(...ids);
+  res.json({ updated: result.changes, message: `${result.changes} action(s) completed` });
+});
+
+// ---------- Bulk Delete Observations ----------
+router.post('/observations/bulk-delete', requirePermission('DeleteObservations'), (req: AuthRequest, res: Response) => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids array required' });
+  }
+  if (ids.length > 100) {
+    return res.status(400).json({ error: 'Maximum 100 items per bulk operation' });
+  }
+  const placeholders = ids.map(() => '?').join(',');
+  const result = db.prepare(`DELETE FROM observations WHERE id IN (${placeholders})`).run(...ids);
+  res.json({ deleted: result.changes, message: `${result.changes} observation(s) deleted` });
+});
+
+// ---------- Bulk Export (returns IDs for client-side CSV generation) ----------
+router.post('/bulk-export', (req: AuthRequest, res: Response) => {
+  const { entity, ids } = req.body;
+  if (!['incidents', 'actions', 'observations', 'risk_assessments', 'permits'].includes(entity)) {
+    return res.status(400).json({ error: 'Invalid entity type' });
+  }
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ error: 'ids array required' });
+  }
+  if (ids.length > 500) {
+    return res.status(400).json({ error: 'Maximum 500 items per export' });
+  }
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = db.prepare(`SELECT * FROM ${entity} WHERE id IN (${placeholders})`).all(...ids);
+  res.json(rows);
+});
+
 export default router;
