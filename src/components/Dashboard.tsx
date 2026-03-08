@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle, Clock, TrendingUp, ClipboardCheck, Sparkles, BarChart2, Zap, ShieldCheck, X, ChevronRight, Calendar, ArrowUpRight, Target } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, TrendingUp, ClipboardCheck, Sparkles, BarChart2, Zap, ShieldCheck, X, ChevronRight, Calendar, ArrowUpRight, Target, Eye } from 'lucide-react';
 import { getIncidents, getActions, calculateSiteSafetyScore, getInspections, getRiskAssessments, getObservations } from '../services/storageService';
 import { IncidentSeverity, SiteSafetyScore, SubscriptionTier } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -25,6 +25,10 @@ export const Dashboard: React.FC = () => {
     closedActions: 0,
     totalActions: 0,
     daysSinceLastIncident: 0,
+    totalObservations: 0,
+    openObservations: 0,
+    closedObservations: 0,
+    latestObservation: null as { type: string; description: string; date: string; location: string; status: string } | null,
     severityBreakdown: [] as { name: string; value: number }[],
     monthlyTrends: [] as { name: string; incidents: number; observations: number }[]
   });
@@ -127,6 +131,12 @@ export const Dashboard: React.FC = () => {
         // Action closure rate
         const closedActions = actions.filter(a => a.status === 'Done').length;
 
+        // Observation stats
+        const openObs = observations.filter((o: any) => o.status === 'Open').length;
+        const closedObs = observations.filter((o: any) => o.status === 'Closed').length;
+        const sortedObs = [...observations].sort((a: any, b: any) => new Date(b.date || b.created_at).getTime() - new Date(a.date || a.created_at).getTime());
+        const latest = sortedObs.length > 0 ? sortedObs[0] as any : null;
+
         setStats({
           totalIncidents: incidents.length,
           openActions: (actions || []).filter(a => a.status !== 'Done').length,
@@ -134,6 +144,10 @@ export const Dashboard: React.FC = () => {
           totalActions: actions.length,
           daysSinceLastIncident,
           inspectionCount: inspections.length,
+          totalObservations: observations.length,
+          openObservations: openObs,
+          closedObservations: closedObs,
+          latestObservation: latest ? { type: latest.type, description: latest.description, date: latest.date || latest.created_at, location: latest.location, status: latest.status } : null,
           severityBreakdown: severityData,
           monthlyTrends: monthlyData
         });
@@ -148,6 +162,10 @@ export const Dashboard: React.FC = () => {
           closedActions: 0,
           totalActions: 0,
           daysSinceLastIncident: 0,
+          totalObservations: 0,
+          openObservations: 0,
+          closedObservations: 0,
+          latestObservation: null,
           severityBreakdown: [],
           monthlyTrends: []
         });
@@ -311,8 +329,8 @@ export const Dashboard: React.FC = () => {
             </button>
         </div>
 
-        {/* Hero Row: Safety Score + Days Incident-Free */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        {/* Hero Row: Safety Score + Days Incident-Free + Observations */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
             {/* Safety Score Hero Card */}
             <button
               onClick={() => navigate('/analytics')}
@@ -374,6 +392,59 @@ export const Dashboard: React.FC = () => {
                 </p>
                 <span className="inline-flex items-center gap-1 text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wide mt-3 group-hover:gap-2 transition-all">
                   View Incidents <ChevronRight size={14} />
+                </span>
+              </div>
+            </button>
+
+            {/* Observations Hero Card */}
+            <button
+              onClick={() => navigate('/observations')}
+              className="group relative bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border-2 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-amber-300 dark:hover:border-amber-700 transition-all text-left overflow-hidden md:col-span-2 lg:col-span-1"
+            >
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <Eye size={120} className="text-amber-600" />
+              </div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+                    <Eye className="text-amber-600 dark:text-amber-400" size={20} />
+                  </div>
+                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Observations</p>
+                </div>
+
+                {/* Stats Row */}
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-2.5 text-center">
+                    <p className="text-xl font-black text-slate-800 dark:text-white">{stats.totalObservations}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Total</p>
+                  </div>
+                  <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-2.5 text-center">
+                    <p className="text-xl font-black text-amber-600 dark:text-amber-400">{stats.openObservations}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Open</p>
+                  </div>
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-2.5 text-center">
+                    <p className="text-xl font-black text-green-600 dark:text-green-400">{stats.closedObservations}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Closed</p>
+                  </div>
+                </div>
+
+                {/* Latest Observation */}
+                {stats.latestObservation ? (
+                  <div className="bg-slate-50 dark:bg-slate-700/40 rounded-lg p-3 border border-slate-100 dark:border-slate-600">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`inline-block w-2 h-2 rounded-full ${stats.latestObservation.status === 'Open' ? 'bg-amber-400' : 'bg-green-400'}`} />
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Latest</span>
+                      <span className="text-[10px] text-slate-400 ml-auto">{new Date(stats.latestObservation.date).toLocaleDateString()}</span>
+                    </div>
+                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{stats.latestObservation.type}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{stats.latestObservation.description}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400 italic">No observations recorded yet</p>
+                )}
+
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wide mt-3 group-hover:gap-2 transition-all">
+                  View All Observations <ChevronRight size={14} />
                 </span>
               </div>
             </button>
