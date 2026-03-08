@@ -1,5 +1,5 @@
 
-import React, { createContext, useState, useContext, useEffect, useRef, ReactNode } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef, useMemo, useCallback, ReactNode } from 'react';
 import { AuthUser, UserRole, Permission, UserRoles } from '../types';
 import { getCurrentUser, login as authLogin, logout as authLogout, register as authRegister, verifySession, completeLoginWith2FA, updateProfile as authUpdateProfile } from '../services/authService';
 import { getRoles } from '../services/storageService';
@@ -125,8 +125,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return userRole.permissions.includes(permission);
   };
 
+  const contextValue = useMemo(() => ({
+    user,
+    isAuthenticated: !!user,
+    login,
+    loginWith2FA,
+    register,
+    logout,
+    loading,
+    checkPermission,
+    updateProfile,
+  }), [user, loading]);
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, loginWith2FA, register, logout, loading, checkPermission, updateProfile }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

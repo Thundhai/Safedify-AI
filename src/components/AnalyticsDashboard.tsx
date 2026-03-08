@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { 
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -42,21 +42,21 @@ export const AnalyticsDashboard: React.FC = () => {
         remarks: ''
     });
 
+    const refreshData = useCallback(async () => {
+        const calculated = await calculateHSEMetrics();
+        setMetrics(calculated);
+        setIncidents(await getIncidents());
+    }, []);
+
     useEffect(() => {
         refreshData();
-    }, []);
+    }, [refreshData]);
 
     // Derived: Man Hours = Manpower × Hours × Days (useMemo avoids render loops)
     const calculatedManHours = useMemo(() => {
         const workers = Number(statsEntry.activeWorkers) || 0;
         return workers * hoursPerDay * daysWorked;
     }, [statsEntry.activeWorkers, hoursPerDay, daysWorked]);
-
-    const refreshData = async () => {
-        const calculated = await calculateHSEMetrics();
-        setMetrics(calculated);
-        setIncidents(await getIncidents());
-    };
 
     const handleSaveStats = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -117,25 +117,25 @@ export const AnalyticsDashboard: React.FC = () => {
     if (!metrics) return <div className="p-8"><Loader2 className="animate-spin" /></div>;
 
     // --- Incident Trend Data (Based on Current Data Only) ---
-    const incidentTrendData = [
+    const incidentTrendData = useMemo(() => [
         { month: 'Current Period', count: incidents.length, lti: metrics.ltiCount },
-    ];
+    ], [incidents.length, metrics.ltiCount]);
 
-    const typeData = [
+    const typeData = useMemo(() => [
         { name: 'Near Miss', value: metrics.nmCount },
         { name: 'First Aid', value: metrics.facCount },
         { name: 'Medical Tx', value: metrics.mtcCount },
         { name: 'LTI', value: metrics.ltiCount },
-    ].filter(d => d.value > 0);
+    ].filter(d => d.value > 0), [metrics.nmCount, metrics.facCount, metrics.mtcCount, metrics.ltiCount]);
 
-    const locationData = incidents.reduce((acc, curr) => {
-        // Simple extraction of Zone/Area from location string
-        const loc = curr.location.split('-')[0].trim() || 'Unknown';
-        acc[loc] = (acc[loc] || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
-
-    const locationChartData = Object.keys(locationData).map(k => ({ name: k, count: locationData[k] }));
+    const locationChartData = useMemo(() => {
+        const locationMap = incidents.reduce((acc, curr) => {
+            const loc = curr.location.split('-')[0].trim() || 'Unknown';
+            acc[loc] = (acc[loc] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+        return Object.keys(locationMap).map(k => ({ name: k, count: locationMap[k] }));
+    }, [incidents]);
 
     // Monthly trend data grouped by month
     const monthlyTrendData = useMemo(() => {
@@ -157,9 +157,9 @@ export const AnalyticsDashboard: React.FC = () => {
     }, [incidents]);
 
     // Severity rate
-    const severityRate = metrics.totalManHours > 0
+    const severityRate = useMemo(() => metrics.totalManHours > 0
         ? ((metrics.ltiCount * 200000) / metrics.totalManHours)
-        : 0;
+        : 0, [metrics.ltiCount, metrics.totalManHours]);
 
     // Risk matrix data: 5x5 grid (likelihood x severity)
     const riskMatrixData = useMemo(() => {
@@ -185,13 +185,13 @@ export const AnalyticsDashboard: React.FC = () => {
     }, [incidents]);
 
     // Leading vs lagging comparison
-    const leadingVsLagging = [
+    const leadingVsLagging = useMemo(() => [
         { name: 'Near Misses', value: metrics.nmCount, type: 'Leading' },
         { name: 'Inspections', value: Math.round(metrics.inspectionCompliance), type: 'Leading' },
         { name: 'First Aid', value: metrics.facCount, type: 'Lagging' },
         { name: 'Medical Tx', value: metrics.mtcCount, type: 'Lagging' },
         { name: 'LTI', value: metrics.ltiCount, type: 'Lagging' },
-    ];
+    ], [metrics.nmCount, metrics.inspectionCompliance, metrics.facCount, metrics.mtcCount, metrics.ltiCount]);
 
     const COLORS = ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#8b5cf6'];
 
