@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, CheckCircle, Clock, TrendingUp, ClipboardCheck, Sparkles, BarChart2, Zap, ShieldCheck, X, ChevronRight, Calendar, ArrowUpRight, Target, Eye, TrendingDown, Activity } from 'lucide-react';
-import { getIncidents, getActions, calculateSiteSafetyScore, getInspections, getRiskAssessments, getObservations, calculateHSEMetrics } from '../services/storageService';
+import { AlertTriangle, CheckCircle, Clock, TrendingUp, ClipboardCheck, Sparkles, BarChart2, Zap, ShieldCheck, X, ChevronRight, Calendar, ArrowUpRight, Target, Eye, TrendingDown, Activity, GraduationCap } from 'lucide-react';
+import { getIncidents, getActions, calculateSiteSafetyScore, getInspections, getRiskAssessments, getObservations, calculateHSEMetrics, getTrainingModules, getTrainingRecords } from '../services/storageService';
 import { IncidentSeverity, SiteSafetyScore, SubscriptionTier, HSEMetrics } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -39,6 +39,7 @@ export const Dashboard: React.FC = () => {
   const [hasData, setHasData] = useState(false);
   const [rawIncidents, setRawIncidents] = useState<any[]>([]);
   const [rawActions, setRawActions] = useState<any[]>([]);
+  const [trainingStats, setTrainingStats] = useState({ totalModules: 0, totalRecords: 0, validRecords: 0, expiredRecords: 0, complianceRate: 0 });
 
   // Onboarding State
   const [showOnboarding, setShowOnboarding] = useState(true);
@@ -89,6 +90,16 @@ export const Dashboard: React.FC = () => {
 
         // Calculate Site Score
         setSiteScore(await calculateSiteSafetyScore());
+
+        // Calculate Training Stats
+        try {
+          const trainingModules = (await getTrainingModules()) || [];
+          const trainingRecords = (await getTrainingRecords()) || [];
+          const validRecs = trainingRecords.filter(r => r.status === 'Valid').length;
+          const expiredRecs = trainingRecords.filter(r => r.status === 'Expired').length;
+          const compRate = trainingRecords.length > 0 ? Math.round((validRecs / trainingRecords.length) * 100) : 0;
+          setTrainingStats({ totalModules: trainingModules.length, totalRecords: trainingRecords.length, validRecords: validRecs, expiredRecords: expiredRecs, complianceRate: compRate });
+        } catch { /* training data optional */ }
 
         // Calculate HSE Metrics (TRIR, LTIFR etc.)
         setHseMetrics(await calculateHSEMetrics());
@@ -412,7 +423,7 @@ export const Dashboard: React.FC = () => {
               </div>
             </button>
 
-            {/* Days Incident-Free Hero Card */}
+            {/* Incident Overview Hero Card — Days Incident-Free + Total Incidents + Severity */}
             <button
               onClick={() => navigate('/incidents')}
               className="group relative bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border-2 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-green-300 dark:hover:border-green-700 transition-all text-left overflow-hidden"
@@ -425,17 +436,34 @@ export const Dashboard: React.FC = () => {
                   <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
                     <Calendar className="text-green-600 dark:text-green-400" size={20} />
                   </div>
-                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Days Without Incident</p>
+                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Incident Overview</p>
                 </div>
                 <div className="flex items-end gap-2 mt-3">
                   <span className={`text-5xl font-black leading-none ${stats.daysSinceLastIncident >= 30 ? 'text-green-500' : stats.daysSinceLastIncident >= 7 ? 'text-yellow-500' : 'text-red-500'}`}>
                     {stats.totalIncidents > 0 ? stats.daysSinceLastIncident : '∞'}
                   </span>
-                  <span className="text-lg font-bold text-slate-400 mb-1">days</span>
+                  <span className="text-lg font-bold text-slate-400 mb-1">days without incident</span>
                 </div>
-                <p className="text-slate-500 dark:text-slate-400 text-sm mt-3">
+                <p className="text-slate-500 dark:text-slate-400 text-xs mt-2">
                   {stats.daysSinceLastIncident >= 30 ? 'Outstanding safety streak! Keep it up.' : stats.daysSinceLastIncident >= 7 ? 'Good progress — stay vigilant.' : stats.totalIncidents === 0 ? 'No incidents recorded yet.' : 'Recent incident detected — review now.'}
                 </p>
+
+                {/* Merged incident stats */}
+                <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+                  <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-2 text-center">
+                    <p className="text-xl font-black text-red-600 dark:text-red-400">{stats.totalIncidents}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Total</p>
+                  </div>
+                  <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-2 text-center">
+                    <p className="text-xl font-black text-amber-600 dark:text-amber-400">{stats.severityBreakdown.filter(s => s.name === 'High' || s.name === 'Critical').reduce((sum, s) => sum + s.value, 0)}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">High/Crit</p>
+                  </div>
+                  <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-2 text-center">
+                    <p className="text-xl font-black text-green-600 dark:text-green-400">{stats.severityBreakdown.filter(s => s.name === 'Low' || s.name === 'Medium').reduce((sum, s) => sum + s.value, 0)}</p>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase">Low/Med</p>
+                  </div>
+                </div>
+
                 <span className="inline-flex items-center gap-1 text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wide mt-3 group-hover:gap-2 transition-all">
                   View Incidents <ChevronRight size={14} />
                 </span>
@@ -498,19 +526,27 @@ export const Dashboard: React.FC = () => {
 
         {/* Metric Cards Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Incidents */}
+            {/* Training */}
             <button
-              onClick={() => navigate('/incidents')}
-              className="group bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-red-300 dark:hover:border-red-700 transition-all text-left"
+              onClick={() => navigate('/training')}
+              className="group bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700 transition-all text-left"
             >
               <div className="flex items-center justify-between mb-3">
-                <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                  <AlertTriangle className="text-red-500" size={18} />
+                <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                  <GraduationCap className="text-purple-500" size={18} />
                 </div>
-                <ArrowUpRight size={14} className="text-slate-300 group-hover:text-red-400 transition-colors" />
+                <ArrowUpRight size={14} className="text-slate-300 group-hover:text-purple-400 transition-colors" />
               </div>
-              <p className="text-2xl font-black text-slate-800 dark:text-white">{stats.totalIncidents}</p>
-              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">Total Incidents</p>
+              <p className="text-2xl font-black text-slate-800 dark:text-white">{trainingStats.totalModules}</p>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">Training Modules</p>
+              {trainingStats.totalRecords > 0 && (
+                <>
+                  <div className="mt-2 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                    <div className="h-full bg-purple-500 rounded-full transition-all duration-700" style={{ width: `${trainingStats.complianceRate}%` }} />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">{trainingStats.complianceRate}% compliant</p>
+                </>
+              )}
             </button>
 
             {/* Open Actions */}
