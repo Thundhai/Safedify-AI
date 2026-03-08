@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   ChevronRight, 
   ChevronLeft, 
@@ -11,7 +11,11 @@ import {
   ClipboardCheck,
   BookOpen,
   Settings,
-  Sparkles
+  Sparkles,
+  BarChart3,
+  FileText,
+  Activity,
+  Wifi
 } from 'lucide-react';
 
 interface OnboardingStep {
@@ -41,22 +45,22 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
     {
       id: 'welcome',
       title: 'Welcome to Safedify AI! 🎉',
-      description: 'Your intelligent Health, Safety & Environment (HSE) management platform. Let\'s take a quick tour to help you get started.',
+      description: 'Your intelligent Health, Safety & Environment platform. This quick tour covers the essential features — you can revisit it anytime from your profile.',
       icon: <Sparkles className="w-8 h-8 text-blue-500" />
     },
     {
       id: 'dashboard',
-      title: 'Your Safety Dashboard',
-      description: 'Monitor your safety metrics, track incidents, and get AI-powered insights about your workplace safety performance in real-time.',
+      title: 'Safety Dashboard',
+      description: 'Your command centre — see site safety score, open actions, recent incidents, and a safety calendar all in one place. The dashboard updates in real-time as your team enters data.',
       icon: <Shield className="w-8 h-8 text-green-500" />
     },
     {
       id: 'incidents',
-      title: 'Incident Reporting',
-      description: 'Quickly report safety incidents, near misses, and observations. Our AI helps classify incidents and suggests corrective actions.',
+      title: 'Incidents & Observations',
+      description: 'Report incidents, near misses, and behavioural observations. Attach photos, tag root causes, and track corrective actions through to closure. AI auto-suggests categories and recommendations.',
       icon: <AlertTriangle className="w-8 h-8 text-yellow-500" />,
       action: {
-        text: 'Report Your First Incident',
+        text: 'Report an Incident',
         onClick: () => {
           window.location.hash = '/incidents/new';
           onComplete();
@@ -64,38 +68,51 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
       }
     },
     {
-      id: 'inspections',
-      title: 'Safety Inspections',
-      description: 'Create and manage safety inspections with customizable checklists. Track compliance and identify trends.',
-      icon: <ClipboardCheck className="w-8 h-8 text-purple-500" />,
+      id: 'analytics',
+      title: 'Analytics & KPIs',
+      description: 'Track TRIR, LTIFR, severity rate, and action closure rate. View monthly trends, a 5×5 risk matrix, leading vs lagging indicators, and generate AI executive reports. Export dashboards as PDF.',
+      icon: <BarChart3 className="w-8 h-8 text-purple-500" />,
       action: {
-        text: 'Start First Inspection',
+        text: 'Open Analytics',
         onClick: () => {
-          window.location.hash = '/inspections/new';
+          window.location.hash = '/analytics';
           onComplete();
         }
       }
     },
     {
-      id: 'training',
-      title: 'Training Management',
-      description: 'Track worker training, manage certifications, and ensure compliance with safety requirements.',
-      icon: <BookOpen className="w-8 h-8 text-indigo-500" />,
+      id: 'inspections',
+      title: 'Inspections & Risk Assessments',
+      description: 'Run inspections using built-in templates (Workplace, Fire, PPE, Electrical). Create risk assessments with hazard identification, control measures, and residual risk scoring.',
+      icon: <ClipboardCheck className="w-8 h-8 text-indigo-500" />,
       action: {
-        text: 'Explore Training',
+        text: 'Start an Inspection',
         onClick: () => {
-          window.location.hash = '/training';
+          window.location.hash = '/inspections';
+          onComplete();
+        }
+      }
+    },
+    {
+      id: 'permits',
+      title: 'Permits & Documents',
+      description: 'Issue permits-to-work (Hot Work, Confined Space, Electrical, etc.), upload and manage safety documents, and maintain a complete audit trail. Export data as CSV or JSON anytime.',
+      icon: <FileText className="w-8 h-8 text-orange-500" />,
+      action: {
+        text: 'View Permits',
+        onClick: () => {
+          window.location.hash = '/permits';
           onComplete();
         }
       }
     },
     {
       id: 'team',
-      title: 'Manage Your Team',
-      description: 'Add team members, assign roles, and track their safety performance and training progress.',
+      title: 'Team, Training & PPE',
+      description: 'Register workers, manage contractors, track training certifications, and assign PPE. Use role-based access (Admin, Supervisor, Worker) to control who sees what.',
       icon: <Users className="w-8 h-8 text-pink-500" />,
       action: {
-        text: 'Add Team Members',
+        text: 'Manage Workers',
         onClick: () => {
           window.location.hash = '/workers';
           onComplete();
@@ -103,12 +120,31 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
       }
     },
     {
+      id: 'actions',
+      title: 'Actions & Emergency',
+      description: 'Track corrective and preventive actions with due dates and status. Access the Emergency Response dashboard for critical situation management and environmental logging.',
+      icon: <Activity className="w-8 h-8 text-red-500" />,
+      action: {
+        text: 'View Actions',
+        onClick: () => {
+          window.location.hash = '/actions';
+          onComplete();
+        }
+      }
+    },
+    {
+      id: 'offline',
+      title: 'Offline & Multi-language',
+      description: 'Safedify works offline as an installable PWA — data syncs automatically when you reconnect. Switch between English, Spanish, and French from your profile. Dark mode is also available.',
+      icon: <Wifi className="w-8 h-8 text-teal-500" />
+    },
+    {
       id: 'settings',
-      title: 'Customize Your Workspace',
-      description: 'Configure your organization settings, notification preferences, and integrate with your existing systems.',
+      title: 'Profile & Settings',
+      description: 'Update your name, change your password, set notification preferences, and manage your subscription tier. Admins can configure roles, backups, and multi-site settings.',
       icon: <Settings className="w-8 h-8 text-gray-500" />,
       action: {
-        text: 'Open Settings',
+        text: 'Open Profile',
         onClick: () => {
           window.location.hash = '/profile';
           onComplete();
@@ -255,37 +291,51 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
 export const QuickStartCards: React.FC = () => {
   const quickActions = [
     {
-      title: 'Report First Incident',
-      description: 'Start by reporting a safety incident or near miss',
+      title: 'Report an Incident',
+      description: 'Log a safety incident, near miss, or observation',
       icon: <AlertTriangle className="w-6 h-6 text-yellow-500" />,
       href: '/incidents/new',
       color: 'from-yellow-400 to-orange-500'
     },
     {
-      title: 'Create Inspection',
-      description: 'Set up your first safety inspection checklist',
+      title: 'View Analytics',
+      description: 'Check your TRIR, LTIFR, and safety trends',
+      icon: <BarChart3 className="w-6 h-6 text-purple-500" />,
+      href: '/analytics',
+      color: 'from-purple-400 to-blue-500'
+    },
+    {
+      title: 'Run an Inspection',
+      description: 'Complete a site inspection using built-in templates',
       icon: <ClipboardCheck className="w-6 h-6 text-green-500" />,
-      href: '/inspections/new',
-      color: 'from-green-400 to-blue-500'
+      href: '/inspections',
+      color: 'from-green-400 to-teal-500'
     },
     {
-      title: 'Add Team Members',
-      description: 'Invite your team to join your safety program',
-      icon: <Users className="w-6 h-6 text-purple-500" />,
+      title: 'Manage Workers',
+      description: 'Add team members and assign roles and PPE',
+      icon: <Users className="w-6 h-6 text-pink-500" />,
       href: '/workers',
-      color: 'from-purple-400 to-pink-500'
+      color: 'from-pink-400 to-rose-500'
     },
     {
-      title: 'Setup Training',
-      description: 'Configure training modules and requirements',
-      icon: <BookOpen className="w-6 h-6 text-indigo-500" />,
-      href: '/training',
-      color: 'from-indigo-400 to-purple-500'
+      title: 'Risk Assessment',
+      description: 'Identify hazards and evaluate risk controls',
+      icon: <Shield className="w-6 h-6 text-blue-500" />,
+      href: '/risk-assessments',
+      color: 'from-blue-400 to-indigo-500'
+    },
+    {
+      title: 'Issue a Permit',
+      description: 'Create a permit-to-work for high-risk tasks',
+      icon: <FileText className="w-6 h-6 text-orange-500" />,
+      href: '/permits',
+      color: 'from-orange-400 to-red-500'
     }
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
       {quickActions.map((action, index) => (
         <a
           key={index}

@@ -7,7 +7,11 @@ import {
   Bell,
   CheckCircle,
   ArrowRight,
-  Play
+  Play,
+  FileText,
+  AlertTriangle,
+  Wifi,
+  Globe
 } from 'lucide-react';
 import { OnboardingTour, QuickStartCards } from './OnboardingTour';
 
@@ -28,23 +32,33 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   const features = [
     {
       icon: <Shield className="w-8 h-8 text-green-500" />,
-      title: 'AI-Powered Safety Analysis',
-      description: 'Get intelligent insights and recommendations for your safety data'
-    },
-    {
-      icon: <Users className="w-8 h-8 text-blue-500" />,
-      title: 'Team Collaboration',
-      description: 'Work together with your team on safety initiatives and compliance'
+      title: 'AI-Powered Safety',
+      description: 'AI chat assistant, executive reports, and smart auto-complete for faster workflows'
     },
     {
       icon: <BarChart className="w-8 h-8 text-purple-500" />,
-      title: 'Real-time Analytics',
-      description: 'Track safety metrics and identify trends with powerful dashboards'
+      title: 'Analytics & KPIs',
+      description: 'TRIR, LTIFR, risk matrix, trend charts, and exportable PDF reports'
     },
     {
-      icon: <Bell className="w-8 h-8 text-yellow-500" />,
-      title: 'Smart Notifications',
-      description: 'Stay informed about incidents, due dates, and compliance requirements'
+      icon: <AlertTriangle className="w-8 h-8 text-yellow-500" />,
+      title: 'Incidents & Risk',
+      description: 'Report incidents, run risk assessments, log observations, and track corrective actions'
+    },
+    {
+      icon: <FileText className="w-8 h-8 text-blue-500" />,
+      title: 'Permits & Documents',
+      description: 'Manage permits-to-work, upload documents, and maintain full audit trails'
+    },
+    {
+      icon: <Users className="w-8 h-8 text-pink-500" />,
+      title: 'Team & Training',
+      description: 'Manage workers, contractors, certifications, and PPE assignments'
+    },
+    {
+      icon: <Globe className="w-8 h-8 text-indigo-500" />,
+      title: 'Multi-site & Offline',
+      description: 'Works offline as a PWA — data syncs automatically when back online'
     }
   ];
 
@@ -52,7 +66,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     {
       id: 'profile',
       title: 'Complete Your Profile',
-      description: 'Add your organization details and contact information',
+      description: 'Set your name, role, and notification preferences',
       completed: completedSteps.includes('profile'),
       action: () => {
         window.location.hash = '/profile';
@@ -61,8 +75,8 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     },
     {
       id: 'team',
-      title: 'Invite Team Members',
-      description: 'Add your colleagues to collaborate on safety management',
+      title: 'Add Team Members',
+      description: 'Register workers and assign roles and PPE',
       completed: completedSteps.includes('team'),
       action: () => {
         window.location.hash = '/workers';
@@ -72,7 +86,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     {
       id: 'first-incident',
       title: 'Report Your First Incident',
-      description: 'Learn how incident reporting works with a test case',
+      description: 'Log an incident or near miss to see the workflow',
       completed: completedSteps.includes('first-incident'),
       action: () => {
         window.location.hash = '/incidents/new';
@@ -81,12 +95,32 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
     },
     {
       id: 'inspection',
-      title: 'Create an Inspection',
-      description: 'Set up your first safety inspection checklist',
+      title: 'Run a Safety Inspection',
+      description: 'Use a template checklist to complete your first inspection',
       completed: completedSteps.includes('inspection'),
       action: () => {
-        window.location.hash = '/inspections/new';
+        window.location.hash = '/inspections';
         markStepCompleted('inspection');
+      }
+    },
+    {
+      id: 'analytics',
+      title: 'Review Analytics & KPIs',
+      description: 'Check your TRIR, LTIFR, risk matrix, and trend data',
+      completed: completedSteps.includes('analytics'),
+      action: () => {
+        window.location.hash = '/analytics';
+        markStepCompleted('analytics');
+      }
+    },
+    {
+      id: 'risk',
+      title: 'Create a Risk Assessment',
+      description: 'Identify hazards and evaluate controls for a task',
+      completed: completedSteps.includes('risk'),
+      action: () => {
+        window.location.hash = '/risk-assessments';
+        markStepCompleted('risk');
       }
     }
   ];
@@ -170,7 +204,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
             What You Can Do with Safedify AI
           </h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, index) => (
               <div
                 key={index}
