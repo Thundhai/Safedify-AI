@@ -21,6 +21,101 @@
   }
 }
 
+/* Dark mode utility classes for common patterns */
+@layer components {
+  /* Cards and containers */
+  .dark .bg-white:not(.dark\:bg-*) {
+    background-color: #0f172a;   /* slate-900 */
+  }
+  .dark .bg-slate-50:not(.dark\:bg-*) {
+    background-color: #020617;   /* slate-950 */
+  }
+  .dark .border-slate-200:not(.dark\:border-*) {
+    border-color: #334155;       /* slate-700 */
+  }
+  .dark .border-slate-300:not(.dark\:border-*) {
+    border-color: #475569;       /* slate-600 */
+  }
+  
+  /* Text colors */
+  .dark .text-slate-900:not(.dark\:text-*),
+  .dark .text-slate-800:not(.dark\:text-*) {
+    color: #f1f5f9;              /* slate-100 */
+  }
+  .dark .text-slate-700:not(.dark\:text-*) {
+    color: #e2e8f0;              /* slate-200 */
+  }
+  .dark .text-slate-600:not(.dark\:text-*) {
+    color: #cbd5e1;              /* slate-300 */
+  }
+  .dark .text-slate-500:not(.dark\:text-*) {
+    color: #94a3b8;              /* slate-400 */
+  }
+  .dark .text-gray-900:not(.dark\:text-*),
+  .dark .text-gray-800:not(.dark\:text-*) {
+    color: #f1f5f9;
+  }
+  .dark .text-gray-700:not(.dark\:text-*),
+  .dark .text-gray-600:not(.dark\:text-*) {
+    color: #cbd5e1;
+  }
+  
+  /* Hover states */
+  .dark .hover\:bg-slate-50:hover:not(.dark\:hover\:bg-*) {
+    background-color: #1e293b;   /* slate-800 */
+  }
+  .dark .hover\:bg-slate-100:hover:not(.dark\:hover\:bg-*) {
+    background-color: #1e293b;   /* slate-800 */
+  }
+  
+  /* Shadows - softer in dark mode */
+  .dark .shadow-sm,
+  .dark .shadow {
+    --tw-shadow-color: rgba(0, 0, 0, 0.5);
+  }
+  
+  /* Tables */
+  .dark th {
+    background-color: #1e293b;
+    color: #e2e8f0;
+    border-color: #334155;
+  }
+  .dark td {
+    border-color: #334155;
+  }
+  .dark tbody tr:hover {
+    background-color: #1e293b;
+  }
+}
+
+/* Mobile-first responsiveness */
+@layer utilities {
+  /* Touch-friendly tap targets */
+  @media (max-width: 640px) {
+    button:not(.btn-sm),
+    .touch-target {
+      min-height: 44px;
+      min-width: 44px;
+    }
+    /* Better text readability on mobile */
+    body {
+      -webkit-text-size-adjust: 100%;
+    }
+    /* Prevent horizontal overflow */
+    html, body {
+      overflow-x: hidden;
+    }
+  }
+  
+  /* Safe area for notch/home indicator */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+}
+
 /* Custom scrollbar for cleaner look */
 ::-webkit-scrollbar {
   width: 8px;

@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, AlertTriangle, Printer, Plus, Trash2 } from 'lucide-react';
+import { Search, AlertTriangle, Printer, Plus, Trash2, Download } from 'lucide-react';
 import { getIncidents, deleteIncident } from '../services/storageService';
+import { apiExportData } from '../services/apiService';
 import { Incident, IncidentSeverity, IncidentCategory } from '../types';
 import { Pagination } from './Pagination';
 import toast from 'react-hot-toast';
@@ -65,6 +66,12 @@ export const IncidentList: React.FC = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
                 <h2 className="text-xl font-bold text-slate-800 dark:text-white">Incident Registry</h2>
                 <div className="flex gap-2">
+                    <button 
+                        onClick={() => apiExportData('incidents').then(() => toast.success('Export downloaded')).catch(() => toast.error('Export failed'))}
+                        className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 flex items-center gap-2"
+                    >
+                        <Download size={18} /> Export CSV
+                    </button>
                     <button onClick={() => window.print()} className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 flex items-center gap-2">
                         <Printer size={18} /> Print
                     </button>

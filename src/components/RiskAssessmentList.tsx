@@ -3,9 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getRiskAssessments, deleteRiskAssessment } from '../services/storageService';
 import { RiskAssessment } from '../types';
-import { ShieldAlert, Plus, Calendar, FileText, Search, Filter, Printer, Trash2 } from 'lucide-react';
+import { ShieldAlert, Plus, Calendar, FileText, Search, Filter, Printer, Trash2, Download } from 'lucide-react';
 import { Pagination } from './Pagination';
 import toast from 'react-hot-toast';
+import { apiExportData } from '../services/apiService';
 
 export const RiskAssessmentList: React.FC = () => {
     const [assessments, setAssessments] = useState<RiskAssessment[]>([]);
@@ -63,6 +64,12 @@ export const RiskAssessmentList: React.FC = () => {
                     <p className="text-slate-500">Manage JHA, HIRA, and Task Risk Assessments.</p>
                 </div>
                 <div className="flex gap-2">
+                    <button 
+                        onClick={() => apiExportData('risk-assessments').then(() => toast.success('Export downloaded')).catch(() => toast.error('Export failed'))}
+                        className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm flex items-center justify-center gap-2"
+                    >
+                        <Download size={18} /> Export CSV
+                    </button>
                     <button 
                         onClick={() => window.print()}
                         className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm flex items-center justify-center gap-2"

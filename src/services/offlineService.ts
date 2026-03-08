@@ -32,6 +32,48 @@ export interface SyncTask {
 const OFFLINE_QUEUE_KEY = 'hse_offline_queue';
 export const SYNC_QUEUE_KEY = 'hse_sync_queue';
 
+// ─── Service Worker Integration ──────────────────────────────
+
+/**
+ * Initialize service worker message listener for background sync
+ */
+export const initOfflineSync = () => {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data?.type === 'SYNC_REQUESTED') {
+        console.log('[Offline] Received sync request from Service Worker');
+        processSyncQueue().then((count) => {
+          if (count > 0) {
+            console.log(`[Offline] Synced ${count} items via background sync`);
+          }
+        });
+      }
+    });
+  }
+
+  // Also sync when coming back online
+  window.addEventListener('online', () => {
+    console.log('[Offline] Network restored, syncing...');
+    requestBackgroundSync();
+    processSyncQueue();
+  });
+};
+
+/**
+ * Request a background sync if supported
+ */
+export const requestBackgroundSync = async () => {
+  if ('serviceWorker' in navigator && 'SyncManager' in window) {
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      await (reg as any).sync.register('safedify-sync');
+      console.log('[Offline] Background sync registered');
+    } catch (err) {
+      console.warn('[Offline] Background sync not available:', err);
+    }
+  }
+};
+
 // ─── Offline Request Queue (machine-readable) ───────────────
 
 export const getOfflineQueue = (): QueuedRequest[] => {

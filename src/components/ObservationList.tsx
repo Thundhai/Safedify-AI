@@ -1,9 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, Eye, CheckCircle, Sparkles, Loader2, Camera, Trash2, Edit2, X, Save, MapPin, Tag, FileText, Printer, Filter } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { Plus, Eye, CheckCircle, Sparkles, Loader2, Camera, Trash2, Edit2, X, Save, MapPin, Tag, FileText, Printer, Filter, Download } from 'lucide-react';
 import { getObservations, deleteObservation, updateObservation } from '../services/storageService';
 import { analyzeObservationTrendsAI } from '../services/geminiService';
+import { apiExportData } from '../services/apiService';
 import { Observation, ObservationType } from '../types';
 import { Pagination } from './Pagination';
 
@@ -132,6 +134,12 @@ export const ObservationList: React.FC = () => {
                     <p className="text-slate-500">Track unsafe acts, conditions, and safe behaviors.</p>
                 </div>
                 <div className="flex gap-2">
+                    <button 
+                        onClick={() => apiExportData('observations').then(() => toast.success('Export downloaded')).catch(() => toast.error('Export failed'))}
+                        className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm flex items-center justify-center gap-2"
+                    >
+                        <Download size={18} /> Export CSV
+                    </button>
                     <button 
                         onClick={() => window.print()}
                         className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm flex items-center justify-center gap-2"

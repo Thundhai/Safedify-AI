@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Plus, X, Calendar, User, Link as LinkIcon, Trash2 } from 'lucide-react';
+import { Plus, X, Calendar, User, Link as LinkIcon, Trash2, Download } from 'lucide-react';
 import { getActions, getIncidents, saveAction, deleteAction } from '../services/storageService';
 import { Incident, ActionItem } from '../types';
 import { Pagination } from './Pagination';
 import toast from 'react-hot-toast';
+import { apiExportData } from '../services/apiService';
 
 export const ActionList: React.FC = () => {
     const [actions, setActions] = useState<ActionItem[]>([]);
@@ -74,12 +75,20 @@ export const ActionList: React.FC = () => {
         <div className="space-y-6">
             <div className="flex justify-between items-center">
                 <h2 className="text-xl font-bold text-slate-800 dark:text-white">Action Items</h2>
-                <button 
-                    onClick={() => setShowModal(true)}
-                    className="bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 shadow-sm flex items-center gap-2"
-                >
-                    <Plus size={18} /> New Action
-                </button>
+                <div className="flex gap-2">
+                    <button 
+                        onClick={() => apiExportData('actions').then(() => toast.success('Export downloaded')).catch(() => toast.error('Export failed'))}
+                        className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 flex items-center gap-2"
+                    >
+                        <Download size={18} /> Export CSV
+                    </button>
+                    <button 
+                        onClick={() => setShowModal(true)}
+                        className="bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 shadow-sm flex items-center gap-2"
+                    >
+                        <Plus size={18} /> New Action
+                    </button>
+                </div>
             </div>
 
             <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">

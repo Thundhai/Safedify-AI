@@ -1,6 +1,7 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { initOfflineSync } from './services/offlineService';
 
 // Providers & Layout (not lazy — needed immediately)
 import { AuthProvider } from './context/AuthContext';
@@ -107,6 +108,11 @@ class ErrorBoundary extends React.Component<
 
 /* --- MAIN APP --- */
 function App() {
+  // Initialize offline sync listeners on mount
+  useEffect(() => {
+    initOfflineSync();
+  }, []);
+
   return (
     <ErrorBoundary>
       <Toaster

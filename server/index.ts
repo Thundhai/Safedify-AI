@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import { sanitizeBody } from './middleware/sanitize.js';
 
 // Database init (creates tables on import)
 import './db.js';
@@ -105,6 +106,9 @@ app.use(cors({
 
 // ---------- Body Parsing ----------
 app.use(express.json({ limit: '10mb' }));
+
+// ---------- Input Sanitization ----------
+app.use(sanitizeBody({ stripTags: true, maxLength: 50000 }));
 
 // ---------- Serve Frontend (Production) ----------
 if (isProduction) {

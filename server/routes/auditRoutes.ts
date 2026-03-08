@@ -42,7 +42,8 @@ export type AuditAction =
   | 'create' | 'update' | 'delete'
   | 'export' | 'upload'
   | 'role_change' | 'permission_change'
-  | '2fa_enabled' | '2fa_disabled' | '2fa_failed';
+  | '2fa_enabled' | '2fa_disabled' | '2fa_failed'
+  | 'profile_update' | 'password_change';
 
 export interface AuditEntry {
   action: AuditAction;
