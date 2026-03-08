@@ -2,12 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  ArrowLeft, Save, Sparkles, Loader2, Plus, Trash2, Printer, AlertTriangle, X, Info, CheckCircle2, Lock
+  ArrowLeft, Save, Sparkles, Loader2, Plus, Trash2, Printer, AlertTriangle, X, Info, CheckCircle2
 } from 'lucide-react';
 import { getRiskAssessmentById, saveRiskAssessment } from '../services/storageService';
 import { identifyHazardsAI, suggestControlsAI, explainRiskScoreAI, reviewRiskAssessmentAI } from '../services/geminiService';
 import { SmartTextArea } from './SmartTextInput';
-import { RiskAssessment, RiskHazard, RiskControl, RiskControlType, SubscriptionTier } from '../types';
+import { RiskAssessment, RiskHazard, RiskControl, RiskControlType } from '../types';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -16,7 +16,7 @@ export const RiskAssessmentForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isNew = !id || id === 'new';
-  const isFree = user?.tier === SubscriptionTier.FREE;
+
   
   const [formData, setFormData] = useState<RiskAssessment>({
     id: `risk-${Date.now()}`,
@@ -49,7 +49,7 @@ export const RiskAssessmentForm: React.FC = () => {
   }, [id, isNew]);
 
   const handleSuggestHazards = async () => {
-    if (isFree) return toast("Upgrade to Pro to use AI Hazard Identification.", { icon: '🔒' });
+
     if (!formData.taskDescription) return toast.error("Please enter a task description first.");
     setLoadingHazards(true);
     try {
@@ -74,7 +74,7 @@ export const RiskAssessmentForm: React.FC = () => {
   };
 
   const handleSuggestControls = async (hazardIndex: number) => {
-    if (isFree) return toast("Upgrade to Pro for AI Controls.", { icon: '🔒' });
+
     const hazard = formData.hazards[hazardIndex];
     if (!hazard.description || hazard.description.trim().length < 3) {
       toast.error("Please enter a hazard description before generating controls.");
@@ -106,7 +106,7 @@ export const RiskAssessmentForm: React.FC = () => {
   };
 
   const handleReviewRiskAssessment = async () => {
-      if (isFree) return toast("Upgrade to Pro for AI Review.", { icon: '🔒' });
+
       if (!formData.taskDescription) return toast.error("Task description required for review.");
       setLoadingReview(true);
       try {
@@ -121,7 +121,7 @@ export const RiskAssessmentForm: React.FC = () => {
   };
 
   const handleExplainRisk = async (hazard: RiskHazard) => {
-    if (isFree) return toast("Upgrade to Pro for Risk Explanations.", { icon: '🔒' });
+
     if (riskExplanations[hazard.id]) return; // Already loaded or collapsed
     setLoadingExplanation(hazard.id);
     try {
@@ -281,7 +281,7 @@ export const RiskAssessmentForm: React.FC = () => {
                             disabled={loadingReview}
                             className="flex items-center gap-2 bg-white border border-purple-200 text-purple-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-purple-50 transition-colors"
                         >
-                            {loadingReview ? <Loader2 size={14} className="animate-spin" /> : (isFree ? <Lock size={14} /> : <Sparkles size={14} />)}
+                            {loadingReview ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                             Review Quality
                         </button>
                         <button 
@@ -290,7 +290,7 @@ export const RiskAssessmentForm: React.FC = () => {
                             disabled={loadingHazards}
                             className="flex items-center gap-2 bg-purple-100 text-purple-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-purple-200 transition-colors"
                         >
-                            {loadingHazards ? <Loader2 size={14} className="animate-spin" /> : (isFree ? <Lock size={14} /> : <Sparkles size={14} />)}
+                            {loadingHazards ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                             Suggest Hazards
                         </button>
                     </div>
@@ -393,7 +393,7 @@ export const RiskAssessmentForm: React.FC = () => {
                                                 className="flex items-center gap-1 text-[10px] bg-purple-50 text-purple-600 px-2 py-1 rounded border border-purple-100 hover:bg-purple-100 transition-colors print:hidden"
                                                 title="Get AI explanation of this risk score"
                                             >
-                                                {isFree ? <Lock size={10} /> : <Sparkles size={10} />} Explain Score
+                                                <Sparkles size={10} /> Explain Score
                                             </button>
                                         </div>
                                         <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${riskLevel.color} text-white print:border print:border-slate-300 print:text-black print:bg-white`}>
@@ -435,7 +435,7 @@ export const RiskAssessmentForm: React.FC = () => {
                                             disabled={loadingControls === hazard.id}
                                             className="text-xs flex items-center gap-1 text-purple-600 hover:text-purple-700 font-medium bg-purple-50 px-2 py-1 rounded border border-purple-100 hover:bg-purple-100 transition-colors print:hidden"
                                         >
-                                            {loadingControls === hazard.id ? <Loader2 size={12} className="animate-spin" /> : (isFree ? <Lock size={12} /> : <Sparkles size={12} />)}
+                                            {loadingControls === hazard.id ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                                             AI Suggest Controls
                                         </button>
                                     </div>

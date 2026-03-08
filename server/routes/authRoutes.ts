@@ -85,9 +85,9 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
 
     db.prepare(
       'INSERT INTO users (id, name, email, password_hash, role, tier, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(id, name, email, hash, safeRole, 'Free', avatar);
+    ).run(id, name, email, hash, safeRole, 'Pro', avatar);
 
-    const user = { id, name, email, role: safeRole, tier: 'Free', avatar };
+    const user = { id, name, email, role: safeRole, tier: 'Pro', avatar };
     const token = generateToken(user);
     logAudit(req, { action: 'register', entityType: 'user', entityId: id, details: `New user registered: ${email}` });
     res.status(201).json({ token, user });

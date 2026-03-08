@@ -8,11 +8,11 @@ import {
 } from 'recharts';
 import { 
     AlertTriangle, TrendingUp, Activity, CheckSquare, Sparkles, Loader2, 
-    FileText, Calendar, Users, MapPin, Plus, X, Calculator, Lock, BarChart3, Shield
+    FileText, Calendar, Users, MapPin, Plus, X, Calculator, BarChart3, Shield
 } from 'lucide-react';
 import { calculateHSEMetrics, getIncidents, saveStatsLog } from '../services/storageService';
 import { generateExecutiveReportAI } from '../services/geminiService';
-import { HSEMetrics, Incident, IncidentType, HSEStatsLog, SubscriptionTier } from '../types';
+import { HSEMetrics, Incident, IncidentType, HSEStatsLog } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -97,10 +97,6 @@ export const AnalyticsDashboard: React.FC = () => {
     };
 
     const handleGenerateReport = async () => {
-        if (user?.tier === SubscriptionTier.FREE) {
-            navigate('/pricing');
-            return;
-        }
         if (!metrics) return;
         setLoadingReport(true);
         try {
@@ -708,8 +704,8 @@ export const AnalyticsDashboard: React.FC = () => {
                                         disabled={loadingReport}
                                         className="bg-white text-indigo-900 px-8 py-3 rounded-xl font-bold hover:bg-indigo-50 transition-colors shadow-lg disabled:opacity-70 flex items-center gap-2 mx-auto"
                                     >
-                                        {user?.tier === SubscriptionTier.FREE ? <Lock size={18} /> : (loadingReport ? <Loader2 className="animate-spin" /> : <FileText />)}
-                                        {loadingReport ? 'Generating Insights...' : (user?.tier === SubscriptionTier.FREE ? 'Unlock Report' : 'Generate Report Now')}
+                                        {loadingReport ? <Loader2 className="animate-spin" /> : <FileText />}
+                                        {loadingReport ? 'Generating Insights...' : 'Generate Report Now'}
                                     </button>
                                 </div>
                             ) : (

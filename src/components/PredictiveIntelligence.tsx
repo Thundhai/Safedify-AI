@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Sparkles, Loader2, CheckCircle, TrendingUp, ArrowLeft, Brain, ShieldAlert } from 'lucide-react';
 import { getIncidents, calculateHSEMetrics } from '../services/storageService';
 import { predictiveSafetyAlertsAI } from '../services/geminiService';
-import { SubscriptionTier } from '../types';
+
 import { EnvironmentalCard } from './EnvironmentalCard';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -15,7 +15,6 @@ export const PredictiveIntelligence: React.FC = () => {
 
   useEffect(() => {
     const load = async () => {
-      if (user?.tier === SubscriptionTier.FREE) return;
       try {
         const incidents = (await getIncidents()) || [];
         if (incidents.length === 0) return;
@@ -66,19 +65,7 @@ export const PredictiveIntelligence: React.FC = () => {
       <section>
         <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-xl shadow-md border border-slate-700 relative overflow-hidden flex flex-col min-h-[300px]">
           {/* Overlay for Free Users */}
-          {user?.tier === SubscriptionTier.FREE && (
-            <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-6 text-center">
-              <Sparkles size={48} className="text-yellow-400 mb-4" />
-              <h3 className="text-xl font-bold text-white mb-2">Predictive AI Analytics</h3>
-              <p className="text-slate-300 mb-6 text-sm">Upgrade to Pro to unlock 7-day risk forecasting and trend analysis.</p>
-              <button
-                onClick={() => navigate('/pricing')}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-lg"
-              >
-                Unlock Intelligence
-              </button>
-            </div>
-          )}
+          {/* Predictive Content always visible */}
 
           <div className="absolute top-0 right-0 p-4 opacity-10">
             <TrendingUp size={150} />

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import ReactMarkdown from 'react-markdown';
 import {
-  X, Send, Image, Loader2, Sparkles, Volume2, Lock, Database,
+  X, Send, Image, Loader2, Sparkles, Volume2, Database,
   Bot, Search, BarChart3, ShieldAlert, FileText, Zap, ChevronRight, ChevronDown,
   Minimize2, Maximize2
 } from 'lucide-react';
@@ -10,7 +10,6 @@ import { chatSafetyAssistant, generateSpeechAI, playGeneratedAudio } from '../se
 import { apiAgentChat, apiHealthCheck } from '../services/apiService';
 import { calculateHSEMetrics } from '../services/storageService';
 import { useAuth } from '../context/AuthContext';
-import { SubscriptionTier } from '../types';
 import { useNavigate } from 'react-router-dom';
 
 /* ─── Quick Prompt Categories ─── */
@@ -51,8 +50,6 @@ export const AIChatAssistant: React.FC = () => {
   const [showToolCalls, setShowToolCalls] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const isFree = user?.tier === SubscriptionTier.FREE;
-
   useEffect(() => {
     apiHealthCheck().then(ok => setBackendAvailable(ok)).catch(() => setBackendAvailable(false));
   }, []);
@@ -68,17 +65,7 @@ export const AIChatAssistant: React.FC = () => {
   const handleSendMessage = async () => {
     if ((!inputValue.trim() && !selectedImage) || isLoading) return;
 
-    if (isFree) {
-      setMessages(prev => [...prev, { role: 'user', text: inputValue }]);
-      setInputValue('');
-      setTimeout(() => {
-        setMessages(prev => [...prev, {
-          role: 'model',
-          text: '**Upgrade Required:** The Safedify AI Agent is available on Pro and Enterprise plans. Upgrade to unlock full database querying, analytics, and AI-powered safety insights.'
-        }]);
-      }, 500);
-      return;
-    }
+    // AI chat is available to all tiers
 
     const userMsg = { role: 'user' as const, text: inputValue, image: selectedImage || undefined };
     setMessages(prev => [...prev, userMsg]);
@@ -132,7 +119,7 @@ export const AIChatAssistant: React.FC = () => {
 
   const handleReadAloud = async (text: string, index: number) => {
     if (isReading !== null) return;
-    if (isFree) { toast.error('Text-to-Speech is a Pro feature.'); return; }
+
     setIsReading(index);
     try {
       const cleanText = text.replace(/\*\*/g, '');
@@ -308,17 +295,6 @@ export const AIChatAssistant: React.FC = () => {
 
       {/* ─── Input Area ─── */}
       <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-700 shrink-0 pb-safe">
-        {isFree ? (
-          <div className="text-center p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-3 font-medium">AI Agent requires a Pro or Enterprise plan.</p>
-            <button
-              onClick={() => navigate('/pricing')}
-              className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2.5 rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
-            >
-              <Lock size={14} /> Upgrade to Unlock AI Agent
-            </button>
-          </div>
-        ) : (
           <>
             {/* Quick Prompts — shown when conversation is fresh */}
             {messages.length < 3 && (
@@ -373,7 +349,6 @@ export const AIChatAssistant: React.FC = () => {
               </button>
             </div>
           </>
-        )}
       </div>
 
       {/* ─── Bottom Collapse Bar ─── */}

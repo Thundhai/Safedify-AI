@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import {
   Wind, Thermometer, Droplets, Activity, Ear,
-  Sparkles, Loader2, AlertTriangle, CheckCircle2, RefreshCw, Lock,
+  Sparkles, Loader2, AlertTriangle, CheckCircle2, RefreshCw,
   Sun, Eye, Gauge, ArrowUp, ArrowDown, Minus, ShieldAlert,
   CloudSun, Cloud, CloudDrizzle, Umbrella,
   ChevronDown, ChevronUp,
   MapPin, Clock, Zap, Info, CircleAlert, TriangleAlert,
   Wifi, WifiOff
 } from 'lucide-react';
-import { EnvironmentalData, WeatherRiskAnalysis, PermitStatus, SubscriptionTier } from '../types';
+import { EnvironmentalData, WeatherRiskAnalysis, PermitStatus } from '../types';
 import { analyzeWeatherRisksAI } from '../services/geminiService';
 import { getPermits } from '../services/storageService';
 import { apiGetWeather } from '../services/apiService';
@@ -219,7 +219,7 @@ export const EnvironmentalCard: React.FC = () => {
       setPrevWeather(weather);
       setWeather(newData);
       setDataSource(apiData.dataSource === 'simulated' ? 'simulated' : 'live');
-      if (user?.tier !== SubscriptionTier.FREE) { handleRunAnalysis(newData); }
+      handleRunAnalysis(newData);
     } catch {
       setFetchError(true);
       // Keep stale data if available, don't generate fake data
@@ -233,7 +233,6 @@ export const EnvironmentalCard: React.FC = () => {
   const refreshWeather = () => refreshWeatherWithCoords(geoCoords?.lat, geoCoords?.lng);
 
   const handleRunAnalysis = async (data: EnvironmentalData) => {
-    if (user?.tier === SubscriptionTier.FREE) return;
     setLoadingAnalysis(true);
     try {
       const activePermits = (await getPermits()).filter(p => p.status === PermitStatus.APPROVED);
@@ -514,19 +513,7 @@ export const EnvironmentalCard: React.FC = () => {
 
         {advisoryExpanded && (
           <div className="px-5 py-4 bg-white dark:bg-slate-900">
-            {user?.tier === SubscriptionTier.FREE ? (
-              <div className="flex flex-col items-center text-center py-6">
-                <Lock size={36} className="text-slate-300 dark:text-slate-600 mb-3" />
-                <h4 className="font-bold text-slate-700 dark:text-slate-300 mb-1">AI Risk Analysis</h4>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 max-w-md">
-                  Get real-time AI-powered safety recommendations based on current environmental conditions and active site operations.
-                </p>
-                <button onClick={() => navigate('/pricing')}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:opacity-90 transition-opacity shadow-md flex items-center gap-2">
-                  <Sparkles size={14} /> Upgrade to Pro
-                </button>
-              </div>
-            ) : loadingAnalysis ? (
+            {loadingAnalysis ? (
               <div className="flex items-center justify-center gap-3 py-8 text-slate-400 dark:text-slate-500">
                 <Loader2 className="animate-spin" size={20} />
                 <span className="text-sm font-medium">Analyzing environmental conditions against active operations…</span>

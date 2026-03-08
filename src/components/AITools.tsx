@@ -3,8 +3,7 @@ import React, { useState } from 'react';
 import toast from 'react-hot-toast';
 import { Camera, HardHat, FileSearch, Loader2, UploadCloud, AlertCircle, CheckCircle2, Sparkles, Volume2, Mic } from 'lucide-react';
 import { detectPPEAI, extractDocumentDataAI, generateSpeechAI, playGeneratedAudio } from '../services/geminiService';
-import { FeatureGate } from './FeatureGate';
-import { SubscriptionTier } from '../types';
+
 
 export const AITools: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'ppe' | 'ocr' | 'tts'>('ppe');
@@ -66,7 +65,6 @@ export const AITools: React.FC = () => {
   };
 
   return (
-    <FeatureGate requiredTier={SubscriptionTier.PRO} fullPage featureName="AI Safety Tools">
         <div className="space-y-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
@@ -253,6 +251,5 @@ export const AITools: React.FC = () => {
             </div>
         )}
         </div>
-    </FeatureGate>
   );
 };
