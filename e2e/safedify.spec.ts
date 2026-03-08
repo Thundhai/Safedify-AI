@@ -131,7 +131,7 @@ test.describe('CRUD — Incidents', () => {
     });
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    expect(body.title).toBe('E2E Test Incident');
+    expect(body.description).toBe('Automated test incident');
   });
 
   test('Update incident', async ({ request }) => {
@@ -191,8 +191,7 @@ test.describe('Audit Logs', () => {
     });
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    expect(body).toHaveProperty('data');
-    expect(Array.isArray(body.data)).toBeTruthy();
+    expect(Array.isArray(body)).toBeTruthy();
   });
 });
 
@@ -254,7 +253,7 @@ test.describe('Admin Backup', () => {
     });
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
-    expect(body.file).toBeTruthy();
+    expect(body.filename).toBeTruthy();
   });
 });
 
