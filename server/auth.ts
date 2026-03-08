@@ -119,7 +119,7 @@ export const seedDefaultUsers = () => {
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get('admin@safedify.com');
   if (!existing) {
     // Use synchronous hash so users are guaranteed to exist before any request
-    const hash = bcrypt.hashSync('password', 10);
+    const hash = bcrypt.hashSync('admin123', 10);
     const users = [
       { id: uuid(), name: 'John Doe', email: 'admin@safedify.com', role: 'Admin', tier: 'Enterprise', avatar: 'JD' },
       { id: uuid(), name: 'Robert Fox', email: 'worker@safedify.com', role: 'Worker', tier: 'Free', avatar: 'RF' },
