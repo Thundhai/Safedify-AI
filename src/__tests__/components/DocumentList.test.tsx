@@ -13,31 +13,33 @@ vi.mock('../../context/AuthContext', () => ({
   }),
 }));
 
-// Mock storageService for documents
-const mockDocuments = [
-  {
-    id: 'doc-1',
-    title: 'Safety Policy Manual',
-    category: 'Policy',
-    version: 'v2.1',
-    status: 'Approved',
-    uploadDate: '2024-01-15',
-    author: 'John Safety',
-    description: 'Company-wide safety policy document',
-    tags: ['safety', 'policy'],
-  },
-  {
-    id: 'doc-2',
-    title: 'MSDS - Acetone',
-    category: 'MSDS',
-    version: 'v1.0',
-    status: 'Draft',
-    uploadDate: '2024-02-01',
-    author: 'Lab Manager',
-    description: 'Material safety data sheet for acetone',
-    expiryDate: '2024-03-01', // expired
-  },
-];
+// Mock storageService for documents — use vi.hoisted to avoid reference-before-init with vi.mock hoisting
+const { mockDocuments } = vi.hoisted(() => ({
+  mockDocuments: [
+    {
+      id: 'doc-1',
+      title: 'Safety Policy Manual',
+      category: 'Policy',
+      version: 'v2.1',
+      status: 'Approved',
+      uploadDate: '2024-01-15',
+      author: 'John Safety',
+      description: 'Company-wide safety policy document',
+      tags: ['safety', 'policy'],
+    },
+    {
+      id: 'doc-2',
+      title: 'MSDS - Acetone',
+      category: 'MSDS',
+      version: 'v1.0',
+      status: 'Draft',
+      uploadDate: '2024-02-01',
+      author: 'Lab Manager',
+      description: 'Material safety data sheet for acetone',
+      expiryDate: '2024-03-01', // expired
+    },
+  ],
+}));
 
 vi.mock('../../services/storageService', () => ({
   getDocuments: vi.fn().mockResolvedValue(mockDocuments),
@@ -77,9 +79,10 @@ describe('DocumentList', () => {
     renderDocumentList();
     await waitFor(() => {
       expect(screen.getByText('All Docs')).toBeInTheDocument();
-      expect(screen.getByText('Policy')).toBeInTheDocument();
+      // Category names may appear both as filter buttons and on document cards
+      expect(screen.getAllByText('Policy').length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText('SOP')).toBeInTheDocument();
-      expect(screen.getByText('MSDS')).toBeInTheDocument();
+      expect(screen.getAllByText('MSDS').length).toBeGreaterThanOrEqual(1);
     });
   });
 

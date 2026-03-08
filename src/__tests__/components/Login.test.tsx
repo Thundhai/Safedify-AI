@@ -29,8 +29,8 @@ describe('Login', () => {
 
   it('renders login form with email and password fields', () => {
     renderLogin();
-    expect(screen.getByPlaceholderText(/email/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/password/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('name@company.com')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('••••••••')).toBeInTheDocument();
   });
 
   it('renders sign in button', () => {
@@ -53,8 +53,8 @@ describe('Login', () => {
     const user = userEvent.setup();
     renderLogin();
 
-    const emailInput = screen.getByPlaceholderText(/email/i);
-    const passwordInput = screen.getByPlaceholderText(/password/i);
+    const emailInput = screen.getByPlaceholderText('name@company.com');
+    const passwordInput = screen.getByPlaceholderText('••••••••');
 
     await user.type(emailInput, 'admin@safedify.com');
     await user.type(passwordInput, 'password123');
@@ -69,7 +69,7 @@ describe('Login', () => {
 
   it('has a link to register page', () => {
     renderLogin();
-    const link = screen.getByText(/sign up/i) || screen.getByText(/register/i) || screen.getByText(/create.*account/i);
+    const link = screen.getByText(/create account/i);
     expect(link).toBeInTheDocument();
   });
 

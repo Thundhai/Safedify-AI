@@ -17,7 +17,7 @@ vi.mock('../db.js', () => ({
 // Now import auth (it will use the mocked db)
 const { authenticate, requireRole, requirePermission, hashPassword, comparePassword, generateToken } = await import('../auth.js');
 
-const JWT_SECRET = 'safedify-secret-key-change-in-production'; // matches default in auth.ts
+const JWT_SECRET = 'safedify-dev-secret-not-for-production'; // matches default in auth.ts
 
 // ---------- Helpers ----------
 const mockUser = { id: 'u1', name: 'Test', email: 'test@test.com', role: 'Admin', tier: 'Enterprise', avatar: 'T' };

@@ -114,16 +114,16 @@ describe('Sanitization - sanitizeValue', () => {
   });
 
   it('blocks prototype pollution - __proto__', () => {
-    // The sanitization removes __proto__ keys during processing
-    // In the actual middleware, this prevents prototype pollution attacks
-    const input = { '__proto__': { polluted: true }, normal: 'ok' };
+    // Construct the object so __proto__ is an enumerable own property (not the prototype setter)
+    const input = Object.create(null);
+    input['__proto__'] = { polluted: true };
+    input['normal'] = 'ok';
     const result = sanitizeValue(input, { stripTags: true }) as Record<string, unknown>;
-    // The key should be removed or sanitized
-    // Note: In actual JS, __proto__ in object literals may behave differently
-    // Our middleware replaces special chars, so __proto__ becomes _proto__
+    // The sanitizer skips __proto__ keys, so it must NOT appear in output
     expect(result.normal).toBe('ok');
-    // The presence of __proto__ in output doesn't cause pollution if we check hasOwnProperty
-    expect(Object.prototype.hasOwnProperty.call(result, '__proto__') || result['_proto__']).toBeDefined();
+    expect(Object.prototype.hasOwnProperty.call(result, '__proto__')).toBe(false);
+    // Verify Object.prototype was not polluted
+    expect((Object.prototype as any).polluted).toBeUndefined();
   });
 
   it('blocks prototype pollution - constructor', () => {
