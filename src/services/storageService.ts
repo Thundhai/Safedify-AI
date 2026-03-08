@@ -481,8 +481,8 @@ export const getActions = async (): Promise<ActionItem[]> => {
   } catch { return []; }
 };
 
-export const saveAction = async (action: ActionItem): Promise<void> => {
-  await apiCreateAction(actionToApi(action));
+export const saveAction = async (action: ActionItem): Promise<any> => {
+  return await apiCreateAction(actionToApi(action));
 };
 
 export const updateAction = async (action: ActionItem): Promise<void> => {

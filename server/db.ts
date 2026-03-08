@@ -451,8 +451,8 @@ const seedDefaults = () => {
       { id: 'role-coordinator', name: 'HSE Coordinator', desc: 'Coordinates safety activities and data.', perms: ['view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','approve_permit','manage_documents','ai_features'] },
       { id: 'role-advisor', name: 'HSE Advisor', desc: 'Subject matter expert for risk and compliance.', perms: ['view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','ai_features'] },
       { id: 'role-officer', name: 'HSE Officer', desc: 'Field safety officer executing inspections.', perms: ['create_incident','manage_incidents','perform_inspection','create_permit','manage_documents','ai_features'] },
-      { id: 'role-supervisor', name: 'HSE Supervisor', desc: 'Site supervisor responsible for team safety.', perms: ['create_incident','perform_inspection','create_permit','ai_features'] },
-      { id: 'role-technician', name: 'HSE Technician', desc: 'HSE Technician for equipment and monitoring.', perms: ['create_incident','perform_inspection','ai_features'] },
+      { id: 'role-supervisor', name: 'HSE Supervisor', desc: 'Site supervisor responsible for team safety.', perms: ['create_incident','manage_incidents','perform_inspection','create_permit','ai_features'] },
+      { id: 'role-technician', name: 'HSE Technician', desc: 'HSE Technician for equipment and monitoring.', perms: ['create_incident','manage_incidents','perform_inspection','ai_features'] },
       { id: 'role-worker', name: 'Worker', desc: 'General staff reporting observations.', perms: ['create_incident'] },
       { id: 'role-executive', name: 'Executive Management', desc: 'Senior leadership read-only access.', perms: ['view_analytics'] },
     ];

@@ -55,14 +55,23 @@ export const ActionList: React.FC = () => {
             indicator: 'Lagging',
             relatedIncidentId: newItem.relatedIncidentId || undefined
         };
-        await saveAction(action);
-        setActions(prev => [action, ...prev]);
-        setShowModal(false);
-        setNewItem({
-            title: '', assignee: '', priority: 'Medium',
-            dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-            relatedIncidentId: ''
-        });
+        try {
+            const result = await saveAction(action);
+            if (result && (result as any).id) {
+                action.id = (result as any).id;
+            }
+            setActions(prev => [action, ...prev]);
+            setShowModal(false);
+            setNewItem({
+                title: '', assignee: '', priority: 'Medium',
+                dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+                relatedIncidentId: ''
+            });
+            toast.success('Action created successfully');
+        } catch (err: any) {
+            console.error('Create action failed:', err);
+            toast.error(err.message || 'Failed to create action. Please try again.');
+        }
     };
 
     if (loading) return (

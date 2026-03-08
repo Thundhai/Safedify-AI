@@ -136,7 +136,7 @@ router.get('/actions', (req: AuthRequest, res: Response) => {
   paginate(req, res, 'actions');
 });
 
-router.post('/actions', requirePermission('manage_incidents'), (req: AuthRequest, res: Response) => {
+router.post('/actions', requirePermission('create_incident'), (req: AuthRequest, res: Response) => {
   const { title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, effectiveness } = req.body;
   const id = uuid();
   db.prepare(
