@@ -1,10 +1,8 @@
 
 import React, { useEffect, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area } from 'recharts';
-import { AlertTriangle, CheckCircle, Clock, TrendingUp, ClipboardCheck, Sparkles, Gauge, BarChart2, Zap, ShieldCheck, Plus, X, ChevronRight, Download, Calendar } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, TrendingUp, ClipboardCheck, Sparkles, BarChart2, Zap, ShieldCheck, X, ChevronRight, Calendar, ArrowUpRight, Target } from 'lucide-react';
 import { getIncidents, getActions, calculateSiteSafetyScore, getInspections, getRiskAssessments, getObservations } from '../services/storageService';
-import { Incident, ActionItem, IncidentSeverity, SiteSafetyScore, SubscriptionTier } from '../types';
-import { apiExportData } from '../services/apiService';
+import { IncidentSeverity, SiteSafetyScore, SubscriptionTier } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { WelcomeScreen } from './WelcomeScreen';
@@ -165,21 +163,21 @@ export const Dashboard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, isFirstTimeUser]);
 
-  const COLORS = ['#22c55e', '#eab308', '#f97316', '#ef4444'];
-
   const getScoreColor = (score: number) => {
-      if (score >= 90) return 'text-green-600';
-      if (score >= 75) return 'text-blue-600';
-      if (score >= 60) return 'text-yellow-600';
-      return 'text-red-600';
+      if (score >= 90) return 'text-green-500';
+      if (score >= 75) return 'text-blue-500';
+      if (score >= 60) return 'text-yellow-500';
+      return 'text-red-500';
   };
 
-  const gaugeData = [
-    { name: 'Poor', value: 60, fill: '#ef4444' },      // 0-60
-    { name: 'Fair', value: 15, fill: '#eab308' },      // 60-75
-    { name: 'Good', value: 15, fill: '#3b82f6' },      // 75-90
-    { name: 'Excellent', value: 10, fill: '#22c55e' }, // 90-100
-  ];
+  const getScoreBg = (score: number) => {
+      if (score >= 90) return 'from-green-500 to-emerald-600';
+      if (score >= 75) return 'from-blue-500 to-indigo-600';
+      if (score >= 60) return 'from-yellow-500 to-amber-600';
+      return 'from-red-500 to-rose-600';
+  };
+
+  const closureRate = stats.totalActions > 0 ? Math.round((stats.closedActions / stats.totalActions) * 100) : 0;
 
   // Show welcome screen for first-time users (AFTER all hooks)
   if (isFirstTimeUser && !hasData) {
@@ -295,7 +293,7 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* SECTION 1: STATISTICS & METRICS */}
+      {/* SECTION 1: SAFETY PERFORMANCE HIGHLIGHTS */}
       <section>
         <div className="flex items-center gap-3 mb-6">
             <div className="p-2 bg-blue-600 rounded-lg shadow-sm">
@@ -303,248 +301,150 @@ export const Dashboard: React.FC = () => {
             </div>
             <div>
                 <h2 className="text-xl font-bold text-slate-800 dark:text-white">Safety Performance</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Real-time KPIs and incident statistics</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Key highlights — click any card for full details</p>
             </div>
-            <div className="ml-auto">
-              <button
-                onClick={() => apiExportData('incidents', 'csv').catch(() => {})}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition"
-                title="Export incidents to CSV"
-              >
-                <Download size={14} /> Export CSV
-              </button>
-            </div>
+            <button
+              onClick={() => navigate('/analytics')}
+              className="ml-auto flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30 dark:hover:bg-blue-900/50 rounded-lg transition"
+            >
+              Full Analytics <ArrowUpRight size={14} />
+            </button>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-            {/* Left Column: KPIs & Charts (Span 3) */}
-            <div className="xl:col-span-3 space-y-6">
-                {/* KPI Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-                    {/* KPI 1: Incidents */}
-                    <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Incidents</p>
-                            <h3 className="text-2xl font-bold text-slate-800 dark:text-white mt-1">{stats.totalIncidents}</h3>
-                        </div>
-                        <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg text-red-600 dark:text-red-400">
-                            <AlertTriangle size={20} />
-                        </div>
-                    </div>
-
-                    {/* KPI 2: Open Actions */}
-                    <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Open Actions</p>
-                            <h3 className="text-2xl font-bold text-slate-800 dark:text-white mt-1">{stats.openActions}</h3>
-                        </div>
-                        <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg text-yellow-600 dark:text-yellow-400">
-                            <Clock size={20} />
-                        </div>
-                    </div>
-
-                    {/* KPI 3: Compliance */}
-                    <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Compliance</p>
-                            <h3 className="text-2xl font-bold text-slate-800 dark:text-white mt-1">{siteScore ? `${siteScore.score}%` : '—'}</h3>
-                        </div>
-                        <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg text-green-600 dark:text-green-400">
-                            <CheckCircle size={20} />
-                        </div>
-                    </div>
-
-                    {/* KPI 4: Inspections */}
-                    <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Inspections</p>
-                            <h3 className="text-2xl font-bold text-slate-800 dark:text-white mt-1">{stats.inspectionCount}</h3>
-                        </div>
-                        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-blue-600 dark:text-blue-400">
-                            <ClipboardCheck size={20} />
-                        </div>
-                    </div>
-
-                    {/* KPI 5: Days Since Last Incident */}
-                    <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Days Incident-Free</p>
-                            <h3 className={`text-2xl font-bold mt-1 ${stats.daysSinceLastIncident >= 30 ? 'text-green-600' : stats.daysSinceLastIncident >= 7 ? 'text-yellow-600' : 'text-red-600'}`}>{stats.totalIncidents > 0 ? stats.daysSinceLastIncident : '∞'}</h3>
-                        </div>
-                        <div className="bg-purple-50 dark:bg-purple-900/20 p-3 rounded-lg text-purple-600 dark:text-purple-400">
-                            <Calendar size={20} />
-                        </div>
-                    </div>
-
-                    {/* KPI 6: Action Closure Rate */}
-                    <div className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Action Closure</p>
-                            <h3 className="text-2xl font-bold text-slate-800 dark:text-white mt-1">{stats.totalActions > 0 ? Math.round((stats.closedActions / stats.totalActions) * 100) : 0}%</h3>
-                        </div>
-                        <div className="bg-teal-50 dark:bg-teal-900/20 p-3 rounded-lg text-teal-600 dark:text-teal-400">
-                            <TrendingUp size={20} />
-                        </div>
-                    </div>
+        {/* Hero Row: Safety Score + Days Incident-Free */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            {/* Safety Score Hero Card */}
+            <button
+              onClick={() => navigate('/analytics')}
+              className={`group relative bg-gradient-to-br ${getScoreBg(siteScore?.score || 0)} text-white p-6 rounded-xl shadow-md hover:shadow-xl transition-all text-left overflow-hidden`}
+            >
+              <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                <Target size={120} />
+              </div>
+              <div className="relative z-10">
+                <p className="text-white/70 text-xs font-bold uppercase tracking-widest mb-1">Digital Safety Score</p>
+                <div className="flex items-end gap-3 mb-3">
+                  <span className="text-5xl font-black leading-none">{siteScore?.score || 0}</span>
+                  <span className="text-lg font-bold text-white/80 mb-1">/ 100</span>
                 </div>
-
-                {/* Charts Row */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Bar Chart */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                        <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4 uppercase tracking-wide">Incident & Observation Trends (6 Mo)</h3>
-                        <div className="h-64 w-full" style={{ minHeight: '200px', minWidth: '300px' }}>
-                            {stats.totalIncidents > 0 && Array.isArray(stats.monthlyTrends) && stats.monthlyTrends.length > 0 ? (
-                                <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
-                                    <BarChart data={stats.monthlyTrends || []}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                        <XAxis dataKey="name" tick={{fontSize: 12, fill: '#94a3b8'}} axisLine={false} tickLine={false} />
-                                        <YAxis tick={{fontSize: 12, fill: '#94a3b8'}} axisLine={false} tickLine={false} />
-                                        <Tooltip 
-                                            contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
-                                            itemStyle={{color: '#1e293b'}}
-                                        />
-                                        <Bar dataKey="incidents" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={24} name="Incidents" />
-                                        <Bar dataKey="observations" fill="#22c55e" radius={[4, 4, 0, 0]} barSize={24} name="Observations" />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-center">
-                                    <div className="bg-green-50 p-4 rounded-full mb-3">
-                                        <ShieldCheck size={32} className="text-green-600" />
-                                    </div>
-                                    <p className="text-slate-800 font-bold">Excellent Safety Record!</p>
-                                    <p className="text-slate-500 text-sm">No incidents reported yet.</p>
-                                    <button onClick={() => navigate('/incidents/new')} className="mt-3 text-blue-600 text-xs font-bold hover:underline flex items-center gap-1">
-                                        <Plus size={12} /> Report Incident
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Pie Chart */}
-                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                        <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-4 uppercase tracking-wide">Severity Breakdown</h3>
-                        <div className="h-64 w-full" style={{ minHeight: '200px', minWidth: '300px' }}>
-                            {stats.totalIncidents > 0 && Array.isArray(stats.severityBreakdown) && stats.severityBreakdown.length > 0 ? (
-                                <>
-                                    <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
-                                        <PieChart>
-                                            <Pie
-                                                data={stats.severityBreakdown || []}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={60}
-                                                outerRadius={80}
-                                                paddingAngle={5}
-                                                dataKey="value"
-                                                stroke="none"
-                                            >
-                                            {(stats.severityBreakdown || []).map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={COLORS[index % (COLORS?.length || 5)]} />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip 
-                                                contentStyle={{backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
-                                                itemStyle={{color: '#1e293b'}}
-                                            />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                        <div className="text-center">
-                                            <span className="text-2xl font-bold text-slate-800 dark:text-white block">{stats.totalIncidents}</span>
-                                            <span className="text-xs text-slate-500 uppercase">Total</span>
-                                        </div>
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-center">
-                                    <div className="bg-slate-100 p-4 rounded-full mb-3">
-                                        <Sparkles size={32} className="text-slate-400" />
-                                    </div>
-                                    <p className="text-slate-500 text-sm">Waiting for data...</p>
-                                </div>
-                            )}
-                        </div>
-                        {stats.totalIncidents > 0 && (
-                            <div className="flex flex-wrap justify-center gap-3 mt-2">
-                                {stats.severityBreakdown.map((entry, index) => (
-                                    <div key={entry.name} className="flex items-center gap-1.5">
-                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: COLORS[index % (COLORS?.length || 5)] }}></div>
-                                        <span className="text-xs font-medium text-slate-600 dark:text-slate-400">{entry.name}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="px-2.5 py-0.5 bg-white/20 backdrop-blur rounded-full text-xs font-bold uppercase tracking-wide">{siteScore?.rating || 'N/A'}</span>
                 </div>
-            </div>
-
-            {/* Right Column: Score (Span 1) */}
-            <div className="xl:col-span-1">
-                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 flex flex-col justify-between h-full min-h-[400px] relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-5">
-                        <Gauge size={150} className="text-brand-navy dark:text-white" />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-brand-navy dark:text-white">Digital Safety Score</h3>
-                        <p className="text-slate-500 dark:text-slate-400 text-sm">Real-time compliance rating</p>
-                    </div>
-                    
-                    <div className="flex-1 flex flex-col items-center justify-center relative my-6">
-                        <ResponsiveContainer width="100%" height={220} minWidth={250} minHeight={200}>
-                            <PieChart>
-                                <Pie
-                                    data={gaugeData}
-                                    cx="50%"
-                                    cy="75%"
-                                    startAngle={180}
-                                    endAngle={0}
-                                    innerRadius={70}
-                                    outerRadius={95}
-                                    paddingAngle={2}
-                                    dataKey="value"
-                                    stroke="none"
-                                >
-                                    {gaugeData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                                    ))}
-                                </Pie>
-                            </PieChart>
-                        </ResponsiveContainer>
-                        
-                        <div className="absolute bottom-[25%] left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none">
-                             <div className="relative w-0 h-0">
-                                 <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-4 bg-brand-navy dark:bg-white rounded-full z-10 shadow-md" />
-                                 <div 
-                                    className="absolute bottom-2 left-1/2 -ml-0.5 w-1 h-20 bg-brand-navy dark:bg-white rounded-t-full origin-bottom transition-transform duration-1000 ease-out shadow-sm"
-                                    style={{ transform: `rotate(${(siteScore?.score || 0) * 1.8 - 90}deg)` }}
-                                 />
-                             </div>
-                             <div className="mt-6 text-center">
-                                 <span className={`text-5xl font-bold ${getScoreColor(siteScore?.score || 0)}`}>{siteScore?.score || 0}</span>
-                                 <p className="text-sm font-bold text-slate-400 uppercase mt-1 tracking-widest">{siteScore?.rating || 'N/A'}</p>
-                             </div>
-                        </div>
-                    </div>
-                    
-                    <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-700">
-                        <div className="flex justify-between text-sm">
-                            <span className="text-slate-500 dark:text-slate-400">Incidents Impact</span>
-                            <span className="font-bold text-red-500">-{siteScore?.breakdown.incidents} pts</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                            <span className="text-slate-500 dark:text-slate-400">Observations Bonus</span>
-                            <span className="font-bold text-green-500">+{siteScore?.breakdown.observations} pts</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                            <span className="text-slate-500 dark:text-slate-400">Open Actions Penalty</span>
-                            <span className="font-bold text-orange-500">-{siteScore?.breakdown.actions} pts</span>
-                        </div>
-                    </div>
+                {/* Mini breakdown */}
+                <div className="grid grid-cols-3 gap-3 pt-3 border-t border-white/20">
+                  <div>
+                    <p className="text-white/60 text-[10px] uppercase">Incidents</p>
+                    <p className="font-bold text-sm">-{siteScore?.breakdown.incidents || 0} pts</p>
+                  </div>
+                  <div>
+                    <p className="text-white/60 text-[10px] uppercase">Observations</p>
+                    <p className="font-bold text-sm">+{siteScore?.breakdown.observations || 0} pts</p>
+                  </div>
+                  <div>
+                    <p className="text-white/60 text-[10px] uppercase">Actions</p>
+                    <p className="font-bold text-sm">-{siteScore?.breakdown.actions || 0} pts</p>
+                  </div>
                 </div>
-            </div>
+              </div>
+            </button>
+
+            {/* Days Incident-Free Hero Card */}
+            <button
+              onClick={() => navigate('/incidents')}
+              className="group relative bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border-2 border-slate-200 dark:border-slate-700 hover:shadow-lg hover:border-green-300 dark:hover:border-green-700 transition-all text-left overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <ShieldCheck size={120} className="text-green-600" />
+              </div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                    <Calendar className="text-green-600 dark:text-green-400" size={20} />
+                  </div>
+                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest">Days Without Incident</p>
+                </div>
+                <div className="flex items-end gap-2 mt-3">
+                  <span className={`text-5xl font-black leading-none ${stats.daysSinceLastIncident >= 30 ? 'text-green-500' : stats.daysSinceLastIncident >= 7 ? 'text-yellow-500' : 'text-red-500'}`}>
+                    {stats.totalIncidents > 0 ? stats.daysSinceLastIncident : '∞'}
+                  </span>
+                  <span className="text-lg font-bold text-slate-400 mb-1">days</span>
+                </div>
+                <p className="text-slate-500 dark:text-slate-400 text-sm mt-3">
+                  {stats.daysSinceLastIncident >= 30 ? 'Outstanding safety streak! Keep it up.' : stats.daysSinceLastIncident >= 7 ? 'Good progress — stay vigilant.' : stats.totalIncidents === 0 ? 'No incidents recorded yet.' : 'Recent incident detected — review now.'}
+                </p>
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wide mt-3 group-hover:gap-2 transition-all">
+                  View Incidents <ChevronRight size={14} />
+                </span>
+              </div>
+            </button>
+        </div>
+
+        {/* Metric Cards Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Incidents */}
+            <button
+              onClick={() => navigate('/incidents')}
+              className="group bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-red-300 dark:hover:border-red-700 transition-all text-left"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                  <AlertTriangle className="text-red-500" size={18} />
+                </div>
+                <ArrowUpRight size={14} className="text-slate-300 group-hover:text-red-400 transition-colors" />
+              </div>
+              <p className="text-2xl font-black text-slate-800 dark:text-white">{stats.totalIncidents}</p>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">Total Incidents</p>
+            </button>
+
+            {/* Open Actions */}
+            <button
+              onClick={() => navigate('/actions')}
+              className="group bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-yellow-300 dark:hover:border-yellow-700 transition-all text-left"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                  <Clock className="text-yellow-500" size={18} />
+                </div>
+                <ArrowUpRight size={14} className="text-slate-300 group-hover:text-yellow-400 transition-colors" />
+              </div>
+              <p className="text-2xl font-black text-slate-800 dark:text-white">{stats.openActions}</p>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">Open Actions</p>
+              {/* Mini progress bar */}
+              <div className="mt-2 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                <div className="h-full bg-yellow-400 rounded-full transition-all duration-700" style={{ width: `${closureRate}%` }} />
+              </div>
+              <p className="text-[10px] text-slate-400 mt-1">{closureRate}% closed</p>
+            </button>
+
+            {/* Inspections */}
+            <button
+              onClick={() => navigate('/inspections')}
+              className="group bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all text-left"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <ClipboardCheck className="text-blue-500" size={18} />
+                </div>
+                <ArrowUpRight size={14} className="text-slate-300 group-hover:text-blue-400 transition-colors" />
+              </div>
+              <p className="text-2xl font-black text-slate-800 dark:text-white">{stats.inspectionCount}</p>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">Inspections</p>
+            </button>
+
+            {/* Compliance */}
+            <button
+              onClick={() => navigate('/analytics')}
+              className="group bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-green-300 dark:hover:border-green-700 transition-all text-left"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                  <CheckCircle className="text-green-500" size={18} />
+                </div>
+                <ArrowUpRight size={14} className="text-slate-300 group-hover:text-green-400 transition-colors" />
+              </div>
+              <p className={`text-2xl font-black ${getScoreColor(siteScore?.score || 0)}`}>{siteScore ? `${siteScore.score}%` : '—'}</p>
+              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">Compliance Rate</p>
+            </button>
         </div>
       </section>
 
