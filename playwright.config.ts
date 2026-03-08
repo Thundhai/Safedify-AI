@@ -14,7 +14,7 @@ export default defineConfig({
     command: 'npx tsx server/index.ts',
     port: 4500,
     reuseExistingServer: true,
-    timeout: 15000,
+    timeout: 60000,
   },
   projects: [
     { name: 'chromium', use: { browserName: 'chromium' } },
