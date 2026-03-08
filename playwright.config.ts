@@ -15,6 +15,10 @@ export default defineConfig({
     port: 4500,
     reuseExistingServer: true,
     timeout: 60000,
+    env: {
+      PORT: '4500',
+    },
+    stdout: 'pipe',
   },
   projects: [
     { name: 'chromium', use: { browserName: 'chromium' } },
