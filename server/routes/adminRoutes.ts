@@ -97,7 +97,7 @@ router.get('/backups', (_req: AuthRequest, res: Response) => {
 
 // GET /api/admin/backups/:name — download a backup file
 router.get('/backups/:name', (req: AuthRequest, res: Response) => {
-  const name = path.basename(req.params.name);
+  const name = path.basename(req.params.name as string);
   if (!name.startsWith('safedify-backup-') || !name.endsWith('.db')) {
     res.status(400).json({ error: 'Invalid backup name' });
     return;

@@ -49,6 +49,7 @@ const RoleManagement = React.lazy(() => import('./components/RoleManagement').th
 const ProfileSettings = React.lazy(() => import('./components/ProfileSettings').then(m => ({ default: m.ProfileSettings })));
 const EnvironmentalLogPage = React.lazy(() => import('./components/EnvironmentalLogPage').then(m => ({ default: m.EnvironmentalLogPage })));
 const ActionList = React.lazy(() => import('./components/ActionList').then(m => ({ default: m.ActionList })));
+const PredictiveIntelligence = React.lazy(() => import('./components/PredictiveIntelligence').then(m => ({ default: m.PredictiveIntelligence })));
 
 /* --- LOADING FALLBACK --- */
 const PageLoader = () => (
@@ -124,6 +125,7 @@ function App() {
             }>
               <Route index element={<Dashboard />} />
               <Route path="analytics" element={<AnalyticsDashboard />} />
+              <Route path="intelligence" element={<PredictiveIntelligence />} />
               <Route path="smart-camera" element={<SmartCamera />} />
               <Route path="geo-fencing" element={<GeoFencing />} />
               <Route path="gamification" element={<Gamification />} />

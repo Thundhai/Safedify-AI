@@ -119,7 +119,7 @@ router.put('/incidents/:id', (req: AuthRequest, res: Response) => {
         title: `Incident Status → ${b.status}`,
         message: `The ${inc.type || 'incident'} at ${inc.location || 'site'} has been updated to "${b.status}".`,
         entityType: 'incident',
-        entityId: req.params.id,
+        entityId: req.params.id as string,
       }).catch(err => console.error('[Notify] incident update:', err.message));
     }
   }
@@ -182,7 +182,7 @@ router.put('/actions/:id', requirePermission('manage_incidents'), (req: AuthRequ
           title: `Action Status → ${status}`,
           message: `The action "${action.title}" status has been updated to "${status}".`,
           entityType: 'action',
-          entityId: req.params.id,
+          entityId: req.params.id as string,
         }).catch(err => console.error('[Notify] action update:', err.message));
       }
     }
@@ -273,7 +273,7 @@ router.put('/permits/:id', requirePermission('approve_permit'), (req: AuthReques
           title: `Permit ${status}`,
           message: `Your ${permit.type || 'permit'} for ${permit.location || 'site'} has been ${status.toLowerCase()}.${approver_comments ? ` Comment: ${approver_comments}` : ''}`,
           entityType: 'permit',
-          entityId: req.params.id,
+          entityId: req.params.id as string,
         }).catch(err => console.error('[Notify] permit update:', err.message));
       }
     }
@@ -283,7 +283,7 @@ router.put('/permits/:id', requirePermission('approve_permit'), (req: AuthReques
       title: `Permit ${status}: ${permit?.type || 'Unknown'}`,
       message: `${permit?.type || 'Permit'} at ${permit?.location || 'site'} has been ${status.toLowerCase()}.`,
       entityType: 'permit',
-      entityId: req.params.id,
+      entityId: req.params.id as string,
     }).catch(err => console.error('[Notify] permit managers:', err.message));
   }
 });

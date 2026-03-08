@@ -1,12 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, AreaChart, Area } from 'recharts';
-import { AlertTriangle, CheckCircle, Clock, TrendingUp, ClipboardCheck, Sparkles, Loader2, Gauge, BarChart2, Zap, ShieldCheck, Plus, X, ChevronRight, PlayCircle, Download, Calendar } from 'lucide-react';
-import { getIncidents, getActions, calculateSiteSafetyScore, calculateHSEMetrics, getInspections, getRiskAssessments, getObservations } from '../services/storageService';
-import { predictiveSafetyAlertsAI } from '../services/geminiService';
+import { AlertTriangle, CheckCircle, Clock, TrendingUp, ClipboardCheck, Sparkles, Gauge, BarChart2, Zap, ShieldCheck, Plus, X, ChevronRight, Download, Calendar } from 'lucide-react';
+import { getIncidents, getActions, calculateSiteSafetyScore, getInspections, getRiskAssessments, getObservations } from '../services/storageService';
 import { Incident, ActionItem, IncidentSeverity, SiteSafetyScore, SubscriptionTier } from '../types';
 import { apiExportData } from '../services/apiService';
-import { EnvironmentalCard } from './EnvironmentalCard';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { WelcomeScreen } from './WelcomeScreen';
@@ -33,8 +31,6 @@ export const Dashboard: React.FC = () => {
     monthlyTrends: [] as { name: string; incidents: number; observations: number }[]
   });
   const [siteScore, setSiteScore] = useState<SiteSafetyScore | null>(null);
-  const [predictiveAlerts, setPredictiveAlerts] = useState<any[]>([]);
-  const [loadingPredictions, setLoadingPredictions] = useState(false);
   const [hasData, setHasData] = useState(false);
 
   // Onboarding State
@@ -143,25 +139,6 @@ export const Dashboard: React.FC = () => {
           severityBreakdown: severityData,
           monthlyTrends: monthlyData
         });
-
-        // Run Predictive Analysis (Only if Pro or higher AND there is data)
-        if (user?.tier !== SubscriptionTier.FREE && incidents.length > 0) {
-            setLoadingPredictions(true);
-            const metrics = await calculateHSEMetrics();
-            try {
-                const res = await predictiveSafetyAlertsAI(metrics, incidents);
-                if (res && Array.isArray(res.predictions)) {
-                    setPredictiveAlerts(res.predictions);
-                } else {
-                    setPredictiveAlerts([]);
-                }
-            } catch (err) {
-                console.error("Predictive Alert Error:", err);
-                setPredictiveAlerts([]);
-            } finally {
-                setLoadingPredictions(false);
-            }
-        }
 
       } catch (error) {
         console.error('Dashboard data loading error:', error);
@@ -571,79 +548,74 @@ export const Dashboard: React.FC = () => {
         </div>
       </section>
 
-      {/* SECTION 2: INTELLIGENCE & ENVIRONMENT */}
+      {/* SECTION 2: QUICK ACCESS CARDS */}
       <section>
         <div className="flex items-center gap-3 mb-6 pt-4 border-t border-slate-200/50 dark:border-slate-700/50">
-            <div className="p-2 bg-purple-600 rounded-lg shadow-sm">
+            <div className="p-2 bg-indigo-600 rounded-lg shadow-sm">
                 <Sparkles className="text-white" size={24} />
             </div>
             <div>
-                <h2 className="text-xl font-bold text-slate-800 dark:text-white">Predictive & Environmental Intelligence</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">AI-driven forecasts and site condition monitoring</p>
+                <h2 className="text-xl font-bold text-slate-800 dark:text-white">Quick Access</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Jump into key areas of your safety workspace</p>
             </div>
         </div>
 
-        <div className="space-y-6">
-            {/* Environmental Intelligence Card (full width with integrated AI Advisory) */}
-            <EnvironmentalCard />
-
-            {/* Predictive Risk Forecast */}
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-xl shadow-md border border-slate-700 relative overflow-hidden flex flex-col min-h-[300px]">
-                {/* Overlay for Free Users */}
-                {user?.tier === SubscriptionTier.FREE && (
-                    <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-6 text-center">
-                        <Sparkles size={48} className="text-yellow-400 mb-4" />
-                        <h3 className="text-xl font-bold text-white mb-2">Predictive AI Analytics</h3>
-                        <p className="text-slate-300 mb-6 text-sm">Upgrade to Pro to unlock 7-day risk forecasting and trend analysis.</p>
-                        <button 
-                            onClick={() => navigate('/pricing')}
-                            className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-700 transition-colors shadow-lg"
-                        >
-                            Unlock Intelligence
-                        </button>
-                    </div>
-                )}
-
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <TrendingUp size={150} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* AI Intelligence Card */}
+            <button
+              onClick={() => navigate('/intelligence')}
+              className="group bg-gradient-to-br from-purple-600 to-indigo-700 text-white p-5 rounded-xl shadow-md hover:shadow-lg transition-all text-left relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                <TrendingUp size={80} />
+              </div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="p-2 bg-white/20 rounded-lg">
+                    <Sparkles className="text-yellow-300" size={20} />
+                  </div>
+                  <h3 className="font-bold text-lg">AI Intelligence</h3>
                 </div>
-                <div className="relative z-10 flex flex-col h-full">
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
-                            <Sparkles className="text-yellow-400" size={20} />
-                        </div>
-                        <h3 className="text-lg font-bold">Predictive Risk Forecast (7 Days)</h3>
-                    </div>
-                    
-                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
-                        {loadingPredictions ? (
-                            <div className="flex items-center justify-center h-full text-slate-400 gap-2">
-                                <Loader2 className="animate-spin" /> Analyzing historical data...
-                            </div>
-                        ) : (predictiveAlerts || []).length > 0 ? (
-                            predictiveAlerts.map((alert, idx) => (
-                                <div key={idx} className="bg-white/10 border border-white/10 p-4 rounded-xl flex items-start gap-4 backdrop-blur-sm hover:bg-white/20 transition-colors">
-                                    <div className={`mt-1.5 w-3 h-3 rounded-full shrink-0 ${alert.likelihood === 'High' ? 'bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.6)]' : 'bg-yellow-500'}`}></div>
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase ${alert.likelihood === 'High' ? 'bg-red-500/20 text-red-300' : 'bg-yellow-500/20 text-yellow-300'}`}>
-                                                {alert.likelihood} Probability
-                                            </span>
-                                        </div>
-                                        <p className="font-bold text-white mb-1">{alert.alert}</p>
-                                        <p className="text-sm text-slate-300">{alert.suggestedMitigation}</p>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                                <CheckCircle size={48} className="text-green-500/50 mb-2" />
-                                <p>No critical risk patterns detected for the upcoming week.</p>
-                            </div>
-                        )}
-                    </div>
+                <p className="text-purple-100 text-sm leading-relaxed mb-3">Predictive risk forecasts, environmental monitoring &amp; AI-driven safety advisories.</p>
+                <span className="inline-flex items-center gap-1 text-xs font-bold text-yellow-200 uppercase tracking-wide group-hover:gap-2 transition-all">
+                  View Full Report <ChevronRight size={14} />
+                </span>
+              </div>
+            </button>
+
+            {/* Environmental Log Card */}
+            <button
+              onClick={() => navigate('/environmental-log')}
+              className="group bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-green-300 dark:hover:border-green-700 transition-all text-left"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                  <ClipboardCheck className="text-green-600 dark:text-green-400" size={20} />
                 </div>
-            </div>
+                <h3 className="font-bold text-slate-800 dark:text-white">Environmental Log</h3>
+              </div>
+              <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-3">Track environmental readings, waste disposal and site condition records.</p>
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-green-600 dark:text-green-400 uppercase tracking-wide group-hover:gap-2 transition-all">
+                Open Log <ChevronRight size={14} />
+              </span>
+            </button>
+
+            {/* Analytics Card */}
+            <button
+              onClick={() => navigate('/analytics')}
+              className="group bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all text-left"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <BarChart2 className="text-blue-600 dark:text-blue-400" size={20} />
+                </div>
+                <h3 className="font-bold text-slate-800 dark:text-white">Analytics &amp; KPIs</h3>
+              </div>
+              <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-3">Deep-dive into safety performance trends, TRIR, LTIFR and compliance metrics.</p>
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wide group-hover:gap-2 transition-all">
+                View Analytics <ChevronRight size={14} />
+              </span>
+            </button>
         </div>
       </section>
 

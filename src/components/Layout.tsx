@@ -39,7 +39,8 @@ import {
   Download,
   Globe,
   Users,
-  Leaf
+  Leaf,
+  Brain
 } from 'lucide-react';
 import { getSyncQueue, processSyncQueue } from '../services/offlineService';
 import { AIChatAssistant } from './AIChatAssistant';
@@ -162,6 +163,7 @@ export const Layout: React.FC = () => {
       items: [
         { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
         { to: '/analytics', icon: BarChart2, label: 'Analytics & KPIs' },
+        { to: '/intelligence', icon: Brain, label: 'AI Intelligence' },
       ]
     },
     {

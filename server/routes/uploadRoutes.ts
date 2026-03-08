@@ -109,7 +109,7 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
  */
 router.get('/:filename', (req: AuthRequest, res: Response) => {
   // Sanitize filename to prevent path traversal
-  const filename = path.basename(req.params.filename);
+  const filename = path.basename(req.params.filename as string);
   const filePath = path.join(UPLOADS_DIR, filename);
 
   if (!existsSync(filePath)) {
@@ -140,7 +140,7 @@ router.get('/:filename', (req: AuthRequest, res: Response) => {
  * DELETE /api/uploads/:filename
  */
 router.delete('/:filename', authenticate, (req: AuthRequest, res: Response) => {
-  const filename = path.basename(req.params.filename);
+  const filename = path.basename(req.params.filename as string);
   const filePath = path.join(UPLOADS_DIR, filename);
 
   if (!existsSync(filePath)) {

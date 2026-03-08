@@ -37,11 +37,12 @@ try {
 // ---------- Logger function ----------
 
 export type AuditAction =
-  | 'login' | 'login_failed' | 'register' | 'logout'
+  | 'login' | 'login_failed' | 'login_2fa_required' | 'register' | 'logout'
   | 'password_reset_request' | 'password_reset'
   | 'create' | 'update' | 'delete'
   | 'export' | 'upload'
-  | 'role_change' | 'permission_change';
+  | 'role_change' | 'permission_change'
+  | '2fa_enabled' | '2fa_disabled' | '2fa_failed';
 
 export interface AuditEntry {
   action: AuditAction;
@@ -102,7 +103,7 @@ export const auditMiddleware = (entityType: string) => {
             details: method === 'DELETE' ? undefined : JSON.stringify(req.body || {}).slice(0, 500),
           });
         }
-        return originalEnd.apply(_res, args);
+        return originalEnd.apply(_res, args as [any, BufferEncoding]);
       } as any;
     }
 

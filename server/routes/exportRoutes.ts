@@ -66,7 +66,7 @@ const EXPORTABLE: Record<string, { table: string; dateCol: string; columns: stri
 };
 
 router.get('/:entity', (req: AuthRequest, res: Response) => {
-  const entity = req.params.entity;
+  const entity = req.params.entity as string;
   const config = EXPORTABLE[entity];
   if (!config) {
     res.status(400).json({ error: `Unknown entity: ${entity}. Available: ${Object.keys(EXPORTABLE).join(', ')}` });

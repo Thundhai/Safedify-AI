@@ -117,7 +117,8 @@ export async function runAgent(
 
     for (const part of functionCalls) {
       const fc = part.functionCall;
-      const toolName = fc.name;
+      if (!fc) continue;
+      const toolName = fc.name ?? '';
       const toolArgs = fc.args || {};
 
       console.log(`[Agent] Tool call: ${toolName}(${JSON.stringify(toolArgs)})`);
@@ -139,11 +140,11 @@ export async function runAgent(
         result = { error: `Unknown tool: ${toolName}` };
       }
 
-      allToolCallsMade.push({ name: toolName, args: toolArgs, result });
+      allToolCallsMade.push({ name: toolName as string, args: toolArgs, result });
 
       functionResponses.push({
         functionResponse: {
-          name: toolName,
+          name: toolName as string,
           response: { result: JSON.stringify(result).slice(0, 15000) } // cap size
         }
       });
