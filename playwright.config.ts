@@ -17,6 +17,7 @@ export default defineConfig({
     timeout: 60000,
     env: {
       PORT: '4500',
+      SEED_DEMO_USERS: 'true',
     },
     stdout: 'pipe',
   },
