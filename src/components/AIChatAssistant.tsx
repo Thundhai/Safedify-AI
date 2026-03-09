@@ -91,6 +91,10 @@ export const AIChatAssistant: React.FC = () => {
           }]);
         } catch (agentErr: any) {
           console.warn('[AI Chat] Agent path failed, falling back to direct AI:', agentErr.message);
+          // If 401 auth error, don't bother with fallback — user needs to re-login
+          if (agentErr?.message?.includes('401') || agentErr?.message?.includes('No token') || agentErr?.message?.includes('no longer exists') || agentErr?.message?.includes('expired')) {
+            throw new Error('Your session has expired. Please log out and log back in.');
+          }
           // Agent failed — try direct AI chat as fallback
           let systemContext = '';
           if (currentInput.toLowerCase().includes('stats') || currentInput.toLowerCase().includes('performance')) {

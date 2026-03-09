@@ -363,8 +363,10 @@ export const chatSafetyAssistant = async (
             message: parts,
         });
         return result.text || "I couldn't process that.";
-    } catch (error) {
-        return "Chat connection failed. Please check your API key.";
+    } catch (error: any) {
+        console.error('[chatSafetyAssistant] Error:', error?.message || error);
+        // Throw so the caller can show the real error to the user
+        throw error;
     }
 };
 

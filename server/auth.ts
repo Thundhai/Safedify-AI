@@ -109,21 +109,25 @@ export const requirePermission = (...permissions: string[]) => {
   };
 };
 
-// ---------- Seed default admin (only when SEED_DEMO_USERS=true) ----------
+// ---------- Seed default admin ----------
 
 export const seedDefaultUsers = () => {
-  if (process.env.SEED_DEMO_USERS !== 'true') {
-    // Skip seeding demo users in production — set SEED_DEMO_USERS=true in .env to enable
+  // On Vercel, the /tmp SQLite DB is ephemeral — users must be re-seeded every cold start.
+  // Locally, seeding only runs when SEED_DEMO_USERS=true.
+  const isVercel = !!process.env.VERCEL;
+  if (!isVercel && process.env.SEED_DEMO_USERS !== 'true') {
     return;
   }
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get('admin@safedify.com');
   if (!existing) {
     // Use synchronous hash so users are guaranteed to exist before any request
     const hash = bcrypt.hashSync('admin123', 10);
+    // IMPORTANT: Use deterministic IDs so tokens survive Vercel cold starts
+    // (On Vercel, /tmp/safedify.db is ephemeral — DB recreated each cold start)
     const users = [
-      { id: uuid(), name: 'John Doe', email: 'admin@safedify.com', role: 'Admin', tier: 'Enterprise', avatar: 'JD' },
-      { id: uuid(), name: 'Robert Fox', email: 'worker@safedify.com', role: 'Worker', tier: 'Free', avatar: 'RF' },
-      { id: uuid(), name: 'Sarah Connor', email: 'supervisor@safedify.com', role: 'HSE Supervisor', tier: 'Pro', avatar: 'SC' },
+      { id: 'seed-admin-001', name: 'John Doe', email: 'admin@safedify.com', role: 'Admin', tier: 'Enterprise', avatar: 'JD' },
+      { id: 'seed-worker-001', name: 'Robert Fox', email: 'worker@safedify.com', role: 'Worker', tier: 'Pro', avatar: 'RF' },
+      { id: 'seed-supervisor-001', name: 'Sarah Connor', email: 'supervisor@safedify.com', role: 'HSE Supervisor', tier: 'Pro', avatar: 'SC' },
     ];
 
     const insert = db.prepare(
