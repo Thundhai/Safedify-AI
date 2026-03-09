@@ -7,9 +7,9 @@
  * - Supports install prompts and push notifications
  */
 
-const CACHE_NAME = 'safedify-v1';
-const STATIC_CACHE = 'safedify-static-v1';
-const RUNTIME_CACHE = 'safedify-runtime-v1';
+const CACHE_NAME = 'safedify-v2';
+const STATIC_CACHE = 'safedify-static-v2';
+const RUNTIME_CACHE = 'safedify-runtime-v2';
 
 // Assets to precache on install
 const PRECACHE_URLS = [
@@ -70,7 +70,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets: cache-first
+  // HTML pages (index.html, navigation): network-first so deploys take effect immediately
+  if (fetchEvent.request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html')) {
+    fetchEvent.respondWith(networkFirst(fetchEvent.request));
+    return;
+  }
+
+  // Static assets (JS/CSS with hashes): cache-first
   fetchEvent.respondWith(cacheFirst(fetchEvent.request));
 });
 

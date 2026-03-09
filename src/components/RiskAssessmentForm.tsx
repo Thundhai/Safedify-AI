@@ -113,10 +113,10 @@ export const RiskAssessmentForm: React.FC = () => {
           const hazardsList = formData.hazards.map(h => h.description);
           const result = await reviewRiskAssessmentAI(formData.taskDescription, hazardsList);
           setAiReview(result);
-      } catch (e) {
+      } catch (e: any) {
           console.error(e);
+          toast.error(`AI Review failed: ${e?.message || 'Unknown error'}`);
       } finally {
-          setLoadingReview(false);
       }
   };
 
@@ -127,8 +127,9 @@ export const RiskAssessmentForm: React.FC = () => {
     try {
       const explanation = await explainRiskScoreAI(hazard.riskScore, hazard.description, hazard.probability, hazard.severity);
       setRiskExplanations(prev => ({ ...prev, [hazard.id]: explanation }));
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      toast.error(`AI Explanation failed: ${e?.message || 'Unknown error'}`);
     } finally {
       setLoadingExplanation(null);
     }

@@ -240,7 +240,7 @@ export const EnvironmentalCard: React.FC = () => {
       if (activeTypes.length === 0) activeTypes.push('General Construction', 'Vehicle Movement');
       const result = await analyzeWeatherRisksAI(data);
       setRiskAnalysis(result);
-    } catch (e) { console.error("Env Analysis failed", e); }
+    } catch (e: any) { console.error("Env Analysis failed", e); }
     finally { setLoadingAnalysis(false); }
   };
 

@@ -28,27 +28,69 @@ const MODEL_NAME = "gemini-2.5-flash";
 const NO_THINK = { thinkingConfig: { thinkingBudget: 0 } } as any;
 
 /**
+ * Safely parse JSON from AI response text.
+ * Handles cases where the model wraps JSON in markdown fences (```json ... ```)
+ * or returns extra whitespace / preamble text around the JSON object.
+ */
+const safeParseJSON = (text: string | undefined | null, fallback: any = {}): any => {
+  if (!text || text.trim().length === 0) return fallback;
+
+  // 1. Try direct parse first (happy path when responseMimeType works)
+  try { return JSON.parse(text); } catch { /* continue */ }
+
+  // 2. Strip markdown code fences:  ```json ... ```  or  ``` ... ```
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) {
+    try { return JSON.parse(fenceMatch[1].trim()); } catch { /* continue */ }
+  }
+
+  // 3. Greedy extraction: first { … last }
+  const braceMatch = text.match(/\{[\s\S]*\}/);
+  if (braceMatch) {
+    try { return JSON.parse(braceMatch[0]); } catch { /* continue */ }
+  }
+
+  // 4. Try array extraction: first [ … last ]
+  const arrayMatch = text.match(/\[[\s\S]*\]/);
+  if (arrayMatch) {
+    try { return JSON.parse(arrayMatch[0]); } catch { /* continue */ }
+  }
+
+  return fallback;
+};
+
+/**
  * Proxy wrapper for ai.models.generateContent Ã¢â‚¬â€ calls the backend /api/ai/generate
  */
 const aiGenerate = async (params: { model?: string; contents: any; config?: any }): Promise<{ text: string }> => {
   const token = getAuthToken();
-  const res = await fetch(`${API_BASE}/ai/generate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(params),
-  });
-  if (!res.ok) {
-    if (res.status === 429) {
-      const retryAfter = res.headers.get('Retry-After') || '30';
-      throw new Error(`AI rate limit exceeded. Please wait ${retryAfter} seconds and try again.`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45000); // 45s timeout
+  try {
+    const res = await fetch(`${API_BASE}/ai/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(params),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      if (res.status === 429) {
+        const retryAfter = res.headers.get('Retry-After') || '30';
+        throw new Error(`AI rate limit exceeded. Please wait ${retryAfter} seconds and try again.`);
+      }
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || `AI call failed: ${res.status}`);
     }
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || `AI call failed: ${res.status}`);
+    return res.json();
+  } catch (e: any) {
+    if (e.name === 'AbortError') throw new Error('AI request timed out. Please try again.');
+    throw e;
+  } finally {
+    clearTimeout(timeout);
   }
-  return res.json();
 };
 
 /**
@@ -56,23 +98,33 @@ const aiGenerate = async (params: { model?: string; contents: any; config?: any 
  */
 const aiChat = async (params: { model?: string; history: any[]; config?: any; message: any }): Promise<{ text: string }> => {
   const token = getAuthToken();
-  const res = await fetch(`${API_BASE}/ai/chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(params),
-  });
-  if (!res.ok) {
-    if (res.status === 429) {
-      const retryAfter = res.headers.get('Retry-After') || '30';
-      throw new Error(`AI rate limit exceeded. Please wait ${retryAfter} seconds and try again.`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45000); // 45s timeout
+  try {
+    const res = await fetch(`${API_BASE}/ai/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(params),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      if (res.status === 429) {
+        const retryAfter = res.headers.get('Retry-After') || '30';
+        throw new Error(`AI rate limit exceeded. Please wait ${retryAfter} seconds and try again.`);
+      }
+      const err = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(err.error || `AI chat failed: ${res.status}`);
     }
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || `AI chat failed: ${res.status}`);
+    return res.json();
+  } catch (e: any) {
+    if (e.name === 'AbortError') throw new Error('AI request timed out. Please try again.');
+    throw e;
+  } finally {
+    clearTimeout(timeout);
   }
-  return res.json();
 };
 
 /**
@@ -107,7 +159,7 @@ export const classifyIncidentAI = async (description: string) => {
         }
       }
     });
-    return JSON.parse(response.text || "{}");
+    return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("AI Classification Error:", error);
     // Return safe fallback instead of throwing
@@ -142,7 +194,7 @@ export const getCorrectiveActionsAI = async (description: string, type: string, 
         }
       }
     });
-    return JSON.parse(response.text || "{\"actions\": []}");
+    return safeParseJSON(response.text, {"actions": []});
   } catch (error) {
     return { actions: [] };
   }
@@ -182,7 +234,7 @@ export const analyzeRootCauseAI = async (description: string, type: string, meth
         }
       }
     });
-    return JSON.parse(response.text || "{}");
+    return safeParseJSON(response.text, {});
   } catch (error) {
     return { whys: [], categories: {}, rootCause: "" };
   }
@@ -214,7 +266,7 @@ export const detectPPEAI = async (base64Image: string) => {
         }
       }
     });
-    return JSON.parse(response.text || "{}");
+    return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("PPE Detection Error:", error);
     throw error;
@@ -247,7 +299,7 @@ export const extractDocumentDataAI = async (base64Image: string) => {
         }
       }
     });
-    return JSON.parse(response.text || "{}");
+    return safeParseJSON(response.text, {});
   } catch (error) {
     throw error;
   }
@@ -286,7 +338,7 @@ export const detectSiteHazardsAI = async (base64Image: string) => {
         }
       }
     });
-    return JSON.parse(response.text || "{\"detections\": []}");
+    return safeParseJSON(response.text, {"detections": []});
   } catch (error) {
     return { detections: [] };
   }
@@ -337,8 +389,7 @@ export const fetchRegulatoryNewsAI = async (country: string) => {
       }
     });
 
-    const jsonMatch = response.text?.match(/\{[\s\S]*\}/);
-    return jsonMatch ? JSON.parse(jsonMatch[0]) : { updates: [] };
+    return safeParseJSON(response.text, { updates: [] });
   } catch (error) {
     return { updates: [] };
   }
@@ -442,7 +493,7 @@ Provide actionable safety recommendations that a site HSE officer can immediatel
         }
       }
     });
-    return JSON.parse(response.text || "{}");
+    return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Weather Risk Analysis Error:", error);
     return {
@@ -497,7 +548,7 @@ Based on patterns, trends, and seasonality, predict potential safety issues and 
         }
       }
     });
-    return JSON.parse(response.text || '{"predictions": []}');
+    return safeParseJSON(response.text, {"predictions": []});
   } catch (error) {
     console.error("Predictive Safety Alerts Error:", error);
     return {
@@ -550,7 +601,7 @@ Provide a comprehensive executive summary highlighting key performance indicator
         }
       }
     });
-    return JSON.parse(response.text || '{}');
+    return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Executive Report Generation Error:", error);
     return {
@@ -601,7 +652,7 @@ Give a concise, actionable recommendation to address this issue and pass the ins
       }
     });
     
-    const result = JSON.parse(response.text || '{"suggestion": ""}');
+    const result = safeParseJSON(response.text, {"suggestion": ""});
     return result.suggestion || "Unable to provide suggestion at this time.";
   } catch (error) {
     console.error("Inspection Fix Suggestion Error:", error);
@@ -638,7 +689,7 @@ Provide a comprehensive list of potential hazards that could occur during this t
         }
       }
     });
-    return JSON.parse(response.text || '{"hazards": []}');
+    return safeParseJSON(response.text, {"hazards": []});
   } catch (error) {
     console.error("Hazard Identification Error:", error);
     return { hazards: [], riskLevel: "Unknown", additionalNotes: "AI service temporarily unavailable" };
@@ -678,7 +729,7 @@ Provide specific control measures using the hierarchy of controls (Elimination, 
         }
       }
     });
-    return JSON.parse(response.text || '{"controls": []}');
+    return safeParseJSON(response.text, {"controls": []});
   } catch (error) {
     console.error("Control Suggestion Error:", error);
     return { controls: [] };
@@ -712,7 +763,7 @@ Provide a clear explanation of why this risk score was calculated and what it me
       }
     });
     
-    const result = JSON.parse(response.text || '{"explanation": ""}');
+    const result = safeParseJSON(response.text, {"explanation": ""});
     return result.explanation || "Risk score explanation temporarily unavailable.";
   } catch (error) {
     console.error("Risk Explanation Error:", error);
@@ -748,7 +799,7 @@ Provide feedback on the risk assessment quality, missing hazards, and improvemen
         }
       }
     });
-    return JSON.parse(response.text || '{}');
+    return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Risk Assessment Review Error:", error);
     return {
@@ -808,7 +859,7 @@ Identify key themes, recurring patterns, and actionable insights to improve safe
         }
       }
     });
-    return JSON.parse(response.text || '{"trends": []}');
+    return safeParseJSON(response.text, {"trends": []});
   } catch (error) {
     console.error("Observation Trends Analysis Error:", error);
     return {
@@ -858,7 +909,7 @@ Based on the description, suggest:
         }
       }
     });
-    return JSON.parse(response.text || '{}');
+    return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Observation Analysis Error:", error);
     return {
@@ -898,7 +949,7 @@ export const parseCertificateAI = async (base64Image: string) => {
         }
       }
     });
-    return JSON.parse(response.text || '{}');
+    return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Certificate Parsing Error:", error);
     return {
@@ -954,7 +1005,7 @@ Identify missing training requirements and recommend specific modules to address
         }
       }
     });
-    return JSON.parse(response.text || '{}');
+    return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Skill Gap Analysis Error:", error);
     return {
@@ -1001,7 +1052,7 @@ Assess the safety impact and provide specific action recommendations for restock
         }
       }
     });
-    return JSON.parse(response.text || '{}');
+    return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("PPE Stock Analysis Error:", error);
     return {
@@ -1053,7 +1104,7 @@ Review for completeness, adequacy of controls, and compliance with safety standa
         }
       }
     });
-    return JSON.parse(response.text || '{"issues": [], "overallRating": "Pass"}');
+    return safeParseJSON(response.text, {"issues": [], "overallRating": "Pass"});
   } catch (error) {
     console.error("Permit Audit Error:", error);
     return {
@@ -1095,7 +1146,7 @@ export const extractCertificateDataAI = async (base64Image: string) => {
         }
       }
     });
-    return JSON.parse(response.text || '{}');
+    return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Certificate Data Extraction Error:", error);
     return {
@@ -1146,7 +1197,7 @@ Assess contractor compliance, identify issues, and provide performance rating ba
         }
       }
     });
-    return JSON.parse(response.text || '{}');
+    return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Contractor Compliance Evaluation Error:", error);
     return {
@@ -1196,7 +1247,7 @@ Provide a concise summary highlighting key safety requirements, procedures, and 
         }
       }
     });
-    return JSON.parse(response.text || '{}');
+    return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Document Summarization Error:", error);
     return {

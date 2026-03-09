@@ -51,7 +51,10 @@ export const AIChatAssistant: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    apiHealthCheck().then(ok => setBackendAvailable(ok)).catch(() => setBackendAvailable(false));
+    apiHealthCheck().then(ok => {
+      console.log('[AI Chat] Backend health:', ok);
+      setBackendAvailable(ok);
+    }).catch(() => setBackendAvailable(false));
   }, []);
 
   const scrollToBottom = () => {
@@ -75,14 +78,28 @@ export const AIChatAssistant: React.FC = () => {
     setIsLoading(true);
 
     try {
-      if (backendAvailable) {
-        const result = await apiAgentChat(currentInput, conversationId || undefined);
-        setConversationId(result.conversationId);
-        setMessages(prev => [...prev, {
-          role: 'model',
-          text: result.response,
-          toolCalls: result.toolCalls?.length > 0 ? result.toolCalls : undefined
-        }]);
+      // Try backend agent first (has DB access), fall back to direct AI chat
+      if (backendAvailable !== false) {
+        try {
+          const result = await apiAgentChat(currentInput, conversationId || undefined);
+          setConversationId(result.conversationId);
+          if (!backendAvailable) setBackendAvailable(true);
+          setMessages(prev => [...prev, {
+            role: 'model',
+            text: result.response,
+            toolCalls: result.toolCalls?.length > 0 ? result.toolCalls : undefined
+          }]);
+        } catch (agentErr: any) {
+          console.warn('[AI Chat] Agent path failed, falling back to direct AI:', agentErr.message);
+          // Agent failed — try direct AI chat as fallback
+          let systemContext = '';
+          if (currentInput.toLowerCase().includes('stats') || currentInput.toLowerCase().includes('performance')) {
+            const metrics = await calculateHSEMetrics();
+            systemContext = `Current Safety Stats: TRIR=${metrics.trir.toFixed(2)}, LTIFR=${metrics.ltifr.toFixed(2)}, LTI Count=${metrics.ltiCount}.`;
+          }
+          const response = await chatSafetyAssistant(currentInput, messages, selectedImage || undefined, systemContext);
+          setMessages(prev => [...prev, { role: 'model', text: response }]);
+        }
       } else {
         let systemContext = '';
         if (currentInput.toLowerCase().includes('stats') || currentInput.toLowerCase().includes('performance')) {
@@ -93,11 +110,14 @@ export const AIChatAssistant: React.FC = () => {
         setMessages(prev => [...prev, { role: 'model', text: response }]);
       }
     } catch (e: any) {
-      console.error(e);
+      console.error('[AI Chat] Error:', e);
       const isRateLimit = e?.message?.includes('rate limit') || e?.message?.includes('429');
+      const isTimeout = e?.message?.includes('timed out');
       setMessages(prev => [...prev, { role: 'model', text: isRateLimit
         ? '**Rate limit reached.** The AI service is temporarily throttled. Please wait 30 seconds and try again.'
-        : "I'm having trouble connecting. Please try again."
+        : isTimeout
+        ? '**Request timed out.** The AI service took too long. Please try a shorter question.'
+        : `I'm having trouble connecting. Error: ${e?.message || 'Unknown'}. Please try again.`
       }]);
     } finally {
       setIsLoading(false);

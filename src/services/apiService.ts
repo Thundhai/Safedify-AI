@@ -206,10 +206,25 @@ export const apiGetMetrics = () => apiFetch('/metrics');
 // ---------- Agent API ----------
 
 export const apiAgentChat = async (message: string, conversationId?: string) => {
-  return apiFetch('/agent/chat', {
-    method: 'POST',
-    body: JSON.stringify({ message, conversationId }),
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45000); // 45s timeout for agent (may do multiple tool calls)
+  try {
+    const result = await apiFetch('/agent/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message, conversationId }),
+      signal: controller.signal,
+    });
+    // Guard against offline placeholder response
+    if (result._offline) {
+      throw new Error('You appear to be offline. AI features require an internet connection.');
+    }
+    return result;
+  } catch (e: any) {
+    if (e.name === 'AbortError') throw new Error('AI request timed out. The server took too long to respond.');
+    throw e;
+  } finally {
+    clearTimeout(timeout);
+  }
 };
 
 export const apiGetAgentConversations = () => apiFetch('/agent/conversations');
