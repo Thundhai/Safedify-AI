@@ -14,47 +14,67 @@ import { Login } from './components/Login';
 import { Register } from './components/Register';
 import { LandingPage } from './components/LandingPage';
 
+/**
+ * Retry wrapper for React.lazy — handles stale chunk errors after deployments.
+ * If a dynamic import fails (e.g. old hash no longer exists), reload the page
+ * once to fetch fresh HTML with updated chunk references.
+ */
+const lazyRetry = (factory: () => Promise<any>): Promise<any> => {
+  const KEY = 'safedify_chunk_retry';
+  return factory().catch((err: any) => {
+    const hasRetried = sessionStorage.getItem(KEY);
+    if (!hasRetried) {
+      sessionStorage.setItem(KEY, '1');
+      window.location.reload();
+      // Return a never-resolving promise so React doesn't render the error
+      return new Promise(() => {});
+    }
+    sessionStorage.removeItem(KEY);
+    throw err; // Genuine error — let error boundary handle it
+  });
+};
+
 // Lazy-loaded pages (split into separate chunks)
-const ForgotPassword = React.lazy(() => import('./components/ForgotPassword').then(m => ({ default: m.ForgotPassword })));
-const ResetPassword = React.lazy(() => import('./components/ResetPassword').then(m => ({ default: m.ResetPassword })));
-const PublicPricing = React.lazy(() => import('./components/PublicPricing').then(m => ({ default: m.PublicPricing })));
-const Dashboard = React.lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })));
-const AnalyticsDashboard = React.lazy(() => import('./components/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard })));
-const IncidentReport = React.lazy(() => import('./components/IncidentReport').then(m => ({ default: m.IncidentReport })));
-const IncidentDetail = React.lazy(() => import('./components/IncidentDetail').then(m => ({ default: m.IncidentDetail })));
-const IncidentList = React.lazy(() => import('./components/IncidentList').then(m => ({ default: m.IncidentList })));
-const InspectionForm = React.lazy(() => import('./components/InspectionForm').then(m => ({ default: m.InspectionForm })));
-const AITools = React.lazy(() => import('./components/AITools').then(m => ({ default: m.AITools })));
-const SmartCamera = React.lazy(() => import('./components/SmartCamera').then(m => ({ default: m.SmartCamera })));
-const GeoFencing = React.lazy(() => import('./components/GeoFencing').then(m => ({ default: m.GeoFencing })));
-const Gamification = React.lazy(() => import('./components/Gamification').then(m => ({ default: m.Gamification })));
-const RiskAssessmentList = React.lazy(() => import('./components/RiskAssessmentList').then(m => ({ default: m.RiskAssessmentList })));
-const RiskAssessmentForm = React.lazy(() => import('./components/RiskAssessmentForm').then(m => ({ default: m.RiskAssessmentForm })));
-const ObservationList = React.lazy(() => import('./components/ObservationList').then(m => ({ default: m.ObservationList })));
-const ObservationForm = React.lazy(() => import('./components/ObservationForm').then(m => ({ default: m.ObservationForm })));
-const TrainingDashboard = React.lazy(() => import('./components/TrainingDashboard').then(m => ({ default: m.TrainingDashboard })));
-const WorkerDetail = React.lazy(() => import('./components/WorkerDetail').then(m => ({ default: m.WorkerDetail })));
-const WorkersList = React.lazy(() => import('./components/WorkersList').then(m => ({ default: m.WorkersList })));
-const WorkerForm = React.lazy(() => import('./components/WorkerForm').then(m => ({ default: m.WorkerForm })));
-const PPEDashboard = React.lazy(() => import('./components/PPEDashboard').then(m => ({ default: m.PPEDashboard })));
-const PermitList = React.lazy(() => import('./components/PermitList').then(m => ({ default: m.PermitList })));
-const PermitForm = React.lazy(() => import('./components/PermitForm').then(m => ({ default: m.PermitForm })));
-const AssetList = React.lazy(() => import('./components/AssetList').then(m => ({ default: m.AssetList })));
-const AssetDetail = React.lazy(() => import('./components/AssetDetail').then(m => ({ default: m.AssetDetail })));
-const ContractorList = React.lazy(() => import('./components/ContractorList').then(m => ({ default: m.ContractorList })));
-const ContractorDetail = React.lazy(() => import('./components/ContractorDetail').then(m => ({ default: m.ContractorDetail })));
-const DocumentList = React.lazy(() => import('./components/DocumentList').then(m => ({ default: m.DocumentList })));
-const DocumentForm = React.lazy(() => import('./components/DocumentForm').then(m => ({ default: m.DocumentForm })));
-const EmergencyDashboard = React.lazy(() => import('./components/EmergencyDashboard').then(m => ({ default: m.EmergencyDashboard })));
-const RegulatoryNews = React.lazy(() => import('./components/RegulatoryNews').then(m => ({ default: m.RegulatoryNews })));
-const PricingPlans = React.lazy(() => import('./components/PricingPlans').then(m => ({ default: m.PricingPlans })));
-const RoleManagement = React.lazy(() => import('./components/RoleManagement').then(m => ({ default: m.RoleManagement })));
-const ProfileSettings = React.lazy(() => import('./components/ProfileSettings').then(m => ({ default: m.ProfileSettings })));
-const EnvironmentalLogPage = React.lazy(() => import('./components/EnvironmentalLogPage').then(m => ({ default: m.EnvironmentalLogPage })));
-const ActionList = React.lazy(() => import('./components/ActionList').then(m => ({ default: m.ActionList })));
-const PredictiveIntelligence = React.lazy(() => import('./components/PredictiveIntelligence').then(m => ({ default: m.PredictiveIntelligence })));
-const LegalPage = React.lazy(() => import('./components/LegalPage').then(m => ({ default: m.LegalPage })));
-const SiteManagement = React.lazy(() => import('./components/SiteManagement').then(m => ({ default: m.SiteManagement })));
+const ForgotPassword = React.lazy(() => lazyRetry(() => import('./components/ForgotPassword').then(m => ({ default: m.ForgotPassword }))));
+const ResetPassword = React.lazy(() => lazyRetry(() => import('./components/ResetPassword').then(m => ({ default: m.ResetPassword }))));
+const PublicPricing = React.lazy(() => lazyRetry(() => import('./components/PublicPricing').then(m => ({ default: m.PublicPricing }))));
+const Dashboard = React.lazy(() => lazyRetry(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard }))));
+const AnalyticsDashboard = React.lazy(() => lazyRetry(() => import('./components/AnalyticsDashboard').then(m => ({ default: m.AnalyticsDashboard }))));
+const IncidentReport = React.lazy(() => lazyRetry(() => import('./components/IncidentReport').then(m => ({ default: m.IncidentReport }))));
+const IncidentDetail = React.lazy(() => lazyRetry(() => import('./components/IncidentDetail').then(m => ({ default: m.IncidentDetail }))));
+const IncidentList = React.lazy(() => lazyRetry(() => import('./components/IncidentList').then(m => ({ default: m.IncidentList }))));
+const InspectionForm = React.lazy(() => lazyRetry(() => import('./components/InspectionForm').then(m => ({ default: m.InspectionForm }))));
+const AITools = React.lazy(() => lazyRetry(() => import('./components/AITools').then(m => ({ default: m.AITools }))));
+const SmartCamera = React.lazy(() => lazyRetry(() => import('./components/SmartCamera').then(m => ({ default: m.SmartCamera }))));
+const GeoFencing = React.lazy(() => lazyRetry(() => import('./components/GeoFencing').then(m => ({ default: m.GeoFencing }))));
+const Gamification = React.lazy(() => lazyRetry(() => import('./components/Gamification').then(m => ({ default: m.Gamification }))));
+const RiskAssessmentList = React.lazy(() => lazyRetry(() => import('./components/RiskAssessmentList').then(m => ({ default: m.RiskAssessmentList }))));
+const RiskAssessmentForm = React.lazy(() => lazyRetry(() => import('./components/RiskAssessmentForm').then(m => ({ default: m.RiskAssessmentForm }))));
+const ObservationList = React.lazy(() => lazyRetry(() => import('./components/ObservationList').then(m => ({ default: m.ObservationList }))));
+const ObservationForm = React.lazy(() => lazyRetry(() => import('./components/ObservationForm').then(m => ({ default: m.ObservationForm }))));
+const TrainingDashboard = React.lazy(() => lazyRetry(() => import('./components/TrainingDashboard').then(m => ({ default: m.TrainingDashboard }))));
+const WorkerDetail = React.lazy(() => lazyRetry(() => import('./components/WorkerDetail').then(m => ({ default: m.WorkerDetail }))));
+const WorkersList = React.lazy(() => lazyRetry(() => import('./components/WorkersList').then(m => ({ default: m.WorkersList }))));
+const WorkerForm = React.lazy(() => lazyRetry(() => import('./components/WorkerForm').then(m => ({ default: m.WorkerForm }))));
+const PPEDashboard = React.lazy(() => lazyRetry(() => import('./components/PPEDashboard').then(m => ({ default: m.PPEDashboard }))));
+const PermitList = React.lazy(() => lazyRetry(() => import('./components/PermitList').then(m => ({ default: m.PermitList }))));
+const PermitForm = React.lazy(() => lazyRetry(() => import('./components/PermitForm').then(m => ({ default: m.PermitForm }))));
+const AssetList = React.lazy(() => lazyRetry(() => import('./components/AssetList').then(m => ({ default: m.AssetList }))));
+const AssetDetail = React.lazy(() => lazyRetry(() => import('./components/AssetDetail').then(m => ({ default: m.AssetDetail }))));
+const ContractorList = React.lazy(() => lazyRetry(() => import('./components/ContractorList').then(m => ({ default: m.ContractorList }))));
+const ContractorDetail = React.lazy(() => lazyRetry(() => import('./components/ContractorDetail').then(m => ({ default: m.ContractorDetail }))));
+const DocumentList = React.lazy(() => lazyRetry(() => import('./components/DocumentList').then(m => ({ default: m.DocumentList }))));
+const DocumentForm = React.lazy(() => lazyRetry(() => import('./components/DocumentForm').then(m => ({ default: m.DocumentForm }))));
+const EmergencyDashboard = React.lazy(() => lazyRetry(() => import('./components/EmergencyDashboard').then(m => ({ default: m.EmergencyDashboard }))));
+const RegulatoryNews = React.lazy(() => lazyRetry(() => import('./components/RegulatoryNews').then(m => ({ default: m.RegulatoryNews }))));
+const PricingPlans = React.lazy(() => lazyRetry(() => import('./components/PricingPlans').then(m => ({ default: m.PricingPlans }))));
+const RoleManagement = React.lazy(() => lazyRetry(() => import('./components/RoleManagement').then(m => ({ default: m.RoleManagement }))));
+const ProfileSettings = React.lazy(() => lazyRetry(() => import('./components/ProfileSettings').then(m => ({ default: m.ProfileSettings }))));
+const EnvironmentalLogPage = React.lazy(() => lazyRetry(() => import('./components/EnvironmentalLogPage').then(m => ({ default: m.EnvironmentalLogPage }))));
+const ActionList = React.lazy(() => lazyRetry(() => import('./components/ActionList').then(m => ({ default: m.ActionList }))));
+const PredictiveIntelligence = React.lazy(() => lazyRetry(() => import('./components/PredictiveIntelligence').then(m => ({ default: m.PredictiveIntelligence }))));
+const LegalPage = React.lazy(() => lazyRetry(() => import('./components/LegalPage').then(m => ({ default: m.LegalPage }))));
+const SiteManagement = React.lazy(() => lazyRetry(() => import('./components/SiteManagement').then(m => ({ default: m.SiteManagement }))));
 
 /* --- LOADING FALLBACK --- */
 const PageLoader = () => (
@@ -81,9 +101,36 @@ class ErrorBoundary extends React.Component<
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({ errorInfo });
     console.error('ErrorBoundary caught:', error, errorInfo);
+
+    // Auto-reload on chunk loading errors (stale deployment)
+    const msg = error?.message || '';
+    if (msg.includes('dynamically imported module') || msg.includes('Loading chunk') || msg.includes('Failed to fetch')) {
+      if (!sessionStorage.getItem('safedify_chunk_retry')) {
+        sessionStorage.setItem('safedify_chunk_retry', '1');
+        window.location.reload();
+      }
+    }
   }
   render() {
     if (this.state.hasError) {
+      const msg = this.state.error?.message || '';
+      const isChunkError = msg.includes('dynamically imported module') || msg.includes('Loading chunk') || msg.includes('Failed to fetch');
+
+      if (isChunkError) {
+        return (
+          <div style={{ padding: 40, fontFamily: 'sans-serif', background: '#1e293b', color: '#f8fafc', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <h1 style={{ color: '#f97316', marginBottom: 16 }}>New Version Available</h1>
+            <p style={{ color: '#94a3b8', fontSize: 16, marginBottom: 24 }}>A new version of Safedify has been deployed. Please refresh to continue.</p>
+            <button 
+              onClick={() => { sessionStorage.removeItem('safedify_chunk_retry'); window.location.reload(); }}
+              style={{ padding: '12px 32px', background: '#f97316', color: '#1e293b', border: 'none', borderRadius: 8, fontWeight: 'bold', cursor: 'pointer', fontSize: 16 }}
+            >
+              Refresh Now
+            </button>
+          </div>
+        );
+      }
+
       return (
         <div style={{ padding: 40, fontFamily: 'monospace', background: '#1e293b', color: '#f8fafc', minHeight: '100vh' }}>
           <h1 style={{ color: '#f97316', marginBottom: 16 }}>Safedify — Runtime Error</h1>

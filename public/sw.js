@@ -7,9 +7,9 @@
  * - Supports install prompts and push notifications
  */
 
-const CACHE_NAME = 'safedify-v2';
-const STATIC_CACHE = 'safedify-static-v2';
-const RUNTIME_CACHE = 'safedify-runtime-v2';
+const CACHE_NAME = 'safedify-v3';
+const STATIC_CACHE = 'safedify-static-v3';
+const RUNTIME_CACHE = 'safedify-runtime-v3';
 
 // Assets to precache on install
 const PRECACHE_URLS = [
@@ -82,7 +82,7 @@ self.addEventListener('fetch', (event) => {
 
 // ─── Strategies ──────────────────────────────────────────────
 
-async function cacheFirst(request: Request): Promise<Response> {
+async function cacheFirst(request) {
   const cached = await caches.match(request);
   if (cached) return cached;
 
@@ -91,6 +91,12 @@ async function cacheFirst(request: Request): Promise<Response> {
     if (response.ok && request.method === 'GET') {
       const cache = await caches.open(RUNTIME_CACHE);
       cache.put(request, response.clone());
+    }
+    // If fetch returned 404 for a JS chunk, clear caches and let the page reload
+    if (!response.ok && request.url.match(/\/assets\/.*\.js$/)) {
+      caches.delete(CACHE_NAME);
+      caches.delete(STATIC_CACHE);
+      caches.delete(RUNTIME_CACHE);
     }
     return response;
   } catch {
