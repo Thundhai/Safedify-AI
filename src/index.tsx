@@ -37,6 +37,15 @@ window.addEventListener('unhandledrejection', (event) => {
 
 const rootElement = document.getElementById('root');
 
+// Force update stale service workers so new deploys take effect immediately
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    registrations.forEach(reg => {
+      reg.update().catch(() => {});
+    });
+  });
+}
+
 if (!rootElement) {
   // This error helps you debug if your index.html is missing the <div id="root"></div>
   throw new Error("Target container 'root' is missing. Please check your index.html file.");

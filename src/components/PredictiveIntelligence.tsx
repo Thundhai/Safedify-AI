@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { Sparkles, Loader2, CheckCircle, TrendingUp, ArrowLeft, Brain, ShieldAlert } from 'lucide-react';
 import { getIncidents, calculateHSEMetrics } from '../services/storageService';
 import { predictiveSafetyAlertsAI } from '../services/geminiService';
@@ -26,6 +27,7 @@ export const PredictiveIntelligence: React.FC = () => {
         }
       } catch (err) {
         console.error('Predictive Alert Error:', err);
+        toast.error('Predictive analysis failed. AI service may be temporarily unavailable.');
         setPredictiveAlerts([]);
       } finally {
         setLoadingPredictions(false);

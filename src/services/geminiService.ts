@@ -162,16 +162,7 @@ export const classifyIncidentAI = async (description: string) => {
     return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("AI Classification Error:", error);
-    // Return safe fallback instead of throwing
-    return {
-      type: 'Safety',
-      severity: 'Low',
-      category: 'Near Miss',
-      confidence: 50,
-      reasoning: 'Unable to analyze - API unavailable',
-      causes: ['Service temporarily unavailable'],
-      contributingFactors: ['API error']
-    };
+    throw error;
   }
 };
 
@@ -196,7 +187,8 @@ export const getCorrectiveActionsAI = async (description: string, type: string, 
     });
     return safeParseJSON(response.text, {"actions": []});
   } catch (error) {
-    return { actions: [] };
+    console.error("AI Corrective Actions Error:", error);
+    throw error;
   }
 };
 
@@ -236,7 +228,8 @@ export const analyzeRootCauseAI = async (description: string, type: string, meth
     });
     return safeParseJSON(response.text, {});
   } catch (error) {
-    return { whys: [], categories: {}, rootCause: "" };
+    console.error("Root Cause Analysis Error:", error);
+    throw error;
   }
 };
 
@@ -340,7 +333,8 @@ export const detectSiteHazardsAI = async (base64Image: string) => {
     });
     return safeParseJSON(response.text, {"detections": []});
   } catch (error) {
-    return { detections: [] };
+    console.error("Site Hazard Detection Error:", error);
+    throw error;
   }
 };
 
@@ -391,7 +385,8 @@ export const fetchRegulatoryNewsAI = async (country: string) => {
 
     return safeParseJSON(response.text, { updates: [] });
   } catch (error) {
-    return { updates: [] };
+    console.error("Regulatory News Error:", error);
+    throw error;
   }
 };
 
@@ -496,13 +491,7 @@ Provide actionable safety recommendations that a site HSE officer can immediatel
     return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Weather Risk Analysis Error:", error);
-    return {
-      riskLevel: "Medium",
-      summary: "Unable to perform full analysis — using fallback assessment.",
-      recommendations: ["Monitor weather conditions regularly", "Ensure PPE compliance remains enforced"],
-      affectedActivities: ["General Operations"],
-      workStoppageRequired: false,
-    };
+    throw error;
   }
 };
 
@@ -551,11 +540,7 @@ Based on patterns, trends, and seasonality, predict potential safety issues and 
     return safeParseJSON(response.text, {"predictions": []});
   } catch (error) {
     console.error("Predictive Safety Alerts Error:", error);
-    return {
-      predictions: [],
-      confidence: 0,
-      trendsAnalysis: "Analysis service temporarily unavailable"
-    };
+    throw error;
   }
 };
 
@@ -604,20 +589,7 @@ Provide a comprehensive executive summary highlighting key performance indicator
     return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Executive Report Generation Error:", error);
-    return {
-      executiveSummary: "Executive report generation is temporarily unavailable. Please check your API configuration and try again.",
-      recommendations: [
-        {
-          title: "Service Restoration",
-          description: "Contact system administrator to restore AI reporting functionality.",
-          priority: "High",
-          timeframe: "Immediate"
-        }
-      ],
-      keyInsights: [],
-      riskAreas: [],
-      overallScore: 0
-    };
+    throw error;
   }
 };
 
@@ -656,7 +628,7 @@ Give a concise, actionable recommendation to address this issue and pass the ins
     return result.suggestion || "Unable to provide suggestion at this time.";
   } catch (error) {
     console.error("Inspection Fix Suggestion Error:", error);
-    return "AI suggestion service temporarily unavailable. Please consult safety guidelines or contact your supervisor for guidance.";
+    throw error;
   }
 };
 
@@ -692,7 +664,7 @@ Provide a comprehensive list of potential hazards that could occur during this t
     return safeParseJSON(response.text, {"hazards": []});
   } catch (error) {
     console.error("Hazard Identification Error:", error);
-    return { hazards: [], riskLevel: "Unknown", additionalNotes: "AI service temporarily unavailable" };
+    throw error;
   }
 };
 
@@ -732,7 +704,7 @@ Provide specific control measures using the hierarchy of controls (Elimination, 
     return safeParseJSON(response.text, {"controls": []});
   } catch (error) {
     console.error("Control Suggestion Error:", error);
-    return { controls: [] };
+    throw error;
   }
 };
 
@@ -767,7 +739,7 @@ Provide a clear explanation of why this risk score was calculated and what it me
     return result.explanation || "Risk score explanation temporarily unavailable.";
   } catch (error) {
     console.error("Risk Explanation Error:", error);
-    return "Unable to explain risk score at this time. Please consult safety guidelines.";
+    throw error;
   }
 };
 
@@ -802,13 +774,7 @@ Provide feedback on the risk assessment quality, missing hazards, and improvemen
     return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Risk Assessment Review Error:", error);
-    return {
-      overallScore: 0,
-      completeness: "Unable to review",
-      missingHazards: [],
-      improvements: [],
-      summary: "AI review service temporarily unavailable."
-    };
+    throw error;
   }
 };
 
@@ -862,11 +828,7 @@ Identify key themes, recurring patterns, and actionable insights to improve safe
     return safeParseJSON(response.text, {"trends": []});
   } catch (error) {
     console.error("Observation Trends Analysis Error:", error);
-    return {
-      trends: [],
-      summary: "Trends analysis service temporarily unavailable.",
-      overallScore: 0
-    };
+    throw error;
   }
 };
 
@@ -912,13 +874,7 @@ Based on the description, suggest:
     return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Observation Analysis Error:", error);
-    return {
-      type: "Unsafe Condition",
-      category: "PPE", 
-      immediateAction: "Review and address identified safety concern",
-      riskLevel: "Medium",
-      reasoning: "AI analysis service temporarily unavailable"
-    };
+    throw error;
   }
 };
 
@@ -952,13 +908,7 @@ export const parseCertificateAI = async (base64Image: string) => {
     return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Certificate Parsing Error:", error);
-    return {
-      courseTitle: "Unable to parse certificate",
-      completionDate: new Date().toISOString().split('T')[0],
-      expiryDate: "",
-      issuingAuthority: "Unknown",
-      certificateNumber: ""
-    };
+    throw error;
   }
 };
 
@@ -1008,13 +958,7 @@ Identify missing training requirements and recommend specific modules to address
     return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Skill Gap Analysis Error:", error);
-    return {
-      score: 0,
-      missingModules: [],
-      recommendedModules: [],
-      summary: "Skill gap analysis service temporarily unavailable.",
-      riskLevel: "Medium"
-    };
+    throw error;
   }
 };
 
@@ -1055,18 +999,7 @@ Assess the safety impact and provide specific action recommendations for restock
     return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("PPE Stock Analysis Error:", error);
-    return {
-      priority: "High",
-      summary: "PPE stock analysis service temporarily unavailable. Critical PPE items are below minimum thresholds.",
-      recommendations: [
-        "Contact PPE suppliers immediately",
-        "Review emergency PPE protocols",
-        "Consider temporary work restrictions for affected areas"
-      ],
-      safetyImpact: "High risk of safety incidents due to inadequate PPE availability",
-      estimatedRestockTime: "Unknown",
-      alternativeSources: []
-    };
+    throw error;
   }
 };
 
@@ -1107,14 +1040,7 @@ Review for completeness, adequacy of controls, and compliance with safety standa
     return safeParseJSON(response.text, {"issues": [], "overallRating": "Pass"});
   } catch (error) {
     console.error("Permit Audit Error:", error);
-    return {
-      issues: ["AI audit service temporarily unavailable. Manual review required."],
-      overallRating: "Conditional",
-      riskLevel: "Medium",
-      recommendations: ["Conduct manual permit review", "Verify all safety controls are in place"],
-      missingControls: [],
-      complianceScore: 50
-    };
+    throw error;
   }
 };
 
@@ -1149,14 +1075,7 @@ export const extractCertificateDataAI = async (base64Image: string) => {
     return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Certificate Data Extraction Error:", error);
-    return {
-      title: "Certificate Document",
-      expiryDate: "",
-      certificateNumber: "",
-      documentType: "Unknown",
-      issuingAuthority: "",
-      issueDate: ""
-    };
+    throw error;
   }
 };
 
@@ -1200,15 +1119,7 @@ Assess contractor compliance, identify issues, and provide performance rating ba
     return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Contractor Compliance Evaluation Error:", error);
-    return {
-      complianceScore: 50,
-      performanceRating: "Fair",
-      issues: ["Compliance evaluation service temporarily unavailable"],
-      recommendations: ["Schedule manual compliance review", "Verify contractor documentation"],
-      riskLevel: "Medium",
-      strengths: [],
-      nextReviewDate: ""
-    };
+    throw error;
   }
 };
 
@@ -1250,14 +1161,7 @@ Provide a concise summary highlighting key safety requirements, procedures, and 
     return safeParseJSON(response.text, {});
   } catch (error) {
     console.error("Document Summarization Error:", error);
-    return {
-      summary: "Document summarization service temporarily unavailable. Please review the document manually for key safety requirements and procedures.",
-      keyPoints: [],
-      safetyRequirements: [],
-      documentType: "Unknown",
-      riskLevel: "Medium",
-      applicableRoles: []
-    };
+    throw error;
   }
 };
 

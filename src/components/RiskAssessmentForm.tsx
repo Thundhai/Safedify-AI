@@ -117,6 +117,7 @@ export const RiskAssessmentForm: React.FC = () => {
           console.error(e);
           toast.error(`AI Review failed: ${e?.message || 'Unknown error'}`);
       } finally {
+          setLoadingReview(false);
       }
   };
 

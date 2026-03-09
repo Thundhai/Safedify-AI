@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import {
   Wind, Thermometer, Droplets, Activity, Ear,
   Sparkles, Loader2, AlertTriangle, CheckCircle2, RefreshCw,
@@ -240,7 +241,10 @@ export const EnvironmentalCard: React.FC = () => {
       if (activeTypes.length === 0) activeTypes.push('General Construction', 'Vehicle Movement');
       const result = await analyzeWeatherRisksAI(data);
       setRiskAnalysis(result);
-    } catch (e: any) { console.error("Env Analysis failed", e); }
+    } catch (e: any) {
+      console.error("Env Analysis failed", e);
+      toast.error('Environmental analysis failed. Please try refreshing.');
+    }
     finally { setLoadingAnalysis(false); }
   };
 
@@ -256,8 +260,18 @@ export const EnvironmentalCard: React.FC = () => {
 
   if (!weather) {
     return (
-      <div className="h-64 flex items-center justify-center bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700">
-        <Loader2 className="animate-spin text-blue-600" size={28} />
+      <div className="h-64 flex flex-col items-center justify-center bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 gap-3">
+        {fetchError ? (
+          <>
+            <Cloud size={28} className="text-slate-400" />
+            <p className="text-sm text-slate-500 dark:text-slate-400">Unable to load weather data.</p>
+            <button onClick={refreshWeather} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+              <RefreshCw size={12} /> Retry
+            </button>
+          </>
+        ) : (
+          <Loader2 className="animate-spin text-blue-600" size={28} />
+        )}
       </div>
     );
   }
