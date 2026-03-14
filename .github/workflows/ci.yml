@@ -1,15 +1,3 @@
-      - name: Initialize PostgreSQL schema
-        run: psql -h localhost -U safedify_user -d safedify -f server/postgres-schema.sql
-        env:
-          PGPASSWORD: safedify_pass
-      - name: Initialize PostgreSQL schema
-        run: psql -h localhost -U safedify_user -d safedify -f server/postgres-schema.sql
-        env:
-          PGPASSWORD: safedify_pass
-      - name: Initialize PostgreSQL schema
-        run: psql -h localhost -U safedify_user -d safedify -f server/postgres-schema.sql
-        env:
-          PGPASSWORD: safedify_pass
 name: CI
 
 on:
