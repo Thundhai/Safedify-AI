@@ -11,28 +11,7 @@ import pool from '../postgres';
 import { AuthRequest, authenticate, requireRole } from '../auth.js';
 import { v4 as uuid } from 'uuid';
 
-// ---------- Schema ----------
-try {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS audit_logs (
-      id TEXT PRIMARY KEY,
-      user_id TEXT,
-      user_email TEXT,
-      user_role TEXT,
-      action TEXT NOT NULL,
-      entity_type TEXT,
-      entity_id TEXT,
-      details TEXT,
-      ip_address TEXT,
-      user_agent TEXT,
-      created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_logs(user_id);
-    CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_logs(action);
-    CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_logs(entity_type);
-    CREATE INDEX IF NOT EXISTS idx_audit_date ON audit_logs(created_at);
-  `);
-} catch {}
+// Schema creation removed; handled by postgres-schema.sql
 
 // ---------- Logger function ----------
 
@@ -52,27 +31,28 @@ export interface AuditEntry {
   details?: string;
 }
 
-export const logAudit = (
+export const logAudit = async (
   req: AuthRequest,
   entry: AuditEntry
 ) => {
   try {
-    const ip = req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '';
+    const ip = req.ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '';
     const ua = (req.headers['user-agent'] || '').slice(0, 256);
-    db.prepare(
+    await pool.query(
       `INSERT INTO audit_logs (id, user_id, user_email, user_role, action, entity_type, entity_id, details, ip_address, user_agent)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      uuid(),
-      req.user?.id || null,
-      req.user?.email || (req.body?.email as string) || null,
-      req.user?.role || null,
-      entry.action,
-      entry.entityType || null,
-      entry.entityId || null,
-      entry.details || null,
-      ip,
-      ua,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      [
+        uuid(),
+        req.user?.id || null,
+        req.user?.email || (req.body?.email as string) || null,
+        req.user?.role || null,
+        entry.action,
+        entry.entityType || null,
+        entry.entityId || null,
+        entry.details || null,
+        ip,
+        ua,
+      ]
     );
   } catch (err: any) {
     console.error('[Audit] Write error:', err.message);
@@ -119,7 +99,7 @@ router.use(authenticate);
 router.use(requireRole('Admin'));
 
 // GET /api/audit-logs — paginated list
-router.get('/', (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
   const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
   const offset = (page - 1) * limit;
@@ -127,18 +107,21 @@ router.get('/', (req: AuthRequest, res: Response) => {
   const where: string[] = [];
   const params: any[] = [];
 
-  if (req.query.action) { where.push('action = ?'); params.push(req.query.action); }
-  if (req.query.entity_type) { where.push('entity_type = ?'); params.push(req.query.entity_type); }
-  if (req.query.user_id) { where.push('user_id = ?'); params.push(req.query.user_id); }
-  if (req.query.from) { where.push("created_at >= ?"); params.push(req.query.from); }
-  if (req.query.to) { where.push("created_at <= ?"); params.push(req.query.to); }
+  if (req.query.action) { where.push('action = $' + (params.length + 1)); params.push(req.query.action); }
+  if (req.query.entity_type) { where.push('entity_type = $' + (params.length + 1)); params.push(req.query.entity_type); }
+  if (req.query.user_id) { where.push('user_id = $' + (params.length + 1)); params.push(req.query.user_id); }
+  if (req.query.from) { where.push('created_at >= $' + (params.length + 1)); params.push(req.query.from); }
+  if (req.query.to) { where.push('created_at <= $' + (params.length + 1)); params.push(req.query.to); }
 
   const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
-  const total = (db.prepare(`SELECT COUNT(*) as c FROM audit_logs ${whereClause}`).get(...params) as any).c;
-  const rows = db.prepare(
-    `SELECT * FROM audit_logs ${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
-  ).all(...params, limit, offset);
+  const totalResult = await pool.query(`SELECT COUNT(*) as c FROM audit_logs ${whereClause}`, params);
+  const total = totalResult.rows[0]?.c || 0;
+  const rowsResult = await pool.query(
+    `SELECT * FROM audit_logs ${whereClause} ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, limit, offset]
+  );
+  const rows = rowsResult.rows;
 
   res.set('X-Total-Count', String(total));
   res.set('X-Page', String(page));
@@ -148,26 +131,28 @@ router.get('/', (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/audit-logs/export — CSV download
-router.get('/export', (req: AuthRequest, res: Response) => {
+router.get('/export', async (req: AuthRequest, res: Response) => {
   const where: string[] = [];
   const params: any[] = [];
 
-  if (req.query.from) { where.push("created_at >= ?"); params.push(req.query.from); }
-  if (req.query.to) { where.push("created_at <= ?"); params.push(req.query.to); }
+  if (req.query.from) { where.push('created_at >= $' + (params.length + 1)); params.push(req.query.from); }
+  if (req.query.to) { where.push('created_at <= $' + (params.length + 1)); params.push(req.query.to); }
 
   const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const rows = db.prepare(
-    `SELECT * FROM audit_logs ${whereClause} ORDER BY created_at DESC LIMIT 10000`
-  ).all(...params) as any[];
+  const rowsResult = await pool.query(
+    `SELECT * FROM audit_logs ${whereClause} ORDER BY created_at DESC LIMIT 10000`,
+    params
+  );
+  const rows = rowsResult.rows;
 
   const csvHeader = 'Timestamp,User,Email,Role,Action,Entity Type,Entity ID,IP Address,Details\n';
-  const csvRows = rows.map(r => {
+  const csvRows = rows.map((r: any) => {
     const escape = (v: any) => `"${String(v || '').replace(/"/g, '""')}"`;
     return [r.created_at, r.user_id, r.user_email, r.user_role, r.action, r.entity_type, r.entity_id, r.ip_address, r.details]
       .map(escape).join(',');
   }).join('\n');
 
-  logAudit(req, { action: 'export', entityType: 'audit_logs', details: `Exported ${rows.length} records` });
+  await logAudit(req, { action: 'export', entityType: 'audit_logs', details: `Exported ${rows.length} records` });
 
   res.set('Content-Type', 'text/csv');
   res.set('Content-Disposition', `attachment; filename="audit-logs-${new Date().toISOString().split('T')[0]}.csv"`);

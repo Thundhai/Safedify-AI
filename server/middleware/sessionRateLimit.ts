@@ -1,4 +1,5 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import type { AuthRequest } from '../auth';
 import rateLimit, { RateLimitRequestHandler, ipKeyGenerator } from 'express-rate-limit';
 
 /**
@@ -11,14 +12,15 @@ import rateLimit, { RateLimitRequestHandler, ipKeyGenerator } from 'express-rate
 export function sessionRateLimit(options: Parameters<typeof rateLimit>[0]): RateLimitRequestHandler {
   return rateLimit({
     ...options,
-    keyGenerator: (req: Request, _res: Response): string => {
+    keyGenerator: (req: AuthRequest, _res: Response): string => {
       // Try to use user id from req.user (set by authenticate middleware)
       // Fallback to token in Authorization header
       // Fallback to IPv6-safe IP key
       const authHeader = req.headers['authorization'];
       if (req.user && req.user.id) return `user:${req.user.id}`;
       if (authHeader && authHeader.startsWith('Bearer ')) return `token:${authHeader.slice(7)}`;
-      return ipKeyGenerator(req);
+      // Cast req to Request for ipKeyGenerator compatibility
+      return ipKeyGenerator(req as any);
     },
   });
 }

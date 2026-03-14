@@ -29,14 +29,16 @@ export const notify = async (params: NotifyParams): Promise<string> => {
   const { userId, type = 'info', title, message, entityType, entityId } = params;
 
   // Insert into DB
-  db.prepare(
+  await pool.query(
     `INSERT INTO notifications (id, user_id, type, title, message, entity_type, entity_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run(id, userId, type, title, message, entityType || null, entityId || null);
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [id, userId, type, title, message, entityType || null, entityId || null]
+  );
 
   // Attempt to send email (async, non-blocking)
   try {
-    const user = db.prepare('SELECT email, name FROM users WHERE id = ?').get(userId) as any;
+    const userResult = await pool.query('SELECT email, name FROM users WHERE id = $1', [userId]);
+    const user = userResult.rows[0];
     if (user?.email) {
       const emailSent = await sendEmail({
         to: user.email,
@@ -44,7 +46,7 @@ export const notify = async (params: NotifyParams): Promise<string> => {
         text: `Hi ${user.name || 'there'},\n\n${message}\n\nYou can view details in the Safedify dashboard.`,
       });
       if (emailSent) {
-        db.prepare('UPDATE notifications SET email_sent = 1 WHERE id = ?').run(id);
+        await pool.query('UPDATE notifications SET email_sent = 1 WHERE id = $1', [id]);
       }
     }
   } catch (err: any) {
@@ -62,9 +64,12 @@ export const notifyAllManagers = async (
   params: Omit<NotifyParams, 'userId'>
 ): Promise<number> => {
   const managerRoles = ['Admin', 'Manager', 'HSE Manager', 'Supervisor', 'HSE Supervisor', 'HSE Coordinator', 'HSE Advisor'];
-  const managers = db.prepare(
-    `SELECT id FROM users WHERE role IN (${managerRoles.map(() => '?').join(',')})`
-  ).all(...managerRoles) as any[];
+  const rolePlaceholders = managerRoles.map((_, i) => `$${i + 1}`).join(',');
+  const managersResult = await pool.query(
+    `SELECT id FROM users WHERE role IN (${rolePlaceholders})`,
+    managerRoles
+  );
+  const managers = managersResult.rows;
 
   let count = 0;
   for (const mgr of managers) {
@@ -90,9 +95,12 @@ export const notifyUserAndManagers = async (
   await notify(params);
   // Then notify managers (skip the specific user to avoid duplicate)
   const managerRoles = ['Admin', 'Manager', 'HSE Manager', 'Supervisor', 'HSE Supervisor', 'HSE Coordinator', 'HSE Advisor'];
-  const managers = db.prepare(
-    `SELECT id FROM users WHERE role IN (${managerRoles.map(() => '?').join(',')}) AND id != ?`
-  ).all(...managerRoles, params.userId) as any[];
+  const rolePlaceholders = managerRoles.map((_, i) => `$${i + 1}`).join(',');
+  const managersResult = await pool.query(
+    `SELECT id FROM users WHERE role IN (${rolePlaceholders}) AND id != $${managerRoles.length + 1}`,
+    [...managerRoles, params.userId]
+  );
+  const managers = managersResult.rows;
 
   for (const mgr of managers) {
     try {

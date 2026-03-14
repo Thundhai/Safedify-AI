@@ -31,9 +31,10 @@ router.get('/weather', async (req: AuthRequest, res: Response) => {
     const data = await fetchWeatherAndAQI(lat, lng);
 
     // Merge latest noise reading from DB into the weather response
-    const latestNoise = db.prepare(
+    const latestNoiseResult = await pool.query(
       `SELECT value FROM environmental_readings WHERE reading_type = 'noise' ORDER BY created_at DESC LIMIT 1`
-    ).get() as any;
+    );
+    const latestNoise = latestNoiseResult.rows[0];
 
     const merged = {
       ...data,
@@ -59,26 +60,26 @@ router.post('/weather/refresh', (_req: AuthRequest, res: Response) => {
 // ──────────────────────────────────────────
 
 // List all readings (newest first), with optional type & date filters
-router.get('/readings', (req: AuthRequest, res: Response) => {
+router.get('/readings', async (req: AuthRequest, res: Response) => {
   const { type, from, to, location, limit } = req.query;
   let sql = 'SELECT * FROM environmental_readings WHERE 1=1';
   const params: any[] = [];
 
-  if (type) { sql += ' AND reading_type = ?'; params.push(type); }
-  if (from) { sql += ' AND created_at >= ?'; params.push(from); }
-  if (to) { sql += ' AND created_at <= ?'; params.push(to); }
-  if (location) { sql += ' AND location = ?'; params.push(location); }
+  if (type) { sql += ' AND reading_type = $' + (params.length + 1); params.push(type); }
+  if (from) { sql += ' AND created_at >= $' + (params.length + 1); params.push(from); }
+  if (to) { sql += ' AND created_at <= $' + (params.length + 1); params.push(to); }
+  if (location) { sql += ' AND location = $' + (params.length + 1); params.push(location); }
 
   sql += ' ORDER BY created_at DESC';
   if (limit) { sql += ` LIMIT ${parseInt(limit as string, 10) || 100}`; }
 
-  const rows = db.prepare(sql).all(...params);
-  res.json(rows);
+  const result = await pool.query(sql, params);
+  res.json(result.rows);
 });
 
 // Latest reading per type
-router.get('/readings/latest', (_req: AuthRequest, res: Response) => {
-  const rows = db.prepare(`
+router.get('/readings/latest', async (_req: AuthRequest, res: Response) => {
+  const result = await pool.query(`
     SELECT er.* FROM environmental_readings er
     INNER JOIN (
       SELECT reading_type, MAX(created_at) as max_date
@@ -86,29 +87,29 @@ router.get('/readings/latest', (_req: AuthRequest, res: Response) => {
       GROUP BY reading_type
     ) latest ON er.reading_type = latest.reading_type AND er.created_at = latest.max_date
     ORDER BY er.reading_type
-  `).all();
-  res.json(rows);
+  `);
+  res.json(result.rows);
 });
 
 // Time-series for charts (returns values for a given type ordered chronologically)
-router.get('/readings/history', (req: AuthRequest, res: Response) => {
+router.get('/readings/history', async (req: AuthRequest, res: Response) => {
   const { type, hours = '24', location } = req.query;
   if (!type) { res.status(400).json({ error: 'reading type is required (?type=noise)' }); return; }
 
   const hoursBack = parseInt(hours as string, 10) || 24;
   let sql = `SELECT id, value, unit, location, zone, source, created_at
     FROM environmental_readings
-    WHERE reading_type = ? AND created_at >= datetime('now', ?)`;
-  const params: any[] = [type, `-${hoursBack} hours`];
-  if (location) { sql += ' AND location = ?'; params.push(location); }
+    WHERE reading_type = $1 AND created_at >= NOW() - INTERVAL '${hoursBack} hours'`;
+  const params: any[] = [type];
+  if (location) { sql += ' AND location = $2'; params.push(location); }
   sql += ' ORDER BY created_at ASC';
 
-  const rows = db.prepare(sql).all(...params);
-  res.json(rows);
+  const result = await pool.query(sql, params);
+  res.json(result.rows);
 });
 
 // Log a new reading
-router.post('/readings', (req: AuthRequest, res: Response) => {
+router.post('/readings', async (req: AuthRequest, res: Response) => {
   const b = req.body;
   const id = uuid();
 
@@ -134,52 +135,54 @@ router.post('/readings', (req: AuthRequest, res: Response) => {
 
   const unit = b.unit || units[b.reading_type] || '';
 
-  db.prepare(
+  await pool.query(
     `INSERT INTO environmental_readings (id, reading_type, value, unit, location, zone, source, recorded_by, notes, latitude, longitude)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    id,
-    b.reading_type,
-    b.value,
-    unit,
-    b.location ?? 'Site Zone A',
-    b.zone ?? null,
-    b.source ?? 'manual',
-    req.user?.id ?? null,
-    b.notes ?? null,
-    b.latitude ?? null,
-    b.longitude ?? null,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    [
+      id,
+      b.reading_type,
+      b.value,
+      unit,
+      b.location ?? 'Site Zone A',
+      b.zone ?? null,
+      b.source ?? 'manual',
+      req.user?.id ?? null,
+      b.notes ?? null,
+      b.latitude ?? null,
+      b.longitude ?? null,
+    ]
   );
 
-  const row = db.prepare('SELECT * FROM environmental_readings WHERE id = ?').get(id);
-  res.status(201).json(row);
+  const result = await pool.query('SELECT * FROM environmental_readings WHERE id = $1', [id]);
+  res.status(201).json(result.rows[0]);
 });
 
 // ──────────────────────────────────────────
 //  SITE LOCATIONS
 // ──────────────────────────────────────────
 
-router.get('/locations', (_req: AuthRequest, res: Response) => {
-  const rows = db.prepare('SELECT * FROM site_locations ORDER BY is_default DESC, name ASC').all();
-  res.json(rows);
+router.get('/locations', async (_req: AuthRequest, res: Response) => {
+  const result = await pool.query('SELECT * FROM site_locations ORDER BY is_default DESC, name ASC');
+  res.json(result.rows);
 });
 
-router.post('/locations', (req: AuthRequest, res: Response) => {
+router.post('/locations', async (req: AuthRequest, res: Response) => {
   const { name, latitude, longitude, is_default } = req.body;
   if (!name) { res.status(400).json({ error: 'name is required' }); return; }
   const id = uuid();
 
   // If setting as default, unset existing default
   if (is_default) {
-    db.prepare('UPDATE site_locations SET is_default = 0').run();
+    await pool.query('UPDATE site_locations SET is_default = 0');
   }
 
-  db.prepare(
-    'INSERT INTO site_locations (id, name, latitude, longitude, is_default) VALUES (?, ?, ?, ?, ?)'
-  ).run(id, name, latitude ?? null, longitude ?? null, is_default ? 1 : 0);
+  await pool.query(
+    'INSERT INTO site_locations (id, name, latitude, longitude, is_default) VALUES ($1, $2, $3, $4, $5)',
+    [id, name, latitude ?? null, longitude ?? null, is_default ? 1 : 0]
+  );
 
-  const row = db.prepare('SELECT * FROM site_locations WHERE id = ?').get(id);
-  res.status(201).json(row);
+  const result = await pool.query('SELECT * FROM site_locations WHERE id = $1', [id]);
+  res.status(201).json(result.rows[0]);
 });
 
 export default router;

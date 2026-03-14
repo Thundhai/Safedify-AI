@@ -15,55 +15,62 @@ const router = Router();
 router.use(authenticate);
 
 // ---------- List notifications for current user ----------
-router.get('/', (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   const limit = parseInt(req.query.limit as string) || 50;
   const offset = parseInt(req.query.offset as string) || 0;
-  const rows = db.prepare(
-    'SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?'
-  ).all(req.user!.id, limit, offset);
-  res.json(rows);
+  const result = await pool.query(
+    'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+    [req.user!.id, limit, offset]
+  );
+  res.json(result.rows);
 });
 
 // ---------- Unread count ----------
-router.get('/unread', (req: AuthRequest, res: Response) => {
-  const row = db.prepare(
-    'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = 0'
-  ).get(req.user!.id) as any;
+router.get('/unread', async (req: AuthRequest, res: Response) => {
+  const result = await pool.query(
+    'SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND is_read = 0',
+    [req.user!.id]
+  );
+  const row = result.rows[0];
   res.json({ count: row?.count || 0 });
 });
 
 // ---------- Mark one as read ----------
-router.put('/:id/read', (req: AuthRequest, res: Response) => {
-  db.prepare(
-    'UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?'
-  ).run(req.params.id as string, req.user!.id);
+router.put('/:id/read', async (req: AuthRequest, res: Response) => {
+  await pool.query(
+    'UPDATE notifications SET is_read = 1 WHERE id = $1 AND user_id = $2',
+    [req.params.id as string, req.user!.id]
+  );
   res.json({ message: 'Marked as read' });
 });
 
 // ---------- Mark all as read ----------
-router.put('/read-all', (req: AuthRequest, res: Response) => {
-  db.prepare(
-    'UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0'
-  ).run(req.user!.id);
+router.put('/read-all', async (req: AuthRequest, res: Response) => {
+  await pool.query(
+    'UPDATE notifications SET is_read = 1 WHERE user_id = $1 AND is_read = 0',
+    [req.user!.id]
+  );
   res.json({ message: 'All marked as read' });
 });
 
 // ---------- Delete one ----------
-router.delete('/:id', (req: AuthRequest, res: Response) => {
-  db.prepare(
-    'DELETE FROM notifications WHERE id = ? AND user_id = ?'
-  ).run(req.params.id as string, req.user!.id);
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
+  await pool.query(
+    'DELETE FROM notifications WHERE id = $1 AND user_id = $2',
+    [req.params.id as string, req.user!.id]
+  );
   res.json({ message: 'Deleted' });
 });
 
 // ============ NOTIFICATION PREFERENCES ============
 
 // ---------- Get preferences ----------
-router.get('/preferences', (req: AuthRequest, res: Response) => {
-  const prefs = db.prepare(
-    'SELECT * FROM notification_preferences WHERE user_id = ?'
-  ).get(req.user!.id) as any;
-  
+router.get('/preferences', async (req: AuthRequest, res: Response) => {
+  const result = await pool.query(
+    'SELECT * FROM notification_preferences WHERE user_id = $1',
+    [req.user!.id]
+  );
+  const prefs = result.rows[0];
   // Return defaults if no preferences set
   if (!prefs) {
     return res.json({
@@ -77,8 +84,7 @@ router.get('/preferences', (req: AuthRequest, res: Response) => {
       in_app_all: true,
     });
   }
-  
-  // Convert SQLite integers to booleans
+  // Convert DB integers/booleans
   res.json({
     user_id: prefs.user_id,
     email_incidents: !!prefs.email_incidents,
@@ -92,7 +98,7 @@ router.get('/preferences', (req: AuthRequest, res: Response) => {
 });
 
 // ---------- Update preferences ----------
-router.put('/preferences', (req: AuthRequest, res: Response) => {
+router.put('/preferences', async (req: AuthRequest, res: Response) => {
   const {
     email_incidents = true,
     email_permits = true,
@@ -102,21 +108,20 @@ router.put('/preferences', (req: AuthRequest, res: Response) => {
     email_digest = true,
     in_app_all = true,
   } = req.body;
-  
-  // Upsert preferences
-  db.prepare(`
+  // Upsert preferences (PostgreSQL ON CONFLICT)
+  await pool.query(`
     INSERT INTO notification_preferences (user_id, email_incidents, email_permits, email_actions, email_training, email_observations, email_digest, in_app_all, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
     ON CONFLICT(user_id) DO UPDATE SET
-      email_incidents = excluded.email_incidents,
-      email_permits = excluded.email_permits,
-      email_actions = excluded.email_actions,
-      email_training = excluded.email_training,
-      email_observations = excluded.email_observations,
-      email_digest = excluded.email_digest,
-      in_app_all = excluded.in_app_all,
-      updated_at = excluded.updated_at
-  `).run(
+      email_incidents = EXCLUDED.email_incidents,
+      email_permits = EXCLUDED.email_permits,
+      email_actions = EXCLUDED.email_actions,
+      email_training = EXCLUDED.email_training,
+      email_observations = EXCLUDED.email_observations,
+      email_digest = EXCLUDED.email_digest,
+      in_app_all = EXCLUDED.in_app_all,
+      updated_at = EXCLUDED.updated_at
+  `, [
     req.user!.id,
     email_incidents ? 1 : 0,
     email_permits ? 1 : 0,
@@ -125,8 +130,7 @@ router.put('/preferences', (req: AuthRequest, res: Response) => {
     email_observations ? 1 : 0,
     email_digest ? 1 : 0,
     in_app_all ? 1 : 0
-  );
-  
+  ]);
   res.json({ message: 'Preferences updated' });
 });
 

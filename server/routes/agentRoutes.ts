@@ -32,10 +32,9 @@ router.post('/chat', async (req: AuthRequest, res: Response) => {
     let history: AgentMessage[] = [];
 
     if (convId) {
-      const row = db.prepare('SELECT messages FROM agent_conversations WHERE id = ? AND user_id = ?')
-        .get(convId, req.user?.id) as any;
-      if (row) {
-        history = JSON.parse(row.messages);
+      const { rows } = await pool.query('SELECT messages FROM agent_conversations WHERE id = $1 AND user_id = $2', [convId, req.user?.id]);
+      if (rows[0]) {
+        history = JSON.parse(rows[0].messages);
       }
     } else {
       convId = uuid();
@@ -57,15 +56,17 @@ router.post('/chat', async (req: AuthRequest, res: Response) => {
     }
 
     // Save conversation
-    const existing = db.prepare('SELECT id FROM agent_conversations WHERE id = ? AND user_id = ?').get(convId, req.user?.id);
-    if (existing) {
-      db.prepare(
-        "UPDATE agent_conversations SET messages = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?"
-      ).run(JSON.stringify(history), convId, req.user?.id);
+    const { rows: existingRows } = await pool.query('SELECT id FROM agent_conversations WHERE id = $1 AND user_id = $2', [convId, req.user?.id]);
+    if (existingRows[0]) {
+      await pool.query(
+        'UPDATE agent_conversations SET messages = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3',
+        [JSON.stringify(history), convId, req.user?.id]
+      );
     } else {
-      db.prepare(
-        'INSERT INTO agent_conversations (id, user_id, messages) VALUES (?, ?, ?)'
-      ).run(convId, req.user?.id, JSON.stringify(history));
+      await pool.query(
+        'INSERT INTO agent_conversations (id, user_id, messages) VALUES ($1, $2, $3)',
+        [convId, req.user?.id, JSON.stringify(history)]
+      );
     }
 
     res.json({
@@ -95,10 +96,11 @@ router.post('/chat', async (req: AuthRequest, res: Response) => {
  * GET /api/agent/conversations
  * List user's agent conversations
  */
-router.get('/conversations', (req: AuthRequest, res: Response) => {
-  const rows = db.prepare(
-    'SELECT id, created_at, updated_at FROM agent_conversations WHERE user_id = ? ORDER BY updated_at DESC LIMIT 50'
-  ).all(req.user?.id);
+router.get('/conversations', async (req: AuthRequest, res: Response) => {
+  const { rows } = await pool.query(
+    'SELECT id, created_at, updated_at FROM agent_conversations WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 50',
+    [req.user?.id]
+  );
   res.json(rows);
 });
 
@@ -106,16 +108,16 @@ router.get('/conversations', (req: AuthRequest, res: Response) => {
  * GET /api/agent/conversations/:id
  * Get full conversation history
  */
-router.get('/conversations/:id', (req: AuthRequest, res: Response) => {
-  const row = db.prepare(
-    'SELECT * FROM agent_conversations WHERE id = ? AND user_id = ?'
-  ).get(req.params.id, req.user?.id) as any;
-
+router.get('/conversations/:id', async (req: AuthRequest, res: Response) => {
+  const { rows } = await pool.query(
+    'SELECT * FROM agent_conversations WHERE id = $1 AND user_id = $2',
+    [req.params.id, req.user?.id]
+  );
+  const row = rows[0];
   if (!row) {
     res.status(404).json({ error: 'Conversation not found' });
     return;
   }
-
   res.json({
     id: row.id,
     messages: JSON.parse(row.messages),
@@ -127,9 +129,8 @@ router.get('/conversations/:id', (req: AuthRequest, res: Response) => {
 /**
  * DELETE /api/agent/conversations/:id
  */
-router.delete('/conversations/:id', (req: AuthRequest, res: Response) => {
-  db.prepare('DELETE FROM agent_conversations WHERE id = ? AND user_id = ?')
-    .run(req.params.id, req.user?.id);
+router.delete('/conversations/:id', async (req: AuthRequest, res: Response) => {
+  await pool.query('DELETE FROM agent_conversations WHERE id = $1 AND user_id = $2', [req.params.id, req.user?.id]);
   res.json({ message: 'Deleted' });
 });
 

@@ -65,7 +65,7 @@ const EXPORTABLE: Record<string, { table: string; dateCol: string; columns: stri
   },
 };
 
-router.get('/:entity', (req: AuthRequest, res: Response) => {
+router.get('/:entity', async (req: AuthRequest, res: Response) => {
   const entity = req.params.entity as string;
   const config = EXPORTABLE[entity];
   if (!config) {
@@ -79,14 +79,16 @@ router.get('/:entity', (req: AuthRequest, res: Response) => {
 
   const where: string[] = [];
   const params: any[] = [];
-  if (from) { where.push(`${config.dateCol} >= ?`); params.push(from); }
-  if (to) { where.push(`${config.dateCol} <= ?`); params.push(to); }
+  if (from) { where.push(`${config.dateCol} >= $${params.length + 1}`); params.push(from); }
+  if (to) { where.push(`${config.dateCol} <= $${params.length + 1}`); params.push(to); }
   const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
   const selectCols = config.columns.join(', ');
-  const rows = db.prepare(
-    `SELECT ${selectCols} FROM ${config.table} ${whereClause} ORDER BY ${config.dateCol} DESC LIMIT 10000`
-  ).all(...params) as any[];
+  const result = await pool.query(
+    `SELECT ${selectCols} FROM ${config.table} ${whereClause} ORDER BY ${config.dateCol} DESC LIMIT 10000`,
+    params
+  );
+  const rows = result.rows as any[];
 
   logAudit(req, { action: 'export', entityType: entity, details: `Exported ${rows.length} ${entity} as ${format}` });
 

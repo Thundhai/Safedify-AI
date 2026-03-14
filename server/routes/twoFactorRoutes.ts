@@ -61,20 +61,16 @@ function verifyTOTP(secretHex: string, token: string): boolean {
 
 // ---------- Ensure DB column ----------
 
-try {
-  db.exec(`ALTER TABLE users ADD COLUMN totp_secret TEXT DEFAULT NULL`);
-} catch { /* column already exists */ }
-try {
-  db.exec(`ALTER TABLE users ADD COLUMN totp_enabled INTEGER DEFAULT 0`);
-} catch { /* column already exists */ }
+// PostgreSQL: Assume columns exist. If not, migrations should handle schema.
 
 // ---------- Routes ----------
 
 // POST /api/auth/2fa/setup — Generate TOTP secret & QR URI
-router.post('/setup', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/setup', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
-    const row = db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(user.id) as any;
+    const result = await pool.query('SELECT totp_enabled FROM users WHERE id = $1', [user.id]);
+    const row = result.rows[0];
     if (row?.totp_enabled) {
       res.status(400).json({ error: '2FA is already enabled. Disable it first to reconfigure.' });
       return;
@@ -84,7 +80,7 @@ router.post('/setup', authenticate, (req: AuthRequest, res: Response) => {
     const secretB32 = base32Encode(secretHex);
 
     // Store secret (not yet enabled until verified)
-    db.prepare('UPDATE users SET totp_secret = ? WHERE id = ?').run(secretHex, user.id);
+    await pool.query('UPDATE users SET totp_secret = $1 WHERE id = $2', [secretHex, user.id]);
 
     const issuer = 'Safedify';
     const otpauthUri = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(user.email)}?secret=${secretB32}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
@@ -97,13 +93,14 @@ router.post('/setup', authenticate, (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/auth/2fa/verify — Confirm setup with a valid TOTP code
-router.post('/verify', authenticate, (req: AuthRequest, res: Response) => {
+router.post('/verify', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
     const { token } = req.body;
     if (!token) { res.status(400).json({ error: 'Token is required' }); return; }
 
-    const row = db.prepare('SELECT totp_secret, totp_enabled FROM users WHERE id = ?').get(user.id) as any;
+    const result = await pool.query('SELECT totp_secret, totp_enabled FROM users WHERE id = $1', [user.id]);
+    const row = result.rows[0];
     if (!row?.totp_secret) { res.status(400).json({ error: 'No 2FA setup in progress' }); return; }
     if (row.totp_enabled) { res.status(400).json({ error: '2FA is already enabled' }); return; }
 
@@ -116,13 +113,7 @@ router.post('/verify', authenticate, (req: AuthRequest, res: Response) => {
     const backupCodes = Array.from({ length: 8 }, () => crypto.randomBytes(4).toString('hex'));
     const backupHash = JSON.stringify(backupCodes);
 
-    db.prepare('UPDATE users SET totp_enabled = 1 WHERE id = ?').run(user.id);
-
-    // Store backup codes in a simple way (in production, hash these)
-    try {
-      db.exec(`ALTER TABLE users ADD COLUMN totp_backup_codes TEXT DEFAULT NULL`);
-    } catch { /* already exists */ }
-    db.prepare('UPDATE users SET totp_backup_codes = ? WHERE id = ?').run(backupHash, user.id);
+    await pool.query('UPDATE users SET totp_enabled = 1, totp_backup_codes = $1 WHERE id = $2', [backupHash, user.id]);
 
     logAudit(req, { action: '2fa_enabled', entityType: 'user', entityId: user.id, details: '2FA enabled via TOTP' });
 
@@ -134,13 +125,14 @@ router.post('/verify', authenticate, (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/auth/2fa/validate — Validate TOTP code during login (rate-limited, requires userId + token)
-router.post('/validate', (req: AuthRequest, res: Response) => {
+router.post('/validate', async (req: AuthRequest, res: Response) => {
   try {
     const { userId, token } = req.body;
     if (!userId || !token) { res.status(400).json({ error: 'User ID and token are required' }); return; }
     if (typeof token !== 'string' || token.length > 10) { res.status(400).json({ error: 'Invalid token format' }); return; }
 
-    const row = db.prepare('SELECT totp_secret, totp_enabled, totp_backup_codes FROM users WHERE id = ?').get(userId) as any;
+    const result = await pool.query('SELECT totp_secret, totp_enabled, totp_backup_codes FROM users WHERE id = $1', [userId]);
+    const row = result.rows[0];
     if (!row?.totp_enabled || !row?.totp_secret) {
       res.status(400).json({ error: '2FA is not enabled for this account' });
       return;
@@ -159,7 +151,7 @@ router.post('/validate', (req: AuthRequest, res: Response) => {
         const idx = codes.indexOf(token);
         if (idx !== -1) {
           codes.splice(idx, 1);
-          db.prepare('UPDATE users SET totp_backup_codes = ? WHERE id = ?').run(JSON.stringify(codes), userId);
+          await pool.query('UPDATE users SET totp_backup_codes = $1 WHERE id = $2', [JSON.stringify(codes), userId]);
           res.json({ valid: true, backupCodeUsed: true, remainingBackupCodes: codes.length });
           return;
         }
@@ -174,10 +166,10 @@ router.post('/validate', (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/auth/2fa — Disable 2FA
-router.delete('/', authenticate, (req: AuthRequest, res: Response) => {
+router.delete('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
-    db.prepare('UPDATE users SET totp_secret = NULL, totp_enabled = 0, totp_backup_codes = NULL WHERE id = ?').run(user.id);
+    await pool.query('UPDATE users SET totp_secret = NULL, totp_enabled = 0, totp_backup_codes = NULL WHERE id = $1', [user.id]);
     logAudit(req, { action: '2fa_disabled', entityType: 'user', entityId: user.id, details: '2FA disabled' });
     res.json({ message: '2FA has been disabled' });
   } catch (err: any) {
@@ -187,10 +179,11 @@ router.delete('/', authenticate, (req: AuthRequest, res: Response) => {
 });
 
 // GET /api/auth/2fa/status — Check if 2FA is enabled
-router.get('/status', authenticate, (req: AuthRequest, res: Response) => {
+router.get('/status', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
-    const row = db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(user.id) as any;
+    const result = await pool.query('SELECT totp_enabled FROM users WHERE id = $1', [user.id]);
+    const row = result.rows[0];
     res.json({ enabled: !!row?.totp_enabled });
   } catch (err: any) {
     res.status(500).json({ error: 'Failed to check 2FA status' });
