@@ -10,6 +10,25 @@ jobs:
   lint-and-typecheck:
     name: Lint & Type Check
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        ports: [5432:5432]
+        env:
+          POSTGRES_USER: safedify_user
+          POSTGRES_PASSWORD: safedify_pass
+          POSTGRES_DB: safedify
+        options: >-
+          --health-cmd="pg_isready -U safedify_user -d safedify"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: safedify_user
+      PGPASSWORD: safedify_pass
+      PGDATABASE: safedify
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,6 +55,25 @@ jobs:
     name: Unit & Component Tests
     runs-on: ubuntu-latest
     needs: lint-and-typecheck
+    services:
+      postgres:
+        image: postgres:16
+        ports: [5432:5432]
+        env:
+          POSTGRES_USER: safedify_user
+          POSTGRES_PASSWORD: safedify_pass
+          POSTGRES_DB: safedify
+        options: >-
+          --health-cmd="pg_isready -U safedify_user -d safedify"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: safedify_user
+      PGPASSWORD: safedify_pass
+      PGDATABASE: safedify
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -66,6 +104,25 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: unit-tests
+    services:
+      postgres:
+        image: postgres:16
+        ports: [5432:5432]
+        env:
+          POSTGRES_USER: safedify_user
+          POSTGRES_PASSWORD: safedify_pass
+          POSTGRES_DB: safedify
+        options: >-
+          --health-cmd="pg_isready -U safedify_user -d safedify"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: safedify_user
+      PGPASSWORD: safedify_pass
+      PGDATABASE: safedify
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -92,6 +149,25 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     needs: build
+    services:
+      postgres:
+        image: postgres:16
+        ports: [5432:5432]
+        env:
+          POSTGRES_USER: safedify_user
+          POSTGRES_PASSWORD: safedify_pass
+          POSTGRES_DB: safedify
+        options: >-
+          --health-cmd="pg_isready -U safedify_user -d safedify"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: safedify_user
+      PGPASSWORD: safedify_pass
+      PGDATABASE: safedify
     steps:
       - name: Checkout
         uses: actions/checkout@v4
