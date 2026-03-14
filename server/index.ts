@@ -7,10 +7,11 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
+import { sessionRateLimit } from './middleware/sessionRateLimit.js';
 import { sanitizeBody } from './middleware/sanitize.js';
 
 // Database init (creates tables on import)
-import './db.js';
+// Removed SQLite db.js import
 
 // Auth
 import { seedDefaultUsers } from './auth.js';
@@ -76,10 +77,12 @@ const authLimiter = rateLimit({
   message: { error: 'Too many login attempts, please try again later.' },
 });
 
-const aiLimiter = rateLimit({
-  windowMs: 60 * 1000,  // 1 minute
-  max: isProduction ? 15 : 60,
-  message: { error: 'Too many AI requests. Please slow down.' },
+
+// Per-session (user/token) rate limiter for AI routes
+const aiLimiter = sessionRateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  message: { error: 'Rate limit exceeded. Please wait before sending another request.' },
   standardHeaders: true,
   legacyHeaders: false,
 });

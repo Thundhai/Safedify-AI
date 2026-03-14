@@ -4,7 +4,7 @@
  * GET /api/search?q=keyword&type=incidents,observations&limit=50
  */
 import { Router, Response } from 'express';
-import db from '../db.js';
+import pool from '../postgres';
 import { AuthRequest, authenticate } from '../auth.js';
 
 const router = Router();

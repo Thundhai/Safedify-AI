@@ -11,6 +11,7 @@ import { AreaChart, Area, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAx
 import { generateSafetyReport } from '../services/pdfExportService';
 
 export const Dashboard: React.FC = () => {
+    const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
   
@@ -172,9 +173,9 @@ export const Dashboard: React.FC = () => {
           severityBreakdown: severityData,
           monthlyTrends: monthlyData
         });
-
+        setError(null);
       } catch (error) {
-        console.error('Dashboard data loading error:', error);
+        setError('Dashboard data loading error: ' + (error?.message || 'Unknown error'));
         // Set safe defaults to prevent crashes
         setStats({
           totalIncidents: 0,
@@ -260,6 +261,11 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in">
+      {error && (
+        <div className="bg-red-100 text-red-700 p-4 rounded mb-4">
+          <strong>Error:</strong> {error}
+        </div>
+      )}
       
       {/* ONBOARDING WIDGET (Visible only if not complete and not dismissed) */}
       {showOnboarding && (

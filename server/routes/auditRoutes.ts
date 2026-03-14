@@ -7,7 +7,7 @@
  * GET  /api/audit-logs/export   — CSV export (Admin only)
  */
 import { Router, Response, NextFunction } from 'express';
-import db from '../db.js';
+import pool from '../postgres';
 import { AuthRequest, authenticate, requireRole } from '../auth.js';
 import { v4 as uuid } from 'uuid';
 

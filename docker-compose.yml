@@ -11,10 +11,11 @@ services:
       - PORT=4000
       - JWT_SECRET=${JWT_SECRET}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY:-}
-      - SITE_LATITUDE=${SITE_LATITUDE:-25.2048}
-      - SITE_LONGITUDE=${SITE_LONGITUDE:-55.2708}
-      - SMTP_HOST=${SMTP_HOST:-}
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_USER=safedify_user
+      - PG_PASSWORD=safedify_pass
+      - PG_DATABASE=safedify
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASS=${SMTP_PASS:-}
@@ -37,6 +38,22 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  postgres:
+    image: postgres:15
+    container_name: safedify-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=safedify
+      - POSTGRES_USER=safedify_user
+      - POSTGRES_PASSWORD=safedify_pass
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./server/postgres-schema.sql:/docker-entrypoint-initdb.d/postgres-schema.sql:ro
+
 volumes:
   safedify-data:
+    driver: local
+  postgres-data:
     driver: local

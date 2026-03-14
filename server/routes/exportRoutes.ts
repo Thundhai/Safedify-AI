@@ -4,7 +4,7 @@
  * GET /api/export/:entity?format=csv|json&from=&to=
  */
 import { Router, Response } from 'express';
-import db from '../db.js';
+import pool from '../postgres';
 import { AuthRequest, authenticate, requirePermission } from '../auth.js';
 import { logAudit } from './auditRoutes.js';
 

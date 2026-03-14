@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { v4 as uuid } from 'uuid';
-import db from '../db.js';
+import pool from '../postgres';
 import { AuthRequest, authenticate, requirePermission } from '../auth.js';
 import { notify, notifyAllManagers } from '../services/notificationService.js';
 

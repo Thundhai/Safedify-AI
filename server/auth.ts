@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { v4 as uuid } from 'uuid';
 import { Request, Response, NextFunction } from 'express';
-import db from './db.js';
+import pool from './postgres';
 
 const JWT_SECRET = process.env.JWT_SECRET || (() => {
   if (process.env.NODE_ENV === 'production') {
@@ -49,30 +49,33 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
     return;
   }
 
-  try {
-    const token = header.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
+  (async () => {
+    try {
+      const token = header.split(' ')[1];
+      const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
 
-    // Re-check user still exists and get fresh role/tier from DB
-    const dbUser = db.prepare('SELECT id, name, email, role, tier, avatar FROM users WHERE id = ?').get(decoded.id) as any;
-    if (!dbUser) {
-      res.status(401).json({ error: 'User account no longer exists' });
-      return;
+      // Re-check user still exists and get fresh role/tier from DB
+      const result = await pool.query('SELECT id, name, email, role, tier, avatar FROM users WHERE id = $1', [decoded.id]);
+      const dbUser = result.rows[0];
+      if (!dbUser) {
+        res.status(401).json({ error: 'User account no longer exists' });
+        return;
+      }
+
+      // Use DB values (not stale JWT values) for role/tier
+      req.user = {
+        id: dbUser.id,
+        name: dbUser.name,
+        email: dbUser.email,
+        role: dbUser.role,
+        tier: dbUser.tier,
+        avatar: dbUser.avatar,
+      };
+      next();
+    } catch {
+      res.status(401).json({ error: 'Invalid or expired token' });
     }
-
-    // Use DB values (not stale JWT values) for role/tier
-    req.user = {
-      id: dbUser.id,
-      name: dbUser.name,
-      email: dbUser.email,
-      role: dbUser.role,
-      tier: dbUser.tier,
-      avatar: dbUser.avatar,
-    };
-    next();
-  } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
-  }
+  })();
 };
 
 // ---------- RBAC Middleware ----------
@@ -93,14 +96,15 @@ export const requireRole = (...roles: string[]) => {
 
 /** Require the user's role to include a specific permission key */
 export const requirePermission = (...permissions: string[]) => {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       res.status(401).json({ error: 'Authentication required' });
       return;
     }
     // Admin bypass
     if (req.user.role === 'Admin') { next(); return; }
-    const roleRow = db.prepare('SELECT permissions FROM roles WHERE name = ?').get(req.user.role) as any;
+    const result = await pool.query('SELECT permissions FROM roles WHERE name = $1', [req.user.role]);
+    const roleRow = result.rows[0];
     if (!roleRow) { res.status(403).json({ error: 'Role not found' }); return; }
     const perms: string[] = JSON.parse(roleRow.permissions || '[]');
     const hasAll = permissions.every(p => perms.includes(p));
@@ -118,25 +122,26 @@ export const seedDefaultUsers = () => {
   if (!isVercel && process.env.SEED_DEMO_USERS !== 'true') {
     return;
   }
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get('admin@safedify.com');
-  if (!existing) {
-    // Use synchronous hash so users are guaranteed to exist before any request
-    const hash = bcrypt.hashSync('admin123', 10);
-    // IMPORTANT: Use deterministic IDs so tokens survive Vercel cold starts
-    // (On Vercel, /tmp/safedify.db is ephemeral — DB recreated each cold start)
-    const users = [
-      { id: 'seed-admin-001', name: 'John Doe', email: 'admin@safedify.com', role: 'Admin', tier: 'Enterprise', avatar: 'JD' },
-      { id: 'seed-worker-001', name: 'Robert Fox', email: 'worker@safedify.com', role: 'Worker', tier: 'Pro', avatar: 'RF' },
-      { id: 'seed-supervisor-001', name: 'Sarah Connor', email: 'supervisor@safedify.com', role: 'HSE Supervisor', tier: 'Pro', avatar: 'SC' },
-    ];
+  (async () => {
+    const result = await pool.query('SELECT id FROM users WHERE email = $1', ['admin@safedify.com']);
+    const existing = result.rows[0];
+    if (!existing) {
+      // Use synchronous hash so users are guaranteed to exist before any request
+      const hash = bcrypt.hashSync('admin123', 10);
+      // Use valid UUIDs for user IDs
+      const users = [
+        { id: uuid(), name: 'John Doe', email: 'admin@safedify.com', role: 'Admin', tier: 'Enterprise', avatar: 'JD' },
+        { id: uuid(), name: 'Robert Fox', email: 'worker@safedify.com', role: 'Worker', tier: 'Pro', avatar: 'RF' },
+        { id: uuid(), name: 'Sarah Connor', email: 'supervisor@safedify.com', role: 'HSE Supervisor', tier: 'Pro', avatar: 'SC' },
+      ];
 
-    const insert = db.prepare(
-      'INSERT INTO users (id, name, email, password_hash, role, tier, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    );
-
-    for (const u of users) {
-      insert.run(u.id, u.name, u.email, hash, u.role, u.tier, u.avatar);
+      for (const u of users) {
+        await pool.query(
+          'INSERT INTO users (id, name, email, password_hash, role, tier, avatar) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+          [u.id, u.name, u.email, hash, u.role, u.tier, u.avatar]
+        );
+      }
+      console.log('[Auth] Seeded demo users (SEED_DEMO_USERS=true)');
     }
-    console.log('[Auth] Seeded demo users (SEED_DEMO_USERS=true)');
-  }
+  })();
 };

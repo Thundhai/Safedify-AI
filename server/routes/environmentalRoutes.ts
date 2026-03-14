@@ -13,7 +13,7 @@
 
 import { Router, Response } from 'express';
 import { v4 as uuid } from 'uuid';
-import db from '../db.js';
+import pool from '../postgres';
 import { AuthRequest, authenticate } from '../auth.js';
 import { fetchWeatherAndAQI, clearWeatherCache } from '../services/weatherService.js';
 

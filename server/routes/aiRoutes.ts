@@ -45,11 +45,11 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
     res.json({ text: response.text || '' });
   } catch (err: any) {
     // Forward 429 rate-limit status properly
-    if (err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED')) {
-      const retryMatch = err.message.match(/retry in ([\d.]+)s/i);
+    if (err.status === 429 || err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED')) {
+      const retryMatch = err.message?.match(/retry in ([\d.]+)s/i);
       const retryAfter = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : 30;
       res.set('Retry-After', String(retryAfter));
-      res.status(429).json({ error: 'AI rate limit exceeded. Please wait a moment and try again.', retryAfter });
+      res.status(429).json({ error: 'Rate limit exceeded. Please wait before sending another request.', retryAfter });
       return;
     }
     console.error('[AI Proxy] Generate error:', err.message);
@@ -87,11 +87,11 @@ router.post('/chat', async (req: AuthRequest, res: Response) => {
     res.json({ text: result.text || '' });
   } catch (err: any) {
     // Forward 429 rate-limit status properly
-    if (err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED')) {
-      const retryMatch = err.message.match(/retry in ([\d.]+)s/i);
+    if (err.status === 429 || err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED')) {
+      const retryMatch = err.message?.match(/retry in ([\d.]+)s/i);
       const retryAfter = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : 30;
       res.set('Retry-After', String(retryAfter));
-      res.status(429).json({ error: 'AI rate limit exceeded. Please wait a moment and try again.', retryAfter });
+      res.status(429).json({ error: 'Rate limit exceeded. Please wait before sending another request.', retryAfter });
       return;
     }
     console.error('[AI Proxy] Chat error:', err.message);

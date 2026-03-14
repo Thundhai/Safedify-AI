@@ -6,12 +6,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 
-// ---------- Mock db before importing auth ----------
-const mockGet = vi.fn();
-const mockPrepare = vi.fn(() => ({ get: mockGet, all: vi.fn(() => []) }));
-
-vi.mock('../db.js', () => ({
-  default: { prepare: mockPrepare },
+// ---------- Mock pool before importing auth ----------
+const mockPoolQuery = vi.fn();
+vi.mock('../postgres', () => ({
+  default: { query: mockPoolQuery },
 }));
 
 // Now import auth (it will use the mocked db)
@@ -77,43 +75,43 @@ describe('Auth - authenticate middleware', () => {
     vi.clearAllMocks();
   });
 
-  it('rejects request with no Authorization header', () => {
+  it('rejects request with no Authorization header', async () => {
     const { req, res, next } = createMockReqRes();
-    authenticate(req, res, next);
+    await authenticate(req, res, next);
     expect(res.status).toHaveBeenCalledWith(401);
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('rejects request with invalid token format', () => {
+  it('rejects request with invalid token format', async () => {
     const { req, res, next } = createMockReqRes({ headers: { authorization: 'InvalidToken' } });
-    authenticate(req, res, next);
+    await authenticate(req, res, next);
     expect(res.status).toHaveBeenCalledWith(401);
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('rejects request with expired/invalid JWT', () => {
+  it('rejects request with expired/invalid JWT', async () => {
     const { req, res, next } = createMockReqRes({ headers: { authorization: 'Bearer invalidjwt123' } });
-    authenticate(req, res, next);
+    await authenticate(req, res, next);
     expect(res.status).toHaveBeenCalledWith(401);
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('rejects valid JWT if user no longer exists in DB', () => {
+  it('rejects valid JWT if user no longer exists in DB', async () => {
     const token = jwt.sign(mockUser, JWT_SECRET, { expiresIn: '1h' });
     const { req, res, next } = createMockReqRes({ headers: { authorization: `Bearer ${token}` } });
-    mockGet.mockReturnValue(null); // user not found in DB
-    authenticate(req, res, next);
+    mockPoolQuery.mockResolvedValue({ rows: [] }); // user not found in DB
+    await authenticate(req, res, next);
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: expect.stringContaining('no longer exists') }));
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('accepts valid JWT and sets fresh user from DB', () => {
+  it('accepts valid JWT and sets fresh user from DB', async () => {
     const token = jwt.sign(mockUser, JWT_SECRET, { expiresIn: '1h' });
     const freshUser = { id: 'u1', name: 'Test Updated', email: 'test@test.com', role: 'Worker', tier: 'Free', avatar: 'TU' };
-    mockGet.mockReturnValue(freshUser);
+    mockPoolQuery.mockResolvedValue({ rows: [freshUser] });
     const { req, res, next } = createMockReqRes({ headers: { authorization: `Bearer ${token}` } });
-    authenticate(req, res, next);
+    await authenticate(req, res, next);
     expect(next).toHaveBeenCalled();
     expect(req.user.role).toBe('Worker'); // uses DB value, not stale JWT
     expect(req.user.name).toBe('Test Updated');
@@ -121,36 +119,36 @@ describe('Auth - authenticate middleware', () => {
 });
 
 describe('RBAC - requireRole', () => {
-  it('rejects unauthenticated request', () => {
+  it('rejects unauthenticated request', async () => {
     const middleware = requireRole('Admin');
     const { req, res, next } = createMockReqRes();
-    middleware(req, res, next);
+    await middleware(req, res, next);
     expect(res.status).toHaveBeenCalledWith(401);
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('allows Admin to access any role-gated route', () => {
+  it('allows Admin to access any role-gated route', async () => {
     const middleware = requireRole('Worker');
     const { req, res, next } = createMockReqRes();
     req.user = { ...mockUser, role: 'Admin' };
-    middleware(req, res, next);
+    await middleware(req, res, next);
     expect(next).toHaveBeenCalled();
     expect(res.status).not.toHaveBeenCalled();
   });
 
-  it('allows matching role', () => {
+  it('allows matching role', async () => {
     const middleware = requireRole('Worker', 'HSE Supervisor');
     const { req, res, next } = createMockReqRes();
     req.user = { ...mockUser, role: 'HSE Supervisor' };
-    middleware(req, res, next);
+    await middleware(req, res, next);
     expect(next).toHaveBeenCalled();
   });
 
-  it('rejects non-matching role', () => {
+  it('rejects non-matching role', async () => {
     const middleware = requireRole('Admin');
     const { req, res, next } = createMockReqRes();
     req.user = { ...mockUser, role: 'Worker' };
-    middleware(req, res, next);
+    await middleware(req, res, next);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(next).not.toHaveBeenCalled();
   });
@@ -161,49 +159,49 @@ describe('RBAC - requirePermission', () => {
     vi.clearAllMocks();
   });
 
-  it('Admin bypasses permission check', () => {
+  it('Admin bypasses permission check', async () => {
     const middleware = requirePermission('manage_users');
     const { req, res, next } = createMockReqRes();
     req.user = { ...mockUser, role: 'Admin' };
-    middleware(req, res, next);
+    await middleware(req, res, next);
     expect(next).toHaveBeenCalled();
-    expect(mockPrepare).not.toHaveBeenCalledWith(expect.stringContaining('permissions'));
+    expect(mockPoolQuery).not.toHaveBeenCalledWith(expect.stringContaining('permissions'));
   });
 
-  it('allows user with required permission', () => {
+  it('allows user with required permission', async () => {
     const middleware = requirePermission('view_incidents');
     const { req, res, next } = createMockReqRes();
     req.user = { ...mockUser, role: 'HSE Supervisor' };
-    mockGet.mockReturnValue({ permissions: JSON.stringify(['view_incidents', 'create_incidents']) });
-    middleware(req, res, next);
+    mockPoolQuery.mockResolvedValue({ rows: [{ permissions: JSON.stringify(['view_incidents', 'create_incidents']) }] });
+    await middleware(req, res, next);
     expect(next).toHaveBeenCalled();
   });
 
-  it('rejects user missing required permission', () => {
+  it('rejects user missing required permission', async () => {
     const middleware = requirePermission('manage_users');
     const { req, res, next } = createMockReqRes();
     req.user = { ...mockUser, role: 'Worker' };
-    mockGet.mockReturnValue({ permissions: JSON.stringify(['view_incidents']) });
-    middleware(req, res, next);
+    mockPoolQuery.mockResolvedValue({ rows: [{ permissions: JSON.stringify(['view_incidents']) }] });
+    await middleware(req, res, next);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('rejects when role not found in DB', () => {
+  it('rejects when role not found in DB', async () => {
     const middleware = requirePermission('view_incidents');
     const { req, res, next } = createMockReqRes();
     req.user = { ...mockUser, role: 'Unknown' };
-    mockGet.mockReturnValue(null);
-    middleware(req, res, next);
+    mockPoolQuery.mockResolvedValue({ rows: [] });
+    await middleware(req, res, next);
     expect(res.status).toHaveBeenCalledWith(403);
   });
 
-  it('requires ALL listed permissions', () => {
+  it('requires ALL listed permissions', async () => {
     const middleware = requirePermission('view_incidents', 'manage_users');
     const { req, res, next } = createMockReqRes();
     req.user = { ...mockUser, role: 'HSE Supervisor' };
-    mockGet.mockReturnValue({ permissions: JSON.stringify(['view_incidents']) }); // missing manage_users
-    middleware(req, res, next);
+    mockPoolQuery.mockResolvedValue({ rows: [{ permissions: JSON.stringify(['view_incidents']) }] }); // missing manage_users
+    await middleware(req, res, next);
     expect(res.status).toHaveBeenCalledWith(403);
     expect(next).not.toHaveBeenCalled();
   });

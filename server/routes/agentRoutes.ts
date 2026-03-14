@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../auth.js';
 import { runAgent, AgentMessage } from '../agent/agent.js';
-import db from '../db.js';
+import pool from '../postgres';
 import { v4 as uuid } from 'uuid';
 
 const router = Router();
@@ -79,11 +79,11 @@ router.post('/chat', async (req: AuthRequest, res: Response) => {
     });
   } catch (err: any) {
     // Forward 429 rate-limit status properly
-    if (err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED')) {
-      const retryMatch = err.message.match(/retry in ([\d.]+)s/i);
+    if (err.status === 429 || err.message?.includes('429') || err.message?.includes('RESOURCE_EXHAUSTED')) {
+      const retryMatch = err.message?.match(/retry in ([\d.]+)s/i);
       const retryAfter = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : 30;
       res.set('Retry-After', String(retryAfter));
-      res.status(429).json({ error: 'AI rate limit exceeded. Please wait a moment and try again.', retryAfter });
+      res.status(429).json({ error: 'Rate limit exceeded. Please wait before sending another request.', retryAfter });
       return;
     }
     console.error('[Agent Route Error]', err);

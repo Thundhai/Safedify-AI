@@ -7,7 +7,7 @@
  *   await notifyAllManagers({ type, title, message, entityType, entityId });
  */
 import { v4 as uuid } from 'uuid';
-import db from '../db.js';
+import pool from '../postgres';
 import { sendEmail } from './emailService.js';
 
 export type NotificationType = 'info' | 'success' | 'warning' | 'danger';

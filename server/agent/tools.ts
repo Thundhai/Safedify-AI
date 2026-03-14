@@ -2,7 +2,7 @@
  * Agent Tools — callable functions the AI agent can invoke
  * Each tool has: name, description, parameters schema, and execute function
  */
-import db from '../db.js';
+import pool from '../postgres';
 import { v4 as uuid } from 'uuid';
 
 export interface ToolDefinition {
@@ -28,20 +28,19 @@ const queryIncidents: ToolDefinition = {
       limit: { type: 'number', description: 'Max results to return (default 20)' },
     }
   },
-  execute: (params) => {
+  execute: async (params) => {
     let query = 'SELECT * FROM incidents WHERE 1=1';
     const binds: any[] = [];
-
-    if (params.type) { query += ' AND type = ?'; binds.push(params.type); }
-    if (params.category) { query += ' AND category = ?'; binds.push(params.category); }
-    if (params.severity) { query += ' AND severity = ?'; binds.push(params.severity); }
-    if (params.status) { query += ' AND status = ?'; binds.push(params.status); }
-    if (params.location) { query += ' AND location LIKE ?'; binds.push(`%${params.location}%`); }
-
-    query += ' ORDER BY created_at DESC LIMIT ?';
+    let idx = 1;
+    if (params.type) { query += ` AND type = $${idx}`; binds.push(params.type); idx++; }
+    if (params.category) { query += ` AND category = $${idx}`; binds.push(params.category); idx++; }
+    if (params.severity) { query += ` AND severity = $${idx}`; binds.push(params.severity); idx++; }
+    if (params.status) { query += ` AND status = $${idx}`; binds.push(params.status); idx++; }
+    if (params.location) { query += ` AND location LIKE $${idx}`; binds.push(`%${params.location}%`); idx++; }
+    query += ` ORDER BY created_at DESC LIMIT $${idx}`;
     binds.push(params.limit || 20);
-
-    return db.prepare(query).all(...binds);
+    const result = await pool.query(query, binds);
+    return result.rows;
   }
 };
 
@@ -49,18 +48,18 @@ const getIncidentStats: ToolDefinition = {
   name: 'get_incident_stats',
   description: 'Get aggregate incident statistics: counts by type, category (OSHA), severity, status, monthly trends, days lost, and overall totals. Category hierarchy: Near Miss → First Aid Case → Medical Treatment Case → Restricted Work Case → Lost Time Injury → Fatality.',
   parameters: { type: 'object', properties: {} },
-  execute: () => {
-    const total = (db.prepare('SELECT COUNT(*) as c FROM incidents').get() as any).c;
-    const byType = db.prepare('SELECT type, COUNT(*) as count FROM incidents GROUP BY type').all();
-    const byCategory = db.prepare('SELECT category, COUNT(*) as count FROM incidents GROUP BY category').all();
-    const bySeverity = db.prepare('SELECT severity, COUNT(*) as count FROM incidents GROUP BY severity').all();
-    const byStatus = db.prepare('SELECT status, COUNT(*) as count FROM incidents GROUP BY status').all();
-    const monthly = db.prepare(
-      "SELECT strftime('%Y-%m', date) as month, COUNT(*) as count FROM incidents GROUP BY month ORDER BY month DESC LIMIT 12"
-    ).all();
-    const manHours = (db.prepare('SELECT COALESCE(SUM(man_hours),0) as total FROM stats_logs').get() as any).total;
-    const totalDaysLost = (db.prepare('SELECT COALESCE(SUM(days_lost),0) as total FROM incidents').get() as any).total;
-
+  execute: async () => {
+    const totalResult = await pool.query('SELECT COUNT(*) as c FROM incidents');
+    const total = totalResult.rows[0]?.c || 0;
+    const byType = (await pool.query('SELECT type, COUNT(*) as count FROM incidents GROUP BY type')).rows;
+    const byCategory = (await pool.query('SELECT category, COUNT(*) as count FROM incidents GROUP BY category')).rows;
+    const bySeverity = (await pool.query('SELECT severity, COUNT(*) as count FROM incidents GROUP BY severity')).rows;
+    const byStatus = (await pool.query('SELECT status, COUNT(*) as count FROM incidents GROUP BY status')).rows;
+    const monthly = (await pool.query("SELECT TO_CHAR(date, 'YYYY-MM') as month, COUNT(*) as count FROM incidents GROUP BY month ORDER BY month DESC LIMIT 12")).rows;
+    const manHoursResult = await pool.query('SELECT COALESCE(SUM(man_hours),0) as total FROM stats_logs');
+    const manHours = manHoursResult.rows[0]?.total || 0;
+    const totalDaysLostResult = await pool.query('SELECT COALESCE(SUM(days_lost),0) as total FROM incidents');
+    const totalDaysLost = totalDaysLostResult.rows[0]?.total || 0;
     return { total, byType, byCategory, bySeverity, byStatus, monthly, totalManHours: manHours, totalDaysLost };
   }
 };
@@ -77,15 +76,17 @@ const queryObservations: ToolDefinition = {
       limit: { type: 'number', description: 'Max results (default 20)' }
     }
   },
-  execute: (params) => {
+  execute: async (params) => {
     let query = 'SELECT * FROM observations WHERE 1=1';
     const binds: any[] = [];
-    if (params.type) { query += ' AND type = ?'; binds.push(params.type); }
-    if (params.category) { query += ' AND category = ?'; binds.push(params.category); }
-    if (params.status) { query += ' AND status = ?'; binds.push(params.status); }
-    query += ' ORDER BY created_at DESC LIMIT ?';
+    let idx = 1;
+    if (params.type) { query += ` AND type = $${idx}`; binds.push(params.type); idx++; }
+    if (params.category) { query += ` AND category = $${idx}`; binds.push(params.category); idx++; }
+    if (params.status) { query += ` AND status = $${idx}`; binds.push(params.status); idx++; }
+    query += ` ORDER BY created_at DESC LIMIT $${idx}`;
     binds.push(params.limit || 20);
-    return db.prepare(query).all(...binds);
+    const result = await pool.query(query, binds);
+    return result.rows;
   }
 };
 
@@ -104,18 +105,20 @@ const queryActions: ToolDefinition = {
       limit: { type: 'number' }
     }
   },
-  execute: (params) => {
+  execute: async (params) => {
     let query = 'SELECT * FROM actions WHERE 1=1';
     const binds: any[] = [];
-    if (params.status) { query += ' AND status = ?'; binds.push(params.status); }
-    if (params.priority) { query += ' AND priority = ?'; binds.push(params.priority); }
-    if (params.assignee) { query += ' AND assignee LIKE ?'; binds.push(`%${params.assignee}%`); }
-    if (params.action_type) { query += ' AND action_type = ?'; binds.push(params.action_type); }
-    if (params.indicator) { query += ' AND indicator = ?'; binds.push(params.indicator); }
-    if (params.category) { query += ' AND category = ?'; binds.push(params.category); }
-    query += ' ORDER BY created_at DESC LIMIT ?';
+    let idx = 1;
+    if (params.status) { query += ` AND status = $${idx}`; binds.push(params.status); idx++; }
+    if (params.priority) { query += ` AND priority = $${idx}`; binds.push(params.priority); idx++; }
+    if (params.assignee) { query += ` AND assignee LIKE $${idx}`; binds.push(`%${params.assignee}%`); idx++; }
+    if (params.action_type) { query += ` AND action_type = $${idx}`; binds.push(params.action_type); idx++; }
+    if (params.indicator) { query += ` AND indicator = $${idx}`; binds.push(params.indicator); idx++; }
+    if (params.category) { query += ` AND category = $${idx}`; binds.push(params.category); idx++; }
+    query += ` ORDER BY created_at DESC LIMIT $${idx}`;
     binds.push(params.limit || 20);
-    return db.prepare(query).all(...binds);
+    const result = await pool.query(query, binds);
+    return result.rows;
   }
 };
 
@@ -131,15 +134,17 @@ const queryPermits: ToolDefinition = {
       limit: { type: 'number' }
     }
   },
-  execute: (params) => {
+  execute: async (params) => {
     let query = 'SELECT * FROM permits WHERE 1=1';
     const binds: any[] = [];
-    if (params.type) { query += ' AND type = ?'; binds.push(params.type); }
-    if (params.status) { query += ' AND status = ?'; binds.push(params.status); }
-    if (params.location) { query += ' AND location LIKE ?'; binds.push(`%${params.location}%`); }
-    query += ' ORDER BY created_at DESC LIMIT ?';
+    let idx = 1;
+    if (params.type) { query += ` AND type = $${idx}`; binds.push(params.type); idx++; }
+    if (params.status) { query += ` AND status = $${idx}`; binds.push(params.status); idx++; }
+    if (params.location) { query += ` AND location LIKE $${idx}`; binds.push(`%${params.location}%`); idx++; }
+    query += ` ORDER BY created_at DESC LIMIT $${idx}`;
     binds.push(params.limit || 20);
-    return db.prepare(query).all(...binds);
+    const result = await pool.query(query, binds);
+    return result.rows;
   }
 };
 
@@ -155,15 +160,17 @@ const queryWorkers: ToolDefinition = {
       limit: { type: 'number' }
     }
   },
-  execute: (params) => {
+  execute: async (params) => {
     let query = 'SELECT * FROM workers WHERE 1=1';
     const binds: any[] = [];
-    if (params.role) { query += ' AND role = ?'; binds.push(params.role); }
-    if (params.department) { query += ' AND department = ?'; binds.push(params.department); }
-    if (params.name) { query += ' AND name LIKE ?'; binds.push(`%${params.name}%`); }
-    query += ' ORDER BY created_at DESC LIMIT ?';
+    let idx = 1;
+    if (params.role) { query += ` AND role = $${idx}`; binds.push(params.role); idx++; }
+    if (params.department) { query += ` AND department = $${idx}`; binds.push(params.department); idx++; }
+    if (params.name) { query += ` AND name LIKE $${idx}`; binds.push(`%${params.name}%`); idx++; }
+    query += ` ORDER BY created_at DESC LIMIT $${idx}`;
     binds.push(params.limit || 50);
-    return db.prepare(query).all(...binds);
+    const result = await pool.query(query, binds);
+    return result.rows;
   }
 };
 
@@ -185,12 +192,13 @@ const createIncident: ToolDefinition = {
     },
     required: ['description', 'type', 'severity']
   },
-  execute: (params) => {
+  execute: async (params) => {
     const id = uuid();
-    db.prepare(
-      `INSERT INTO incidents (id, description, location, date, type, category, severity, status, reported_by, days_lost, body_part, mechanism, immediate_action) 
-       VALUES (?, ?, ?, datetime('now'), ?, ?, ?, 'Open', ?, ?, ?, ?, ?)`
-    ).run(id, params.description, params.location || 'Not specified', params.type, params.category || 'Near Miss', params.severity, params._userId || null, params.days_lost || 0, params.body_part, params.mechanism, params.immediate_action);
+    await pool.query(
+      `INSERT INTO incidents (id, description, location, date, type, category, severity, status, reported_by, days_lost, body_part, mechanism, immediate_action)
+       VALUES ($1, $2, $3, NOW(), $4, $5, $6, 'Open', $7, $8, $9, $10, $11)`,
+      [id, params.description, params.location || 'Not specified', params.type, params.category || 'Near Miss', params.severity, params._userId || null, params.days_lost || 0, params.body_part, params.mechanism, params.immediate_action]
+    );
     return { success: true, id, message: `Incident created with ID ${id}` };
   }
 };
@@ -213,11 +221,12 @@ const createAction: ToolDefinition = {
     },
     required: ['title']
   },
-  execute: (params) => {
+  execute: async (params) => {
     const id = uuid();
-    db.prepare(
-      'INSERT INTO actions (id, title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)'
-    ).run(id, params.title, params.description, params.assignee, params.due_date, params.priority || 'Medium', 'Open', params.action_type || 'Corrective', params.category || 'Other', params.indicator || 'Lagging', params.related_incident_id);
+    await pool.query(
+      'INSERT INTO actions (id, title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+      [id, params.title, params.description, params.assignee, params.due_date, params.priority || 'Medium', 'Open', params.action_type || 'Corrective', params.category || 'Other', params.indicator || 'Lagging', params.related_incident_id]
+    );
     return { success: true, id, message: `Action "${params.title}" created as ${params.indicator || 'Lagging'} / ${params.action_type || 'Corrective'}` };
   }
 };
@@ -226,18 +235,18 @@ const calculateSafetyMetrics: ToolDefinition = {
   name: 'calculate_safety_metrics',
   description: 'Calculate HSE KPIs including TRIR, LTIFR, severity rate, leading/lagging indicator performance, action closure rates by type, and incident category breakdown (OSHA pyramid).',
   parameters: { type: 'object', properties: {} },
-  execute: () => {
-    const totalIncidents = (db.prepare('SELECT COUNT(*) as c FROM incidents').get() as any).c;
-    const ltiCount = (db.prepare("SELECT COUNT(*) as c FROM incidents WHERE category = 'Lost Time Injury'").get() as any).c;
-    const rwcCount = (db.prepare("SELECT COUNT(*) as c FROM incidents WHERE category = 'Restricted Work Case'").get() as any).c;
-    const mtcCount = (db.prepare("SELECT COUNT(*) as c FROM incidents WHERE category = 'Medical Treatment Case'").get() as any).c;
-    const facCount = (db.prepare("SELECT COUNT(*) as c FROM incidents WHERE category = 'First Aid Case'").get() as any).c;
-    const nearMisses = (db.prepare("SELECT COUNT(*) as c FROM incidents WHERE category = 'Near Miss'").get() as any).c;
-    const fatalities = (db.prepare("SELECT COUNT(*) as c FROM incidents WHERE category = 'Fatality'").get() as any).c;
-    const totalDaysLost = (db.prepare('SELECT COALESCE(SUM(days_lost),0) as t FROM incidents').get() as any).t;
-    const manHours = (db.prepare('SELECT COALESCE(SUM(man_hours),0) as t FROM stats_logs').get() as any).t;
-    const openActions = (db.prepare("SELECT COUNT(*) as c FROM actions WHERE status NOT IN ('Done','Verified')").get() as any).c;
-    const totalInspections = (db.prepare('SELECT COUNT(*) as c FROM inspections WHERE completed = 1').get() as any).c;
+  execute: async () => {
+    const totalIncidents = (await pool.query('SELECT COUNT(*) as c FROM incidents')).rows[0]?.c || 0;
+    const ltiCount = (await pool.query("SELECT COUNT(*) as c FROM incidents WHERE category = 'Lost Time Injury'")).rows[0]?.c || 0;
+    const rwcCount = (await pool.query("SELECT COUNT(*) as c FROM incidents WHERE category = 'Restricted Work Case'")).rows[0]?.c || 0;
+    const mtcCount = (await pool.query("SELECT COUNT(*) as c FROM incidents WHERE category = 'Medical Treatment Case'")).rows[0]?.c || 0;
+    const facCount = (await pool.query("SELECT COUNT(*) as c FROM incidents WHERE category = 'First Aid Case'")).rows[0]?.c || 0;
+    const nearMisses = (await pool.query("SELECT COUNT(*) as c FROM incidents WHERE category = 'Near Miss'")).rows[0]?.c || 0;
+    const fatalities = (await pool.query("SELECT COUNT(*) as c FROM incidents WHERE category = 'Fatality'")).rows[0]?.c || 0;
+    const totalDaysLost = (await pool.query('SELECT COALESCE(SUM(days_lost),0) as t FROM incidents')).rows[0]?.t || 0;
+    const manHours = (await pool.query('SELECT COALESCE(SUM(man_hours),0) as t FROM stats_logs')).rows[0]?.t || 0;
+    const openActions = (await pool.query("SELECT COUNT(*) as c FROM actions WHERE status NOT IN ('Done','Verified')")).rows[0]?.c || 0;
+    const totalInspections = (await pool.query('SELECT COUNT(*) as c FROM inspections WHERE completed = 1')).rows[0]?.c || 0;
 
     const recordable = mtcCount + rwcCount + ltiCount + fatalities;
     const trir = manHours > 0 ? (recordable / manHours) * 200000 : 0;
@@ -246,11 +255,11 @@ const calculateSafetyMetrics: ToolDefinition = {
     const nearMissRate = manHours > 0 ? (nearMisses / manHours) * 200000 : 0;
 
     // Leading / Lagging action breakdown
-    const leadingTotal = (db.prepare("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Leading'").get() as any).c;
-    const leadingClosed = (db.prepare("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Leading' AND status IN ('Done','Verified')").get() as any).c;
-    const laggingTotal = (db.prepare("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Lagging'").get() as any).c;
-    const laggingClosed = (db.prepare("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Lagging' AND status IN ('Done','Verified')").get() as any).c;
-    const byActionCategory = db.prepare('SELECT category, indicator, action_type, COUNT(*) as count FROM actions GROUP BY category, indicator, action_type').all();
+    const leadingTotal = (await pool.query("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Leading'")).rows[0]?.c || 0;
+    const leadingClosed = (await pool.query("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Leading' AND status IN ('Done','Verified')")).rows[0]?.c || 0;
+    const laggingTotal = (await pool.query("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Lagging'")).rows[0]?.c || 0;
+    const laggingClosed = (await pool.query("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Lagging' AND status IN ('Done','Verified')")).rows[0]?.c || 0;
+    const byActionCategory = (await pool.query('SELECT category, indicator, action_type, COUNT(*) as count FROM actions GROUP BY category, indicator, action_type')).rows;
 
     return {
       totalIncidents,
@@ -282,7 +291,7 @@ const runCustomQuery: ToolDefinition = {
     },
     required: ['sql']
   },
-  execute: (params) => {
+  execute: async (params) => {
     const sql = params.sql.trim();
     // Safety: only allow SELECT statements (must start with SELECT after stripping comments)
     const stripped = sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '').trim();
@@ -307,8 +316,8 @@ const runCustomQuery: ToolDefinition = {
       }
     }
     try {
-      const results = db.prepare(sql).all();
-      return { rowCount: results.length, data: results.slice(0, 100) };
+      const result = await pool.query(sql);
+      return { rowCount: result.rows.length, data: result.rows.slice(0, 100) };
     } catch (err: any) {
       return { error: err.message };
     }
@@ -319,10 +328,10 @@ const getOverdueActions: ToolDefinition = {
   name: 'get_overdue_actions',
   description: 'Get all overdue corrective actions (due date has passed and status is not Done).',
   parameters: { type: 'object', properties: {} },
-  execute: () => {
-    return db.prepare(
-      "SELECT * FROM actions WHERE status != 'Done' AND due_date < date('now') ORDER BY due_date ASC"
-    ).all();
+  execute: async () => {
+    return (await pool.query(
+      "SELECT * FROM actions WHERE status != 'Done' AND due_date < NOW() ORDER BY due_date ASC"
+    )).rows;
   }
 };
 
@@ -330,10 +339,10 @@ const getExpiringPermits: ToolDefinition = {
   name: 'get_expiring_permits',
   description: 'Get permits that are expiring within the next 7 days or have already expired.',
   parameters: { type: 'object', properties: {} },
-  execute: () => {
-    return db.prepare(
-      "SELECT * FROM permits WHERE status = 'Active' AND valid_until < date('now', '+7 days') ORDER BY valid_until ASC"
-    ).all();
+  execute: async () => {
+    return (await pool.query(
+      "SELECT * FROM permits WHERE status = 'Active' AND valid_until < NOW() + INTERVAL '7 days' ORDER BY valid_until ASC"
+    )).rows;
   }
 };
 

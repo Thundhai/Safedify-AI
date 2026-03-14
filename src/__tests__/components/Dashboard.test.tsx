@@ -11,6 +11,29 @@ vi.mock('../../services/storageService', () => ({
   getRiskAssessments: vi.fn().mockResolvedValue([]),
   getObservations: vi.fn().mockResolvedValue([]),
   calculateSiteSafetyScore: vi.fn().mockResolvedValue({ score: 85, rating: 'Good', breakdown: { incidents: 20, observations: 20, inspections: 15, training: 15, actions: 15 } }),
+  calculateHSEMetrics: vi.fn().mockResolvedValue({
+    totalManHours: 10000,
+    ltiCount: 1,
+    mtcCount: 2,
+    rwcCount: 0,
+    facCount: 3,
+    nmCount: 4,
+    fatalityCount: 0,
+    trir: 0.5,
+    ltifr: 0.1,
+    severityRate: 0.2,
+    actionClosureRate: 0.8,
+    inspectionCompliance: 0.9,
+    leadingActions: 5,
+    leadingClosureRate: 0.7,
+    inspectionsCompleted: 10,
+    trainingHours: 100,
+    nearMissReportingRate: 0.3,
+    laggingActions: 2,
+    laggingClosureRate: 0.6,
+    daysLost: 5,
+    recordableIncidents: 3
+  }),
 }));
 
 vi.mock('../../context/AuthContext', () => ({

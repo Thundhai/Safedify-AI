@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import crypto from 'crypto';
-import db from '../db.js';
+import pool from '../postgres';
 import { AuthRequest, authenticate } from '../auth.js';
 import { logAudit } from './auditRoutes.js';
 

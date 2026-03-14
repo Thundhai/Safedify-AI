@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import crypto from 'crypto';
-import db from '../db.js';
+import pool from '../postgres';
 import { AuthRequest, hashPassword, comparePassword, generateToken, authenticate } from '../auth.js';
 import { logAudit } from './auditRoutes.js';
 
@@ -16,7 +16,8 @@ router.post('/login', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const row = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any;
+    const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const row = rows[0];
     if (!row) {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
@@ -73,7 +74,8 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
     const allowedSelfRegRoles = ['Worker', 'HSE Supervisor'];
     const safeRole = (role && allowedSelfRegRoles.includes(role)) ? role : 'Worker';
 
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    const { rows: existingRows } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    const existing = existingRows[0];
     if (existing) {
       res.status(409).json({ error: 'Email already registered' });
       return;
@@ -83,9 +85,10 @@ router.post('/register', async (req: AuthRequest, res: Response) => {
     const id = uuid();
     const avatar = name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
 
-    db.prepare(
-      'INSERT INTO users (id, name, email, password_hash, role, tier, avatar) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(id, name, email, hash, safeRole, 'Pro', avatar);
+    await pool.query(
+      'INSERT INTO users (id, name, email, password_hash, role, tier, avatar) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [id, name, email, hash, safeRole, 'Pro', avatar]
+    );
 
     const user = { id, name, email, role: safeRole, tier: 'Pro', avatar };
     const token = generateToken(user);
@@ -106,7 +109,8 @@ router.post('/login/2fa', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const row = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as any;
+    const { rows } = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+    const row = rows[0];
     if (!row || !row.totp_enabled || !row.totp_secret) {
       res.status(400).json({ error: 'Invalid request' });
       return;
@@ -114,7 +118,7 @@ router.post('/login/2fa', async (req: AuthRequest, res: Response) => {
 
     // Verify TOTP using the same logic as twoFactorRoutes
     const crypto = await import('crypto');
-    function verifyTOTP(secretHex: string, token: string): boolean {
+    async function verifyTOTP(secretHex: string, token: string): Promise<boolean> {
       for (let w = -1; w <= 1; w++) {
         const epoch = Math.floor(Date.now() / 1000);
         const counter = Math.floor(epoch / 30) + w;
@@ -133,7 +137,7 @@ router.post('/login/2fa', async (req: AuthRequest, res: Response) => {
           const idx = codes.indexOf(token);
           if (idx !== -1) {
             codes.splice(idx, 1);
-            db.prepare('UPDATE users SET totp_backup_codes = ? WHERE id = ?').run(JSON.stringify(codes), userId);
+            await pool.query('UPDATE users SET totp_backup_codes = $1 WHERE id = $2', [JSON.stringify(codes), userId]);
             return true;
           }
         } catch { /* ignore */ }
@@ -141,7 +145,7 @@ router.post('/login/2fa', async (req: AuthRequest, res: Response) => {
       return false;
     }
 
-    if (!verifyTOTP(row.totp_secret, totpToken)) {
+    if (!(await verifyTOTP(row.totp_secret, totpToken))) {
       logAudit(req, { action: '2fa_failed', entityType: 'user', entityId: userId, details: 'Invalid 2FA code' });
       res.status(401).json({ error: 'Invalid 2FA code' });
       return;
@@ -171,7 +175,8 @@ router.post('/forgot-password', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const user = db.prepare('SELECT id, name, email FROM users WHERE email = ?').get(email) as any;
+    const { rows } = await pool.query('SELECT id, name, email FROM users WHERE email = $1', [email]);
+    const user = rows[0];
 
     // Always return success to prevent email enumeration
     if (!user) {
@@ -180,7 +185,7 @@ router.post('/forgot-password', async (req: AuthRequest, res: Response) => {
     }
 
     // Invalidate any previous unused tokens for this user
-    db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE user_id = ? AND used = 0').run(user.id);
+    await pool.query('UPDATE password_reset_tokens SET used = 1 WHERE user_id = $1 AND used = 0', [user.id]);
 
     // Generate a secure random token
     const token = crypto.randomBytes(32).toString('hex');
@@ -188,9 +193,10 @@ router.post('/forgot-password', async (req: AuthRequest, res: Response) => {
     // Token expires in 1 hour
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
 
-    db.prepare(
-      'INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES (?, ?, ?, ?)'
-    ).run(id, user.id, token, expiresAt);
+    await pool.query(
+      'INSERT INTO password_reset_tokens (id, user_id, token, expires_at) VALUES ($1, $2, $3, $4)',
+      [id, user.id, token, expiresAt]
+    );
 
     // Build the reset link (frontend HashRouter)
     const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 4500}`;
@@ -232,9 +238,11 @@ router.post('/reset-password', async (req: AuthRequest, res: Response) => {
     }
 
     // Find valid, unused token
-    const resetRow = db.prepare(
-      'SELECT * FROM password_reset_tokens WHERE token = ? AND used = 0'
-    ).get(token) as any;
+    const { rows: resetRows } = await pool.query(
+      'SELECT * FROM password_reset_tokens WHERE token = $1 AND used = 0',
+      [token]
+    );
+    const resetRow = resetRows[0];
 
     if (!resetRow) {
       res.status(400).json({ error: 'Invalid or already used reset token' });
@@ -243,17 +251,17 @@ router.post('/reset-password', async (req: AuthRequest, res: Response) => {
 
     // Check expiry
     if (new Date(resetRow.expires_at) < new Date()) {
-      db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE id = ?').run(resetRow.id);
+      await pool.query('UPDATE password_reset_tokens SET used = 1 WHERE id = $1', [resetRow.id]);
       res.status(400).json({ error: 'Reset token has expired. Please request a new one.' });
       return;
     }
 
     // Update the user's password
     const hash = await hashPassword(password);
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, resetRow.user_id);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, resetRow.user_id]);
 
     // Mark token as used
-    db.prepare('UPDATE password_reset_tokens SET used = 1 WHERE id = ?').run(resetRow.id);
+    await pool.query('UPDATE password_reset_tokens SET used = 1 WHERE id = $1', [resetRow.id]);
 
     logAudit(req, { action: 'password_reset', entityType: 'user', entityId: resetRow.user_id, details: 'Password reset completed' });
     console.log(`[Auth] Password reset successful for user ${resetRow.user_id}`);
@@ -275,11 +283,14 @@ router.put('/profile', authenticate, (req: AuthRequest, res: Response) => {
     }
     const trimmed = name.trim();
     const avatar = trimmed.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
-    db.prepare('UPDATE users SET name = ?, avatar = ? WHERE id = ?').run(trimmed, avatar, userId);
-    const updated = db.prepare('SELECT id, name, email, role, tier, avatar FROM users WHERE id = ?').get(userId) as any;
-    const token = generateToken(updated);
-    logAudit(req, { action: 'profile_update', entityType: 'user', entityId: userId, details: `Profile updated: name → ${trimmed}` });
-    res.json({ token, user: updated });
+    (async () => {
+      await pool.query('UPDATE users SET name = $1, avatar = $2 WHERE id = $3', [trimmed, avatar, userId]);
+      const { rows: updatedRows } = await pool.query('SELECT id, name, email, role, tier, avatar FROM users WHERE id = $1', [userId]);
+      const updated = updatedRows[0];
+      const token = generateToken(updated);
+      logAudit(req, { action: 'profile_update', entityType: 'user', entityId: userId, details: `Profile updated: name → ${trimmed}` });
+      res.json({ token, user: updated });
+    })();
   } catch (err: any) {
     console.error('[Auth] Profile update error:', err.message);
     res.status(500).json({ error: 'Failed to update profile.' });
@@ -299,7 +310,8 @@ router.put('/change-password', authenticate, async (req: AuthRequest, res: Respo
       res.status(400).json({ error: 'New password must be at least 8 characters' });
       return;
     }
-    const row = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(userId) as any;
+    const { rows } = await pool.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+    const row = rows[0];
     if (!row) { res.status(404).json({ error: 'User not found' }); return; }
 
     const valid = await comparePassword(currentPassword, row.password_hash);
@@ -308,7 +320,7 @@ router.put('/change-password', authenticate, async (req: AuthRequest, res: Respo
       return;
     }
     const hash = await hashPassword(newPassword);
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, userId);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, userId]);
     logAudit(req, { action: 'password_change', entityType: 'user', entityId: userId, details: 'Password changed via profile' });
     res.json({ message: 'Password changed successfully.' });
   } catch (err: any) {
