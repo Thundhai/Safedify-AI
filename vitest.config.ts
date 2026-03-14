@@ -20,7 +20,16 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov', 'json-summary'],
       include: ['src/components/**', 'src/services/**', 'src/context/**', 'server/**'],
-      exclude: ['**/*.test.{ts,tsx}', '**/__tests__/**', '**/*.yaml', '**/*.yml', '**/*.db', '**/*.env*', '**/backups/**'],
+      exclude: [
+        '**/*.test.{ts,tsx}',
+        '**/__tests__/**',
+        '**/*.yaml',
+        '**/*.yml',
+        '**/*.db',
+        '**/*.env*',
+        '**/backups/**',
+        '**/*.sql',
+      ],
     },
   },
 });

@@ -52,6 +52,9 @@ vi.mock('recharts', () => ({
   YAxis: () => null,
   CartesianGrid: () => null,
   Tooltip: () => null,
+  PieChart: ({ children }: any) => <div data-testid="pie-chart">{children}</div>,
+  Pie: ({ children }: any) => <div data-testid="pie">{children}</div>,
+  Cell: () => <div data-testid="cell" />,
 }));
 
 import { Dashboard } from '../../components/Dashboard';
