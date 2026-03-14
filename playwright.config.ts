@@ -4,7 +4,6 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 30000,
   retries: 1,
-  globalSetup: require.resolve('./e2e/global-setup'),
   use: {
     baseURL: 'http://localhost:4500',
     headless: true,
