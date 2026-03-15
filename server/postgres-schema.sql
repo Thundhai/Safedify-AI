@@ -19,6 +19,7 @@ CREATE TABLE incidents (
     date TIMESTAMP NOT NULL,
     date_reported TIMESTAMP,
     department TEXT,
+    shift TEXT,
     type TEXT NOT NULL,
     category TEXT NOT NULL DEFAULT 'Near Miss',
     severity TEXT NOT NULL,
