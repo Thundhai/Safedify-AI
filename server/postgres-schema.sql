@@ -17,6 +17,7 @@ CREATE TABLE incidents (
     description TEXT NOT NULL,
     location TEXT,
     date TIMESTAMP NOT NULL,
+    date_reported TIMESTAMP,
     type TEXT NOT NULL,
     category TEXT NOT NULL DEFAULT 'Near Miss',
     severity TEXT NOT NULL,
@@ -43,6 +44,7 @@ CREATE TABLE audit_logs (
     entity_type TEXT,
     entity_id UUID,
     ip_address TEXT,
+    user_agent TEXT,
     details TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

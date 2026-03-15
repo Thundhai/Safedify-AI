@@ -220,6 +220,25 @@ Safedify-AI/
 └── vite.config.ts          # Vite configuration
 ```
 
+## Database Schema (PostgreSQL)
+
+Safedify-AI now uses PostgreSQL for production and development environments. Key schema updates:
+
+- **incidents**: Now includes an `images TEXT[]` column for storing multiple image URLs/paths per incident.
+- **audit_logs**: New table for tracking user actions and changes, with fields:
+  - `id` (UUID, PK)
+  - `user_id` (UUID, FK to users)
+  - `user_email` (TEXT)
+  - `user_role` (TEXT)
+  - `action` (TEXT, required)
+  - `entity_type` (TEXT)
+  - `entity_id` (UUID)
+  - `ip_address` (TEXT)
+  - `details` (TEXT)
+  - `created_at` (TIMESTAMP, default now)
+
+See `server/postgres-schema.sql` for the full schema.
+
 ## Security Notes
 
 - **JWT_SECRET**: Always use a strong, unique secret in production (64+ chars — use `openssl rand -base64 48`)
