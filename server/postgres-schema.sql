@@ -23,6 +23,7 @@ CREATE TABLE incidents (
     status TEXT NOT NULL DEFAULT 'Open',
     reported_by UUID REFERENCES users(id),
     image TEXT,
+    images TEXT[],
     root_cause TEXT,
     corrective_actions TEXT,
     days_lost INTEGER DEFAULT 0,
@@ -31,6 +32,19 @@ CREATE TABLE incidents (
     immediate_action TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+-- Audit logs table for tracking actions and changes
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    user_email TEXT,
+    user_role TEXT,
+    action TEXT NOT NULL,
+    entity_type TEXT,
+    entity_id UUID,
+    ip_address TEXT,
+    details TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE inspections (
