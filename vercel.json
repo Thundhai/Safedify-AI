@@ -1,11 +1,10 @@
 {
   "installCommand": "npm install && cd server && npm install",
-  "buildCommand": "vite build && npx esbuild server/index.ts --bundle --platform=node --format=esm --outfile=api/_compiled.mjs --external:better-sqlite3 --external:pg-native",
+  "buildCommand": "vite build && npx esbuild server/index.ts --bundle --platform=node --format=esm --outfile=api/_compiled.mjs --external:better-sqlite3 --external:pg-native --banner:js=\"import { createRequire } from 'module'; const require = createRequire(import.meta.url);\"",
   "functions": {
     "api/index.js": {
       "maxDuration": 30,
-      "memory": 1024,
-      "includeFiles": "node_modules/better-sqlite3/**"
+      "memory": 1024
     }
   },
   "rewrites": [

@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { v4 as uuid } from 'uuid';
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import pool from './postgres';
 
 const JWT_SECRET = process.env.JWT_SECRET || (() => {
@@ -88,7 +89,6 @@ export const generateToken = (user: AuthUser): string => {
  * Generate a cryptographically secure random token
  */
 export const generateSecureToken = (bytes = 32): string => {
-  const crypto = require('crypto');
   return crypto.randomBytes(bytes).toString('hex');
 };
 
@@ -96,7 +96,6 @@ export const generateSecureToken = (bytes = 32): string => {
  * Hash a token for storage (one-way, prevents token theft from DB)
  */
 export const hashToken = (token: string): string => {
-  const crypto = require('crypto');
   return crypto.createHash('sha256').update(token).digest('hex');
 };
 
