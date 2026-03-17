@@ -44,6 +44,17 @@ CREATE TABLE incidents (
     body_part TEXT,
     mechanism TEXT,
     immediate_action TEXT,
+    weather_conditions TEXT,
+    task_being_performed TEXT,
+    injured_persons TEXT,
+    witnesses TEXT,
+    ppe_worn TEXT,
+    ppe_adequate BOOLEAN,
+    environmental_impact TEXT,
+    immediate_actions_taken TEXT,
+    area_secured BOOLEAN DEFAULT FALSE,
+    emergency_services_notified BOOLEAN DEFAULT FALSE,
+    regulatory_notification BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

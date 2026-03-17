@@ -261,9 +261,9 @@ router.post('/incidents', validate(incidentSchema), async (req: AuthRequest, res
     b.injured_persons ? JSON.stringify(b.injured_persons) : null,
     b.witnesses ? JSON.stringify(b.witnesses) : null,
     b.ppe_worn ? JSON.stringify(b.ppe_worn) : null,
-    b.ppe_adequate != null ? (b.ppe_adequate ? 1 : 0) : null,
+    b.ppe_adequate != null ? b.ppe_adequate : null,
     b.environmental_impact ?? null, b.immediate_actions_taken ?? null,
-    b.area_secured ? 1 : 0, b.emergency_services_notified ? 1 : 0, b.regulatory_notification ? 1 : 0]);
+    b.area_secured ? true : false, b.emergency_services_notified ? true : false, b.regulatory_notification ? true : false]);
   res.status(201).json({ id, message: 'Incident created' });
 
   // Fire-and-forget notification
@@ -300,10 +300,10 @@ router.put('/incidents/:id', validateParams(uuidParamSchema), validate(incidentS
   if (b.witnesses !== undefined) { fields.push(`witnesses = $${fields.length + 1}`); values.push(JSON.stringify(b.witnesses)); }
   if (b.ppe_worn !== undefined) { fields.push(`ppe_worn = $${fields.length + 1}`); values.push(JSON.stringify(b.ppe_worn)); }
   // Boolean fields
-  if (b.ppe_adequate !== undefined) { fields.push(`ppe_adequate = $${fields.length + 1}`); values.push(b.ppe_adequate != null ? (b.ppe_adequate ? 1 : 0) : null); }
-  if (b.area_secured !== undefined) { fields.push(`area_secured = $${fields.length + 1}`); values.push(b.area_secured ? 1 : 0); }
-  if (b.emergency_services_notified !== undefined) { fields.push(`emergency_services_notified = $${fields.length + 1}`); values.push(b.emergency_services_notified ? 1 : 0); }
-  if (b.regulatory_notification !== undefined) { fields.push(`regulatory_notification = $${fields.length + 1}`); values.push(b.regulatory_notification ? 1 : 0); }
+  if (b.ppe_adequate !== undefined) { fields.push(`ppe_adequate = $${fields.length + 1}`); values.push(b.ppe_adequate != null ? b.ppe_adequate : null); }
+  if (b.area_secured !== undefined) { fields.push(`area_secured = $${fields.length + 1}`); values.push(b.area_secured ? true : false); }
+  if (b.emergency_services_notified !== undefined) { fields.push(`emergency_services_notified = $${fields.length + 1}`); values.push(b.emergency_services_notified ? true : false); }
+  if (b.regulatory_notification !== undefined) { fields.push(`regulatory_notification = $${fields.length + 1}`); values.push(b.regulatory_notification ? true : false); }
 
   fields.push(`updated_at = NOW()`);
   values.push(req.params.id);

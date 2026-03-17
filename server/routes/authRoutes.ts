@@ -76,7 +76,7 @@ async function isAccountLocked(userId: string): Promise<{ locked: boolean; remai
 // ============================================
 async function recordFailedLogin(userId: string, email: string, req: AuthRequest): Promise<{ locked: boolean; attemptsRemaining: number }> {
   const { rows } = await pool.query(
-    'UPDATE users SET failed_login_attempts = COALESCE(failed_login_attempts, 0) + 1, last_failed_login = NOW() RETURNING failed_login_attempts',
+    'UPDATE users SET failed_login_attempts = COALESCE(failed_login_attempts, 0) + 1, last_failed_login = NOW() WHERE id = $1 RETURNING failed_login_attempts',
     [userId]
   );
   const attempts = rows[0]?.failed_login_attempts || 1;
