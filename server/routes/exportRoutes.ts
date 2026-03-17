@@ -24,10 +24,6 @@ const exportQuerySchema: ValidationSchema = {
   to: { type: 'date', required: false },
 };
 
-const router = Router();
-router.use(authenticate);
-router.use(requirePermission('view_analytics'));
-
 const EXPORTABLE: Record<string, { table: string; dateCol: string; columns: string[] }> = {
   incidents: {
     table: 'incidents',
@@ -82,7 +78,7 @@ const EXPORTABLE: Record<string, { table: string; dateCol: string; columns: stri
 };
 
 router.get('/:entity', validateParams(entityParamSchema), validateQuery(exportQuerySchema), async (req: AuthRequest, res: Response) => {
-  const entity = sanitizeString(req.params.entity, { stripHtml: true, maxLength: 50 });
+  const entity = sanitizeString(req.params.entity as string, { stripHtml: true, maxLength: 50 });
   const config = EXPORTABLE[entity];
   if (!config) {
     res.status(400).json({ error: `Unknown entity: ${entity}. Available: ${Object.keys(EXPORTABLE).join(', ')}` });

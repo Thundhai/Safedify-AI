@@ -297,6 +297,7 @@ export interface FieldSchema {
   max?: number;
   pattern?: RegExp;
   enum?: any[];
+  trim?: boolean;                // If true, trim whitespace
   allowHtml?: boolean;           // If false (default), strip HTML
   allowInjection?: boolean;      // If false (default), check for injections
   sanitize?: boolean;            // If true, sanitize instead of reject

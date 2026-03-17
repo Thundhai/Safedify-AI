@@ -17,8 +17,6 @@ const validateSchema: ValidationSchema = {
   token: { type: 'string', required: true, maxLength: 10, pattern: /^\d{6,8}$/ },
 };
 
-const router = Router();
-
 // ---------- TOTP helpers (RFC 6238 — no external deps) ----------
 
 function generateSecret(length = 20): string {

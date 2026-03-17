@@ -22,7 +22,9 @@ export type AuditAction =
   | 'export' | 'upload'
   | 'role_change' | 'permission_change'
   | '2fa_enabled' | '2fa_disabled' | '2fa_failed'
-  | 'profile_update' | 'password_change';
+  | 'profile_update' | 'password_change'
+  | 'account_locked' | 'login_blocked_locked'
+  | 'email_verified' | 'verification_resent';
 
 export interface AuditEntry {
   action: AuditAction;

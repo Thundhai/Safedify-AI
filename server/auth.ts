@@ -81,7 +81,7 @@ export const comparePassword = async (password: string, hash: string): Promise<b
 };
 
 export const generateToken = (user: AuthUser): string => {
-  return jwt.sign(user, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+  return jwt.sign(user, JWT_SECRET, { expiresIn: JWT_EXPIRES as string & jwt.SignOptions['expiresIn'] });
 };
 
 /**
