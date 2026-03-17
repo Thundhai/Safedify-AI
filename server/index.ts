@@ -187,6 +187,7 @@ app.get('/api/health', async (_req, res) => {
   let dbStatus = 'disconnected';
   let dbLatencyMs: number | null = null;
   
+  let dbError: string | null = null;
   try {
     const start = Date.now();
     await pool.query('SELECT 1');
@@ -194,6 +195,7 @@ app.get('/api/health', async (_req, res) => {
     dbStatus = 'connected';
   } catch (err: any) {
     dbStatus = 'error';
+    dbError = err.message;
     console.error('[Health] DB connection error:', err.message);
   }
   
@@ -208,6 +210,7 @@ app.get('/api/health', async (_req, res) => {
     agent: !!process.env.GEMINI_API_KEY ? 'enabled' : 'disabled',
     database: {
       status: dbStatus,
+      error: dbError,
       latencyMs: dbLatencyMs,
     },
     // Debug: Show which AI-related env vars are configured (not values, just presence)
