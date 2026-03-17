@@ -265,7 +265,7 @@ test.describe('RBAC enforcement', () => {
   test.beforeAll(async ({ request }) => {
     // Register a worker
     const res = await request.post('/api/auth/register', {
-      data: { name: 'Worker User', email: `worker-${Date.now()}@test.com`, password: 'Worker1234' },
+      data: { name: 'Worker User', email: `worker-${Date.now()}@test.com`, password: 'Worker1234!' },
     });
     workerToken = (await res.json()).token;
   });
