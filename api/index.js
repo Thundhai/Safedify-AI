@@ -9,19 +9,24 @@ try {
   const mod = await import('./_compiled.mjs');
   handler = mod.default;
 } catch (e1) {
+  console.error('[Vercel] Compiled bundle failed:', e1.message);
   try {
     // Fallback: import server directly (relies on @vercel/node TypeScript support)
     const mod = await import('../server/index.js');
     handler = mod.default;
   } catch (e2) {
+    console.error('[Vercel] Direct import failed:', e2.message);
     // If both fail, return diagnostic error
     handler = (req, res) => {
       res.statusCode = 500;
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify({
-        error: 'Server failed to initialize',
-        compiled: e1.message,
-        direct: e2.message,
+        error: 'Server failed to initialize. Check Vercel deployment logs and ensure DATABASE_URL and other env vars are configured.',
+        details: {
+          compiled: e1.message,
+          direct: e2.message,
+          hint: 'Ensure DATABASE_URL is set in Vercel Environment Variables (Settings → Environment Variables).',
+        },
       }));
     };
   }

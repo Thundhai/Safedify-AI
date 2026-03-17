@@ -121,6 +121,10 @@ export const AIChatAssistant: React.FC = () => {
         ? '**Rate limit reached.** The AI service is temporarily throttled. Please wait 30 seconds and try again.'
         : isTimeout
         ? '**Request timed out.** The AI service took too long. Please try a shorter question.'
+        : e?.message?.includes('Server failed to initialize')
+        ? '**Server not available.** The backend server could not start. Please check that DATABASE_URL and GEMINI_API_KEY are configured in your deployment environment variables.'
+        : e?.message?.includes('AI service not configured') || e?.message?.includes('GEMINI_API_KEY')
+        ? '**AI not configured.** The GEMINI_API_KEY environment variable is not set on the server. Please add it to enable AI features.'
         : `I'm having trouble connecting. Error: ${e?.message || 'Unknown'}. Please try again.`
       }]);
     } finally {

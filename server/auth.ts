@@ -184,29 +184,33 @@ export const seedDefaultUsers = () => {
     return;
   }
   (async () => {
-    const result = await pool.query('SELECT id FROM users WHERE email = $1', ['admin@safedify.com']);
-    const existing = result.rows[0];
-    if (!existing) {
-      // Use higher cost factor for seeded users
-      const hash = bcrypt.hashSync('admin123', 12);
-      // Use valid UUIDs for user IDs
-      const users = [
-        { id: uuid(), name: 'John Doe', email: 'admin@safedify.com', role: 'Admin', tier: 'Enterprise', avatar: 'JD' },
-        { id: uuid(), name: 'Robert Fox', email: 'worker@safedify.com', role: 'Worker', tier: 'Pro', avatar: 'RF' },
-        { id: uuid(), name: 'Sarah Connor', email: 'supervisor@safedify.com', role: 'HSE Supervisor', tier: 'Pro', avatar: 'SC' },
-      ];
+    try {
+      const result = await pool.query('SELECT id FROM users WHERE email = $1', ['admin@safedify.com']);
+      const existing = result.rows[0];
+      if (!existing) {
+        // Use higher cost factor for seeded users
+        const hash = bcrypt.hashSync('admin123', 12);
+        // Use valid UUIDs for user IDs
+        const users = [
+          { id: uuid(), name: 'John Doe', email: 'admin@safedify.com', role: 'Admin', tier: 'Enterprise', avatar: 'JD' },
+          { id: uuid(), name: 'Robert Fox', email: 'worker@safedify.com', role: 'Worker', tier: 'Pro', avatar: 'RF' },
+          { id: uuid(), name: 'Sarah Connor', email: 'supervisor@safedify.com', role: 'HSE Supervisor', tier: 'Pro', avatar: 'SC' },
+        ];
 
-      // In production, seeded users MUST change their password on first login
-      // This prevents usage of the well-known demo password 'admin123'
-      const mustChangePassword = isProduction;
+        // In production, seeded users MUST change their password on first login
+        // This prevents usage of the well-known demo password 'admin123'
+        const mustChangePassword = isProduction;
 
-      for (const u of users) {
-        await pool.query(
-          `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, email_verified, must_change_password, password_changed_at) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8, NOW())`,[u.id, u.name, u.email, hash, u.role, u.tier, u.avatar, mustChangePassword]
-        );
+        for (const u of users) {
+          await pool.query(
+            `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, email_verified, must_change_password, password_changed_at) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8, NOW())`,[u.id, u.name, u.email, hash, u.role, u.tier, u.avatar, mustChangePassword]
+          );
+        }
+        console.log(`[Auth] Seeded demo users (must_change_password: ${mustChangePassword})`);
       }
-      console.log(`[Auth] Seeded demo users (must_change_password: ${mustChangePassword})`);
+    } catch (err: any) {
+      console.error('[Auth] Failed to seed users (database may not be configured):', err.message);
     }
   })();
 };
