@@ -3,10 +3,17 @@ import { AuthRequest, authenticate } from '../auth.js';
 import { runAgent, AgentMessage } from '../agent/agent.js';
 import pool from '../postgres';
 import { v4 as uuid } from 'uuid';
+import { validate, ValidationSchema, sanitizeString } from '../middleware/inputValidation.js';
 
 const router = Router();
 
 router.use(authenticate);
+
+// Validation schema for chat endpoint
+const chatSchema: ValidationSchema = {
+  message: { type: 'string', required: true, maxLength: 10000, trim: true },
+  conversationId: { type: 'uuid', required: false },
+};
 
 /**
  * POST /api/agent/chat
@@ -18,11 +25,24 @@ router.use(authenticate);
  *   3. Save updated conversation
  *   4. Return the response + tool calls made
  */
-router.post('/chat', async (req: AuthRequest, res: Response) => {
+router.post('/chat', validate(chatSchema), async (req: AuthRequest, res: Response) => {
+  // Early check for API key configuration
+  if (!process.env.GEMINI_API_KEY) {
+    console.error('[Agent] GEMINI_API_KEY not configured in environment');
+    res.status(503).json({ 
+      error: 'AI Agent is not configured. The GEMINI_API_KEY environment variable is missing on the server.',
+      hint: 'In Vercel: Settings → Environment Variables → Add GEMINI_API_KEY (ensure Production is checked) → Redeploy'
+    });
+    return;
+  }
+
   try {
     const { message, conversationId } = req.body;
+    
+    // Sanitize message content to prevent prompt injection in AI context
+    const sanitizedMessage = sanitizeString(message, { stripHtml: true, maxLength: 10000 });
 
-    if (!message || typeof message !== 'string') {
+    if (!sanitizedMessage || sanitizedMessage.length < 1) {
       res.status(400).json({ error: 'Message is required' });
       return;
     }
@@ -41,13 +61,13 @@ router.post('/chat', async (req: AuthRequest, res: Response) => {
     }
 
     // Run the agent
-    const { response, toolCalls } = await runAgent(message, history, {
+    const { response, toolCalls } = await runAgent(sanitizedMessage, history, {
       userId: req.user?.id,
       userName: req.user?.name,
     });
 
     // Update history
-    history.push({ role: 'user', text: message });
+    history.push({ role: 'user', text: sanitizedMessage });
     history.push({ role: 'model', text: response, toolCalls });
 
     // Keep last 40 messages to prevent context overflow

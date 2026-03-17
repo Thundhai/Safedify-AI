@@ -118,12 +118,12 @@ class ErrorBoundary extends React.Component<
 
       if (isChunkError) {
         return (
-          <div style={{ padding: 40, fontFamily: 'sans-serif', background: '#1e293b', color: '#f8fafc', minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <h1 style={{ color: '#f97316', marginBottom: 16 }}>New Version Available</h1>
-            <p style={{ color: '#94a3b8', fontSize: 16, marginBottom: 24 }}>A new version of Safedify has been deployed. Please refresh to continue.</p>
+          <div className="p-10 font-sans bg-slate-800 text-slate-50 min-h-screen flex flex-col items-center justify-center">
+            <h1 className="text-orange-500 mb-4 text-2xl font-bold">New Version Available</h1>
+            <p className="text-slate-400 text-base mb-6">A new version of Safedify has been deployed. Please refresh to continue.</p>
             <button 
               onClick={() => { sessionStorage.removeItem('safedify_chunk_retry'); window.location.reload(); }}
-              style={{ padding: '12px 32px', background: '#f97316', color: '#1e293b', border: 'none', borderRadius: 8, fontWeight: 'bold', cursor: 'pointer', fontSize: 16 }}
+              className="py-3 px-8 bg-orange-500 text-slate-800 border-none rounded-lg font-bold cursor-pointer text-base hover:bg-orange-400 transition-colors"
             >
               Refresh Now
             </button>
@@ -132,19 +132,19 @@ class ErrorBoundary extends React.Component<
       }
 
       return (
-        <div style={{ padding: 40, fontFamily: 'monospace', background: '#1e293b', color: '#f8fafc', minHeight: '100vh' }}>
-          <h1 style={{ color: '#f97316', marginBottom: 16 }}>Safedify — Runtime Error</h1>
-          <p style={{ color: '#ef4444', fontSize: 18, marginBottom: 8 }}>{this.state.error?.message}</p>
-          <pre style={{ background: '#0f172a', padding: 16, borderRadius: 8, overflow: 'auto', fontSize: 13, lineHeight: 1.5 }}>
+        <div className="p-10 font-mono bg-slate-800 text-slate-50 min-h-screen">
+          <h1 className="text-orange-500 mb-4 text-2xl font-bold">Safedify — Runtime Error</h1>
+          <p className="text-red-500 text-lg mb-2">{this.state.error?.message}</p>
+          <pre className="bg-slate-900 p-4 rounded-lg overflow-auto text-sm leading-relaxed">
             {this.state.error?.stack}
           </pre>
-          <h3 style={{ marginTop: 24, color: '#94a3b8' }}>Component Stack</h3>
-          <pre style={{ background: '#0f172a', padding: 16, borderRadius: 8, overflow: 'auto', fontSize: 13, lineHeight: 1.5 }}>
+          <h3 className="mt-6 text-slate-400 text-lg font-semibold">Component Stack</h3>
+          <pre className="bg-slate-900 p-4 rounded-lg overflow-auto text-sm leading-relaxed">
             {this.state.errorInfo?.componentStack}
           </pre>
           <button 
             onClick={() => { this.setState({ hasError: false, error: null, errorInfo: null }); window.location.hash = '/welcome'; window.location.reload(); }}
-            style={{ marginTop: 24, padding: '12px 24px', background: '#f97316', color: '#1e293b', border: 'none', borderRadius: 8, fontWeight: 'bold', cursor: 'pointer', fontSize: 14 }}
+            className="mt-6 py-3 px-6 bg-orange-500 text-slate-800 border-none rounded-lg font-bold cursor-pointer text-sm hover:bg-orange-400 transition-colors"
           >
             Go to Welcome Page
           </button>

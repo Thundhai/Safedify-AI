@@ -1,14 +1,213 @@
 
-import { Router, Response } from 'express';
+import { Router, Response, NextFunction } from 'express';
 import { v4 as uuid } from 'uuid';
 import pool from '../postgres';
 import { AuthRequest, authenticate, requirePermission } from '../auth.js';
 import { notify, notifyAllManagers } from '../services/notificationService.js';
+import { 
+  validate, validateParams, validateQuery,
+  ValidationSchema, sanitizeString 
+} from '../middleware/inputValidation.js';
 
 const router = Router();
 
+// ---------- VALIDATION SCHEMAS ----------
+
+const uuidParamSchema: ValidationSchema = {
+  id: { type: 'uuid', required: true }
+};
+
+const paginationQuerySchema: ValidationSchema = {
+  page: { type: 'number', min: 1, max: 10000 },
+  limit: { type: 'number', min: 1, max: 200 }
+};
+
+const incidentSchema: ValidationSchema = {
+  description: { type: 'string', required: false, maxLength: 10000, trim: true },
+  location: { type: 'string', required: false, maxLength: 500, trim: true },
+  date: { type: 'date', required: false },
+  type: { type: 'string', required: false, maxLength: 100, trim: true },
+  category: { type: 'string', required: false, maxLength: 100, trim: true, enum: ['Near Miss', 'First Aid', 'Medical Treatment', 'Lost Time', 'Fatality', 'Property Damage', 'Environmental'] },
+  severity: { type: 'string', required: false, maxLength: 50, trim: true, enum: ['Low', 'Medium', 'High', 'Critical'] },
+  status: { type: 'string', required: false, maxLength: 50, trim: true, enum: ['Open', 'In Progress', 'Under Investigation', 'Closed'] },
+  root_cause: { type: 'string', required: false, maxLength: 5000, trim: true },
+  corrective_actions: { type: 'string', required: false, maxLength: 5000, trim: true },
+  days_lost: { type: 'number', required: false, min: 0, max: 9999 },
+  body_part: { type: 'string', required: false, maxLength: 200, trim: true },
+  mechanism: { type: 'string', required: false, maxLength: 500, trim: true },
+  immediate_action: { type: 'string', required: false, maxLength: 2000, trim: true },
+  department: { type: 'string', required: false, maxLength: 200, trim: true },
+  shift: { type: 'string', required: false, maxLength: 50, trim: true },
+  weather_conditions: { type: 'string', required: false, maxLength: 200, trim: true },
+  task_being_performed: { type: 'string', required: false, maxLength: 1000, trim: true },
+  environmental_impact: { type: 'string', required: false, maxLength: 2000, trim: true },
+  immediate_actions_taken: { type: 'string', required: false, maxLength: 2000, trim: true },
+  area_secured: { type: 'boolean', required: false },
+  emergency_services_notified: { type: 'boolean', required: false },
+  regulatory_notification: { type: 'boolean', required: false },
+  ppe_adequate: { type: 'boolean', required: false },
+  images: { type: 'array', required: false, maxLength: 20 },
+  injured_persons: { type: 'array', required: false, maxLength: 50 },
+  witnesses: { type: 'array', required: false, maxLength: 50 },
+  ppe_worn: { type: 'array', required: false, maxLength: 20 },
+};
+
+const actionSchema: ValidationSchema = {
+  title: { type: 'string', required: true, maxLength: 500, trim: true },
+  description: { type: 'string', required: false, maxLength: 5000, trim: true },
+  assignee: { type: 'string', required: false, maxLength: 200, trim: true },
+  due_date: { type: 'date', required: false },
+  completed_date: { type: 'date', required: false },
+  priority: { type: 'string', required: false, maxLength: 50, enum: ['Low', 'Medium', 'High', 'Critical'] },
+  status: { type: 'string', required: false, maxLength: 50, enum: ['Open', 'In Progress', 'Done', 'Overdue', 'Cancelled'] },
+  action_type: { type: 'string', required: false, maxLength: 100, enum: ['Corrective', 'Preventive', 'Improvement'] },
+  category: { type: 'string', required: false, maxLength: 100, trim: true },
+  indicator: { type: 'string', required: false, maxLength: 50, enum: ['Leading', 'Lagging'] },
+  related_incident_id: { type: 'uuid', required: false },
+  effectiveness: { type: 'string', required: false, maxLength: 100, enum: ['Not Assessed', 'Effective', 'Partially Effective', 'Not Effective'] },
+  verified_by: { type: 'string', required: false, maxLength: 200, trim: true },
+};
+
+const observationSchema: ValidationSchema = {
+  type: { type: 'string', required: true, maxLength: 100, trim: true, enum: ['Safe', 'Unsafe', 'Near Miss', 'Positive Recognition'] },
+  category: { type: 'string', required: false, maxLength: 100, trim: true },
+  description: { type: 'string', required: false, maxLength: 5000, trim: true },
+  location: { type: 'string', required: false, maxLength: 500, trim: true },
+  date: { type: 'date', required: false },
+  observer: { type: 'string', required: false, maxLength: 200, trim: true },
+  status: { type: 'string', required: false, maxLength: 50, enum: ['Open', 'Reviewed', 'Closed'] },
+  is_anonymous: { type: 'boolean', required: false },
+  immediate_action: { type: 'string', required: false, maxLength: 2000, trim: true },
+  images: { type: 'array', required: false, maxLength: 20 },
+};
+
+const inspectionSchema: ValidationSchema = {
+  template_name: { type: 'string', required: false, maxLength: 200, trim: true },
+  title: { type: 'string', required: true, maxLength: 500, trim: true },
+  date: { type: 'date', required: false },
+  location: { type: 'string', required: false, maxLength: 500, trim: true },
+  score: { type: 'number', required: false, min: 0, max: 100 },
+  completed: { type: 'boolean', required: false },
+  signature: { type: 'string', required: false, maxLength: 50000 }, // Base64 signature
+  items: { type: 'array', required: false, maxLength: 200 },
+};
+
+const permitSchema: ValidationSchema = {
+  type: { type: 'string', required: true, maxLength: 100, trim: true },
+  location: { type: 'string', required: false, maxLength: 500, trim: true },
+  description: { type: 'string', required: false, maxLength: 5000, trim: true },
+  valid_from: { type: 'date', required: false },
+  valid_until: { type: 'date', required: false },
+  requestor: { type: 'string', required: false, maxLength: 200, trim: true },
+  status: { type: 'string', required: false, maxLength: 50, enum: ['Draft', 'Pending', 'Active', 'Expired', 'Rejected', 'Cancelled'] },
+  approver: { type: 'string', required: false, maxLength: 200, trim: true },
+  approver_comments: { type: 'string', required: false, maxLength: 2000, trim: true },
+  controls: { type: 'array', required: false, maxLength: 100 },
+};
+
+const workerSchema: ValidationSchema = {
+  name: { type: 'string', required: true, maxLength: 200, trim: true },
+  role: { type: 'string', required: false, maxLength: 100, trim: true },
+  department: { type: 'string', required: false, maxLength: 200, trim: true },
+  company_id: { type: 'uuid', required: false },
+  joined_date: { type: 'date', required: false },
+  email: { type: 'email', required: false },
+  phone: { type: 'string', required: false, maxLength: 30, pattern: /^[\d\s\-+()]+$/ },
+  points: { type: 'number', required: false, min: 0, max: 1000000 },
+  level: { type: 'number', required: false, min: 1, max: 100 },
+};
+
+const contractorSchema: ValidationSchema = {
+  name: { type: 'string', required: true, maxLength: 200, trim: true },
+  contact_person: { type: 'string', required: false, maxLength: 200, trim: true },
+  email: { type: 'email', required: false },
+  phone: { type: 'string', required: false, maxLength: 30, pattern: /^[\d\s\-+()]+$/ },
+  status: { type: 'string', required: false, maxLength: 50, enum: ['Pending', 'Approved', 'Suspended', 'Rejected'] },
+};
+
+const assetSchema: ValidationSchema = {
+  name: { type: 'string', required: true, maxLength: 500, trim: true },
+  category: { type: 'string', required: false, maxLength: 100, trim: true },
+  model_number: { type: 'string', required: false, maxLength: 200, trim: true },
+  serial_number: { type: 'string', required: false, maxLength: 200, trim: true },
+  location: { type: 'string', required: false, maxLength: 500, trim: true },
+  status: { type: 'string', required: false, maxLength: 50, enum: ['Active', 'Inactive', 'Maintenance', 'Retired'] },
+  next_inspection_date: { type: 'date', required: false },
+};
+
+const documentSchema: ValidationSchema = {
+  title: { type: 'string', required: true, maxLength: 500, trim: true },
+  category: { type: 'string', required: false, maxLength: 100, trim: true },
+  content: { type: 'string', required: false, maxLength: 100000 }, // Allow large content for documents
+  status: { type: 'string', required: false, maxLength: 50, enum: ['Draft', 'Published', 'Archived'] },
+};
+
 // All routes require auth
 router.use(authenticate);
+
+// ---------- OWNERSHIP VERIFICATION HELPER ----------
+/**
+ * Verify that the current user owns or can modify a resource.
+ * Allows: resource owner, Admin role, or Manager role.
+ * 
+ * @param table - Database table name
+ * @param idParam - Route param name for the resource ID (default: 'id')
+ * @param ownerColumn - Column that stores owner's user ID or name
+ * @param ownerIsName - If true, compare against req.user.name instead of req.user.id
+ * @param altColumn - Alternative column to check (e.g., 'assignee' for actions)
+ */
+function requireOwnership(
+  table: string,
+  ownerColumn: string,
+  ownerIsName = false,
+  altColumn?: string
+) {
+  return async (req: AuthRequest, res: Response, next: NextFunction) => {
+    const resourceId = req.params.id;
+    const userId = req.user?.id;
+    const userName = req.user?.name;
+    const userRole = req.user?.role;
+
+    // Admins and Managers can modify any record
+    if (userRole === 'Admin' || userRole === 'Manager') {
+      return next();
+    }
+
+    try {
+      const selectColumns = altColumn ? `${ownerColumn}, ${altColumn}` : ownerColumn;
+      const result = await pool.query(
+        `SELECT ${selectColumns} FROM ${table} WHERE id = $1`,
+        [resourceId]
+      );
+      
+      if (result.rows.length === 0) {
+        res.status(404).json({ error: 'Resource not found' });
+        return;
+      }
+
+      const row = result.rows[0];
+      const ownerValue = row[ownerColumn];
+      const altValue = altColumn ? row[altColumn] : null;
+      const currentUserValue = ownerIsName ? userName : userId;
+
+      // Check if user owns the resource OR is the alternate (e.g., assignee)
+      const isOwner = ownerValue === currentUserValue;
+      const isAlt = altColumn && (altValue === userId || altValue === userName);
+
+      if (!isOwner && !isAlt) {
+        res.status(403).json({ 
+          error: 'Access denied: You can only modify your own records' 
+        });
+        return;
+      }
+
+      next();
+    } catch (err: any) {
+      console.error('[Ownership Check] Error:', err.message);
+      res.status(500).json({ error: 'Failed to verify ownership' });
+    }
+  };
+}
 
 // ---------- PAGINATION HELPER ----------
 async function paginate(req: AuthRequest, res: Response, table: string, orderBy = 'created_at DESC', where = '', whereParams: any[] = []) {
@@ -31,18 +230,18 @@ async function paginate(req: AuthRequest, res: Response, table: string, orderBy 
 
 // ---------- INCIDENTS ----------
 
-router.get('/incidents', async (req: AuthRequest, res: Response) => {
+router.get('/incidents', validateQuery(paginationQuerySchema), async (req: AuthRequest, res: Response) => {
   await paginate(req, res, 'incidents');
 });
 
-router.get('/incidents/:id', async (req: AuthRequest, res: Response) => {
+router.get('/incidents/:id', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
   const result = await pool.query('SELECT * FROM incidents WHERE id = $1', [req.params.id]);
   const row = result.rows[0];
   if (!row) { res.status(404).json({ error: 'Not found' }); return; }
   res.json(row);
 });
 
-router.post('/incidents', async (req: AuthRequest, res: Response) => {
+router.post('/incidents', validate(incidentSchema), async (req: AuthRequest, res: Response) => {
   const b = req.body;
   const id = uuid();
   await pool.query(
@@ -77,7 +276,7 @@ router.post('/incidents', async (req: AuthRequest, res: Response) => {
   }).catch((err: any) => console.error('[Notify] incident create:', err.message));
 });
 
-router.put('/incidents/:id', async (req: AuthRequest, res: Response) => {
+router.put('/incidents/:id', validateParams(uuidParamSchema), validate(incidentSchema), requireOwnership('incidents', 'reported_by'), async (req: AuthRequest, res: Response) => {
   const b = req.body;
   // Build dynamic SET clause for only provided fields
   const fields: string[] = [];
@@ -128,23 +327,23 @@ router.put('/incidents/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
-router.delete('/incidents/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
+router.delete('/incidents/:id', validateParams(uuidParamSchema), requireOwnership('incidents', 'reported_by'), requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
   await pool.query('DELETE FROM incidents WHERE id = $1', [req.params.id]);
   res.json({ message: 'Deleted' });
 });
 
 // ---------- ACTIONS ----------
 
-router.get('/actions', async (req: AuthRequest, res: Response) => {
+router.get('/actions', validateQuery(paginationQuerySchema), async (req: AuthRequest, res: Response) => {
   await paginate(req, res, 'actions');
 });
 
-router.post('/actions', requirePermission('create_incident'), async (req: AuthRequest, res: Response) => {
+router.post('/actions', validate(actionSchema), requirePermission('create_incident'), async (req: AuthRequest, res: Response) => {
   const { title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, effectiveness } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO actions (id, title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, effectiveness) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-    [id, title, description, assignee, due_date, priority || 'Medium', status || 'Open', action_type || 'Corrective', category || 'Other', indicator || 'Lagging', related_incident_id, effectiveness || 'Not Assessed']
+    'INSERT INTO actions (id, title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, effectiveness, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
+    [id, title, description, assignee, due_date, priority || 'Medium', status || 'Open', action_type || 'Corrective', category || 'Other', indicator || 'Lagging', related_incident_id, effectiveness || 'Not Assessed', req.user?.id]
   );
   res.status(201).json({ id });
 
@@ -165,7 +364,7 @@ router.post('/actions', requirePermission('create_incident'), async (req: AuthRe
   }
 });
 
-router.put('/actions/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
+router.put('/actions/:id', validateParams(uuidParamSchema), validate(actionSchema), requireOwnership('actions', 'created_by', false, 'assignee'), async (req: AuthRequest, res: Response) => {
   const { title, description, assignee, due_date, completed_date, priority, status, action_type, category, indicator, verified_by, effectiveness } = req.body;
   await pool.query(
     `UPDATE actions SET title=COALESCE($1,title), description=COALESCE($2,description), assignee=COALESCE($3,assignee),
@@ -197,28 +396,28 @@ router.put('/actions/:id', requirePermission('manage_incidents'), async (req: Au
   }
 });
 
-router.delete('/actions/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
+router.delete('/actions/:id', validateParams(uuidParamSchema), requireOwnership('actions', 'created_by', false, 'assignee'), async (req: AuthRequest, res: Response) => {
   await pool.query('DELETE FROM actions WHERE id = $1', [req.params.id]);
   res.json({ message: 'Deleted' });
 });
 
 // ---------- OBSERVATIONS ----------
 
-router.get('/observations', async (req: AuthRequest, res: Response) => {
+router.get('/observations', validateQuery(paginationQuerySchema), async (req: AuthRequest, res: Response) => {
   await paginate(req, res, 'observations');
 });
 
-router.post('/observations', requirePermission('create_incident'), async (req: AuthRequest, res: Response) => {
+router.post('/observations', validate(observationSchema), requirePermission('create_incident'), async (req: AuthRequest, res: Response) => {
   const { type, category, description, location, date, observer, is_anonymous, immediate_action, images } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO observations (id, type, category, description, location, date, observer, is_anonymous, immediate_action, images) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
-    [id, type, category, description, location, date || new Date().toISOString(), observer, is_anonymous ? 1 : 0, immediate_action, JSON.stringify(images || [])]
+    'INSERT INTO observations (id, type, category, description, location, date, observer, is_anonymous, immediate_action, images, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+    [id, type, category, description, location, date || new Date().toISOString(), observer, is_anonymous ? 1 : 0, immediate_action, JSON.stringify(images || []), req.user?.id]
   );
   res.status(201).json({ id });
 });
 
-router.put('/observations/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
+router.put('/observations/:id', validateParams(uuidParamSchema), validate(observationSchema), requireOwnership('observations', 'created_by'), async (req: AuthRequest, res: Response) => {
   const { type, category, description, location, date, observer, status, immediate_action, images } = req.body;
   await pool.query(
     `UPDATE observations SET type=COALESCE($1,type), category=COALESCE($2,category), description=COALESCE($3,description),
@@ -229,18 +428,18 @@ router.put('/observations/:id', requirePermission('manage_incidents'), async (re
   res.json({ message: 'Updated' });
 });
 
-router.delete('/observations/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
+router.delete('/observations/:id', validateParams(uuidParamSchema), requireOwnership('observations', 'created_by'), async (req: AuthRequest, res: Response) => {
   await pool.query('DELETE FROM observations WHERE id = $1', [req.params.id]);
   res.json({ message: 'Deleted' });
 });
 
 // ---------- INSPECTIONS ----------
 
-router.get('/inspections', async (req: AuthRequest, res: Response) => {
+router.get('/inspections', validateQuery(paginationQuerySchema), async (req: AuthRequest, res: Response) => {
   await paginate(req, res, 'inspections');
 });
 
-router.post('/inspections', requirePermission('perform_inspection'), async (req: AuthRequest, res: Response) => {
+router.post('/inspections', validate(inspectionSchema), requirePermission('perform_inspection'), async (req: AuthRequest, res: Response) => {
   const { template_name, title, date, location, items, score, completed, signature } = req.body;
   const id = uuid();
   await pool.query(
@@ -252,21 +451,21 @@ router.post('/inspections', requirePermission('perform_inspection'), async (req:
 
 // ---------- PERMITS ----------
 
-router.get('/permits', async (req: AuthRequest, res: Response) => {
+router.get('/permits', validateQuery(paginationQuerySchema), async (req: AuthRequest, res: Response) => {
   await paginate(req, res, 'permits');
 });
 
-router.post('/permits', requirePermission('create_permit'), async (req: AuthRequest, res: Response) => {
+router.post('/permits', validate(permitSchema), requirePermission('create_permit'), async (req: AuthRequest, res: Response) => {
   const { type, location, description, valid_from, valid_until, requestor, status, controls } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO permits (id, type, location, description, valid_from, valid_until, requestor, status, controls) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-    [id, type, location, description, valid_from, valid_until, requestor, status || 'Draft', JSON.stringify(controls || [])]
+    'INSERT INTO permits (id, type, location, description, valid_from, valid_until, requestor, status, controls, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+    [id, type, location, description, valid_from, valid_until, requestor, status || 'Draft', JSON.stringify(controls || []), req.user?.id]
   );
   res.status(201).json({ id });
 });
 
-router.put('/permits/:id', requirePermission('approve_permit'), async (req: AuthRequest, res: Response) => {
+router.put('/permits/:id', validateParams(uuidParamSchema), validate(permitSchema), requirePermission('approve_permit'), async (req: AuthRequest, res: Response) => {
   const { status, approver, approver_comments } = req.body;
   await pool.query(
     'UPDATE permits SET status=COALESCE($1,status), approver=COALESCE($2,approver), approver_comments=COALESCE($3,approver_comments) WHERE id=$4',
@@ -303,25 +502,25 @@ router.put('/permits/:id', requirePermission('approve_permit'), async (req: Auth
   }
 });
 
-router.delete('/permits/:id', requirePermission('approve_permit'), async (req: AuthRequest, res: Response) => {
+router.delete('/permits/:id', validateParams(uuidParamSchema), requireOwnership('permits', 'created_by'), async (req: AuthRequest, res: Response) => {
   await pool.query('DELETE FROM permits WHERE id = $1', [req.params.id]);
   res.json({ message: 'Deleted' });
 });
 
 // ---------- WORKERS ----------
 
-router.get('/workers', async (req: AuthRequest, res: Response) => {
+router.get('/workers', validateQuery(paginationQuerySchema), async (req: AuthRequest, res: Response) => {
   await paginate(req, res, 'workers');
 });
 
-router.get('/workers/:id', async (req: AuthRequest, res: Response) => {
+router.get('/workers/:id', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
   const result = await pool.query('SELECT * FROM workers WHERE id = $1', [req.params.id]);
   const row = result.rows[0];
   if (!row) { res.status(404).json({ error: 'Worker not found' }); return; }
   res.json(row);
 });
 
-router.post('/workers', requirePermission('manage_users'), async (req: AuthRequest, res: Response) => {
+router.post('/workers', validate(workerSchema), requirePermission('manage_users'), async (req: AuthRequest, res: Response) => {
   const { name, role, department, company_id, joined_date, email, phone } = req.body;
   const id = uuid();
   await pool.query(
@@ -331,7 +530,7 @@ router.post('/workers', requirePermission('manage_users'), async (req: AuthReque
   res.status(201).json({ id });
 });
 
-router.put('/workers/:id', requirePermission('manage_users'), async (req: AuthRequest, res: Response) => {
+router.put('/workers/:id', validateParams(uuidParamSchema), validate(workerSchema), requirePermission('manage_users'), async (req: AuthRequest, res: Response) => {
   const { name, role, department, email, phone, points, level } = req.body;
   await pool.query(
     'UPDATE workers SET name=COALESCE($1,name), role=COALESCE($2,role), department=COALESCE($3,department), email=COALESCE($4,email), phone=COALESCE($5,phone), points=COALESCE($6,points), level=COALESCE($7,level) WHERE id=$8',
@@ -340,25 +539,25 @@ router.put('/workers/:id', requirePermission('manage_users'), async (req: AuthRe
   res.json({ message: 'Updated' });
 });
 
-router.delete('/workers/:id', requirePermission('manage_users'), async (req: AuthRequest, res: Response) => {
+router.delete('/workers/:id', validateParams(uuidParamSchema), requirePermission('manage_users'), async (req: AuthRequest, res: Response) => {
   await pool.query('DELETE FROM workers WHERE id = $1', [req.params.id]);
   res.json({ message: 'Deleted' });
 });
 
 // ---------- CONTRACTORS ----------
 
-router.get('/contractors', async (req: AuthRequest, res: Response) => {
+router.get('/contractors', validateQuery(paginationQuerySchema), async (req: AuthRequest, res: Response) => {
   await paginate(req, res, 'contractors');
 });
 
-router.get('/contractors/:id', async (req: AuthRequest, res: Response) => {
+router.get('/contractors/:id', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
   const result = await pool.query('SELECT * FROM contractors WHERE id = $1', [req.params.id]);
   const row = result.rows[0];
   if (!row) { res.status(404).json({ error: 'Contractor not found' }); return; }
   res.json(row);
 });
 
-router.post('/contractors', requirePermission('manage_users'), async (req: AuthRequest, res: Response) => {
+router.post('/contractors', validate(contractorSchema), requirePermission('manage_users'), async (req: AuthRequest, res: Response) => {
   const { name, contact_person, email, phone, status } = req.body;
   const id = uuid();
   await pool.query(
@@ -368,7 +567,7 @@ router.post('/contractors', requirePermission('manage_users'), async (req: AuthR
   res.status(201).json({ id });
 });
 
-router.put('/contractors/:id', requirePermission('manage_users'), async (req: AuthRequest, res: Response) => {
+router.put('/contractors/:id', validateParams(uuidParamSchema), validate(contractorSchema), requirePermission('manage_users'), async (req: AuthRequest, res: Response) => {
   const { name, contact_person, email, phone, status } = req.body;
   await pool.query(
     `UPDATE contractors SET name=COALESCE($1,name), contact_person=COALESCE($2,contact_person),
@@ -379,25 +578,25 @@ router.put('/contractors/:id', requirePermission('manage_users'), async (req: Au
   res.json({ message: 'Updated' });
 });
 
-router.delete('/contractors/:id', requirePermission('manage_users'), async (req: AuthRequest, res: Response) => {
+router.delete('/contractors/:id', validateParams(uuidParamSchema), requirePermission('manage_users'), async (req: AuthRequest, res: Response) => {
   await pool.query('DELETE FROM contractors WHERE id = $1', [req.params.id]);
   res.json({ message: 'Deleted' });
 });
 
 // ---------- ASSETS ----------
 
-router.get('/assets', async (req: AuthRequest, res: Response) => {
+router.get('/assets', validateQuery(paginationQuerySchema), async (req: AuthRequest, res: Response) => {
   await paginate(req, res, 'assets');
 });
 
-router.get('/assets/:id', async (req: AuthRequest, res: Response) => {
+router.get('/assets/:id', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
   const result = await pool.query('SELECT * FROM assets WHERE id = $1', [req.params.id]);
   const row = result.rows[0];
   if (!row) { res.status(404).json({ error: 'Asset not found' }); return; }
   res.json(row);
 });
 
-router.post('/assets', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
+router.post('/assets', validate(assetSchema), requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
   const { name, category, model_number, serial_number, location, status, next_inspection_date } = req.body;
   const id = uuid();
   await pool.query(
@@ -407,7 +606,7 @@ router.post('/assets', requirePermission('manage_incidents'), async (req: AuthRe
   res.status(201).json({ id });
 });
 
-router.put('/assets/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
+router.put('/assets/:id', validateParams(uuidParamSchema), validate(assetSchema), requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
   const { name, category, model_number, serial_number, location, status, next_inspection_date } = req.body;
   await pool.query(
     `UPDATE assets SET name=COALESCE($1,name), category=COALESCE($2,category),
@@ -420,25 +619,25 @@ router.put('/assets/:id', requirePermission('manage_incidents'), async (req: Aut
   res.json({ message: 'Updated' });
 });
 
-router.delete('/assets/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
+router.delete('/assets/:id', validateParams(uuidParamSchema), requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
   await pool.query('DELETE FROM assets WHERE id = $1', [req.params.id]);
   res.json({ message: 'Deleted' });
 });
 
 // ---------- DOCUMENTS ----------
 
-router.get('/documents', async (req: AuthRequest, res: Response) => {
+router.get('/documents', validateQuery(paginationQuerySchema), async (req: AuthRequest, res: Response) => {
   await paginate(req, res, 'documents');
 });
 
-router.get('/documents/:id', async (req: AuthRequest, res: Response) => {
+router.get('/documents/:id', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
   const result = await pool.query('SELECT * FROM documents WHERE id = $1', [req.params.id]);
   const row = result.rows[0];
   if (!row) { res.status(404).json({ error: 'Document not found' }); return; }
   res.json(row);
 });
 
-router.post('/documents', requirePermission('manage_documents'), async (req: AuthRequest, res: Response) => {
+router.post('/documents', validate(documentSchema), requirePermission('manage_documents'), async (req: AuthRequest, res: Response) => {
   const { title, category, content, status } = req.body;
   const id = uuid();
   await pool.query(
@@ -448,7 +647,7 @@ router.post('/documents', requirePermission('manage_documents'), async (req: Aut
   res.status(201).json({ id });
 });
 
-router.put('/documents/:id', requirePermission('manage_documents'), async (req: AuthRequest, res: Response) => {
+router.put('/documents/:id', validateParams(uuidParamSchema), validate(documentSchema), requirePermission('manage_documents'), async (req: AuthRequest, res: Response) => {
   const { title, category, content, status } = req.body;
   await pool.query(
     `UPDATE documents SET title=COALESCE($1,title), category=COALESCE($2,category),
@@ -459,7 +658,7 @@ router.put('/documents/:id', requirePermission('manage_documents'), async (req: 
   res.json({ message: 'Updated' });
 });
 
-router.delete('/documents/:id', requirePermission('manage_documents'), async (req: AuthRequest, res: Response) => {
+router.delete('/documents/:id', validateParams(uuidParamSchema), requirePermission('manage_documents'), async (req: AuthRequest, res: Response) => {
   await pool.query('DELETE FROM documents WHERE id = $1', [req.params.id]);
   res.json({ message: 'Deleted' });
 });

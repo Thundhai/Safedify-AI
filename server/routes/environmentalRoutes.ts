@@ -16,18 +16,71 @@ import { v4 as uuid } from 'uuid';
 import pool from '../postgres';
 import { AuthRequest, authenticate } from '../auth.js';
 import { fetchWeatherAndAQI, clearWeatherCache } from '../services/weatherService.js';
+import { validate, validateQuery, ValidationSchema, sanitizeString } from '../middleware/inputValidation.js';
 
 const router = Router();
 router.use(authenticate);
+
+// Validation schemas
+const weatherQuerySchema: ValidationSchema = {
+  lat: { type: 'number', required: false, min: -90, max: 90 },
+  lng: { type: 'number', required: false, min: -180, max: 180 },
+};
+
+const readingsQuerySchema: ValidationSchema = {
+  type: { type: 'string', required: false, maxLength: 50 },
+  from: { type: 'date', required: false },
+  to: { type: 'date', required: false },
+  location: { type: 'string', required: false, maxLength: 200 },
+  limit: { type: 'number', required: false, min: 1, max: 1000 },
+};
+
+const historyQuerySchema: ValidationSchema = {
+  type: { type: 'string', required: true, maxLength: 50 },
+  hours: { type: 'number', required: false, min: 1, max: 8760 }, // Max 1 year
+  location: { type: 'string', required: false, maxLength: 200 },
+};
+
+const ALLOWED_READING_TYPES = ['noise', 'dust', 'gas_h2s', 'gas_co', 'gas_o2', 'gas_lel', 'temperature', 'humidity', 'vibration', 'light', 'radiation'];
+
+const readingSchema: ValidationSchema = {
+  reading_type: { type: 'string', required: true, maxLength: 50, enum: ALLOWED_READING_TYPES },
+  value: { type: 'number', required: true, min: -1000, max: 100000 },
+  unit: { type: 'string', required: false, maxLength: 20 },
+  location: { type: 'string', required: false, maxLength: 200, trim: true },
+  zone: { type: 'string', required: false, maxLength: 100, trim: true },
+  source: { type: 'string', required: false, maxLength: 50, enum: ['manual', 'sensor', 'iot', 'calibration'] },
+  notes: { type: 'string', required: false, maxLength: 2000, trim: true },
+  latitude: { type: 'number', required: false, min: -90, max: 90 },
+  longitude: { type: 'number', required: false, min: -180, max: 180 },
+};
+
+const locationSchema: ValidationSchema = {
+  name: { type: 'string', required: true, maxLength: 200, trim: true },
+  latitude: { type: 'number', required: false, min: -90, max: 90 },
+  longitude: { type: 'number', required: false, min: -180, max: 180 },
+  is_default: { type: 'boolean', required: false },
+};
 
 // ──────────────────────────────────────────
 //  LIVE WEATHER + AQI
 // ──────────────────────────────────────────
 
-router.get('/weather', async (req: AuthRequest, res: Response) => {
+router.get('/weather', validateQuery(weatherQuerySchema), async (req: AuthRequest, res: Response) => {
   try {
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
+    
+    // Validate coordinates are within bounds
+    if (lat !== undefined && (lat < -90 || lat > 90)) {
+      res.status(400).json({ error: 'Invalid latitude. Must be between -90 and 90.' });
+      return;
+    }
+    if (lng !== undefined && (lng < -180 || lng > 180)) {
+      res.status(400).json({ error: 'Invalid longitude. Must be between -180 and 180.' });
+      return;
+    }
+    
     const data = await fetchWeatherAndAQI(lat, lng);
 
     // Merge latest noise reading from DB into the weather response
@@ -60,18 +113,29 @@ router.post('/weather/refresh', (_req: AuthRequest, res: Response) => {
 // ──────────────────────────────────────────
 
 // List all readings (newest first), with optional type & date filters
-router.get('/readings', async (req: AuthRequest, res: Response) => {
+router.get('/readings', validateQuery(readingsQuerySchema), async (req: AuthRequest, res: Response) => {
   const { type, from, to, location, limit } = req.query;
   let sql = 'SELECT * FROM environmental_readings WHERE 1=1';
   const params: any[] = [];
 
-  if (type) { sql += ' AND reading_type = $' + (params.length + 1); params.push(type); }
+  // Sanitize and validate query parameters
+  if (type) { 
+    const sanitizedType = sanitizeString(type as string, { stripHtml: true, maxLength: 50 });
+    sql += ' AND reading_type = $' + (params.length + 1); 
+    params.push(sanitizedType); 
+  }
   if (from) { sql += ' AND created_at >= $' + (params.length + 1); params.push(from); }
   if (to) { sql += ' AND created_at <= $' + (params.length + 1); params.push(to); }
-  if (location) { sql += ' AND location = $' + (params.length + 1); params.push(location); }
+  if (location) { 
+    const sanitizedLocation = sanitizeString(location as string, { stripHtml: true, maxLength: 200 });
+    sql += ' AND location = $' + (params.length + 1); 
+    params.push(sanitizedLocation); 
+  }
 
   sql += ' ORDER BY created_at DESC';
-  if (limit) { sql += ` LIMIT ${parseInt(limit as string, 10) || 100}`; }
+  const parsedLimit = Math.min(1000, Math.max(1, parseInt(limit as string, 10) || 100));
+  sql += ` LIMIT $${params.length + 1}`;
+  params.push(parsedLimit);
 
   const result = await pool.query(sql, params);
   res.json(result.rows);
@@ -92,16 +156,32 @@ router.get('/readings/latest', async (_req: AuthRequest, res: Response) => {
 });
 
 // Time-series for charts (returns values for a given type ordered chronologically)
-router.get('/readings/history', async (req: AuthRequest, res: Response) => {
+router.get('/readings/history', validateQuery(historyQuerySchema), async (req: AuthRequest, res: Response) => {
   const { type, hours = '24', location } = req.query;
   if (!type) { res.status(400).json({ error: 'reading type is required (?type=noise)' }); return; }
+  
+  // Sanitize and validate query parameters
+  const sanitizedType = sanitizeString(type as string, { stripHtml: true, maxLength: 50 });
+  if (!ALLOWED_READING_TYPES.includes(sanitizedType)) {
+    res.status(400).json({ error: 'Invalid reading type' });
+    return;
+  }
 
-  const hoursBack = parseInt(hours as string, 10) || 24;
+  const hoursBack = Math.min(8760, Math.max(1, parseInt(hours as string, 10) || 24)); // Max 1 year
+  const params: any[] = [sanitizedType];
+  let paramIndex = 2;
+  
   let sql = `SELECT id, value, unit, location, zone, source, created_at
     FROM environmental_readings
-    WHERE reading_type = $1 AND created_at >= NOW() - INTERVAL '${hoursBack} hours'`;
-  const params: any[] = [type];
-  if (location) { sql += ' AND location = $2'; params.push(location); }
+    WHERE reading_type = $1 AND created_at >= NOW() - INTERVAL '1 hour' * $${paramIndex}`;
+  params.push(hoursBack);
+  paramIndex++;
+  
+  if (location) { 
+    const sanitizedLocation = sanitizeString(location as string, { stripHtml: true, maxLength: 200 });
+    sql += ` AND location = $${paramIndex}`; 
+    params.push(sanitizedLocation);
+  }
   sql += ' ORDER BY created_at ASC';
 
   const result = await pool.query(sql, params);
@@ -109,12 +189,18 @@ router.get('/readings/history', async (req: AuthRequest, res: Response) => {
 });
 
 // Log a new reading
-router.post('/readings', async (req: AuthRequest, res: Response) => {
+router.post('/readings', validate(readingSchema), async (req: AuthRequest, res: Response) => {
   const b = req.body;
   const id = uuid();
 
   if (!b.reading_type || b.value == null) {
     res.status(400).json({ error: 'reading_type and value are required' });
+    return;
+  }
+  
+  // Validate reading_type against allowlist
+  if (!ALLOWED_READING_TYPES.includes(b.reading_type)) {
+    res.status(400).json({ error: 'Invalid reading_type' });
     return;
   }
 
@@ -135,6 +221,12 @@ router.post('/readings', async (req: AuthRequest, res: Response) => {
 
   const unit = b.unit || units[b.reading_type] || '';
 
+  // Sanitize string inputs
+  const sanitizedLocation = b.location ? sanitizeString(b.location, { stripHtml: true, maxLength: 200 }) : 'Site Zone A';
+  const sanitizedZone = b.zone ? sanitizeString(b.zone, { stripHtml: true, maxLength: 100 }) : null;
+  const sanitizedSource = b.source && ['manual', 'sensor', 'iot', 'calibration'].includes(b.source) ? b.source : 'manual';
+  const sanitizedNotes = b.notes ? sanitizeString(b.notes, { stripHtml: true, maxLength: 2000 }) : null;
+
   await pool.query(
     `INSERT INTO environmental_readings (id, reading_type, value, unit, location, zone, source, recorded_by, notes, latitude, longitude)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
@@ -143,11 +235,11 @@ router.post('/readings', async (req: AuthRequest, res: Response) => {
       b.reading_type,
       b.value,
       unit,
-      b.location ?? 'Site Zone A',
-      b.zone ?? null,
-      b.source ?? 'manual',
+      sanitizedLocation,
+      sanitizedZone,
+      sanitizedSource,
       req.user?.id ?? null,
-      b.notes ?? null,
+      sanitizedNotes,
       b.latitude ?? null,
       b.longitude ?? null,
     ]
@@ -166,10 +258,17 @@ router.get('/locations', async (_req: AuthRequest, res: Response) => {
   res.json(result.rows);
 });
 
-router.post('/locations', async (req: AuthRequest, res: Response) => {
+router.post('/locations', validate(locationSchema), async (req: AuthRequest, res: Response) => {
   const { name, latitude, longitude, is_default } = req.body;
   if (!name) { res.status(400).json({ error: 'name is required' }); return; }
   const id = uuid();
+  
+  // Sanitize the name
+  const sanitizedName = sanitizeString(name, { stripHtml: true, maxLength: 200 }).trim();
+  if (!sanitizedName) {
+    res.status(400).json({ error: 'name is required' });
+    return;
+  }
 
   // If setting as default, unset existing default
   if (is_default) {
@@ -178,7 +277,7 @@ router.post('/locations', async (req: AuthRequest, res: Response) => {
 
   await pool.query(
     'INSERT INTO site_locations (id, name, latitude, longitude, is_default) VALUES ($1, $2, $3, $4, $5)',
-    [id, name, latitude ?? null, longitude ?? null, is_default ? 1 : 0]
+    [id, sanitizedName, latitude ?? null, longitude ?? null, is_default ? 1 : 0]
   );
 
   const result = await pool.query('SELECT * FROM site_locations WHERE id = $1', [id]);

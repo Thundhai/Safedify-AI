@@ -142,3 +142,13 @@
 .dark ::-webkit-scrollbar-thumb:hover {
   background: #64748b;
 }
+
+/* Dynamic progress bar utility - uses CSS custom property for width */
+.progress-bar-fill {
+  width: var(--progress, 0%);
+}
+
+/* Dynamic color utility - uses CSS custom property for background */
+.dynamic-bg {
+  background-color: var(--bg-color);
+}

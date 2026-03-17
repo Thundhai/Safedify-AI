@@ -286,7 +286,7 @@ export const Dashboard: React.FC = () => {
                       
                       <div className="flex items-center gap-3">
                           <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                              <div className="h-full bg-blue-600 transition-all duration-1000" style={{ width: `${onboardingProgress}%` }}></div>
+                              <div className="h-full bg-blue-600 transition-all duration-1000 progress-bar-fill" style={{ '--progress': `${onboardingProgress}%` } as React.CSSProperties}></div>
                           </div>
                           <span className="text-sm font-bold text-blue-600">{onboardingProgress}%</span>
                       </div>
@@ -548,7 +548,7 @@ export const Dashboard: React.FC = () => {
               {trainingStats.totalRecords > 0 && (
                 <>
                   <div className="mt-2 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                    <div className="h-full bg-purple-500 rounded-full transition-all duration-700" style={{ width: `${trainingStats.complianceRate}%` }} />
+                    <div className="h-full bg-purple-500 rounded-full transition-all duration-700 progress-bar-fill" style={{ '--progress': `${trainingStats.complianceRate}%` } as React.CSSProperties} />
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1">{trainingStats.complianceRate}% compliant</p>
                 </>
@@ -570,7 +570,7 @@ export const Dashboard: React.FC = () => {
               <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-1">Open Actions</p>
               {/* Mini progress bar */}
               <div className="mt-2 h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                <div className="h-full bg-yellow-400 rounded-full transition-all duration-700" style={{ width: `${closureRate}%` }} />
+                <div className="h-full bg-yellow-400 rounded-full transition-all duration-700 progress-bar-fill" style={{ '--progress': `${closureRate}%` } as React.CSSProperties} />
               </div>
               <p className="text-[10px] text-slate-400 mt-1">{closureRate}% closed</p>
             </button>
@@ -662,7 +662,7 @@ export const Dashboard: React.FC = () => {
                 {closureRate}%
               </p>
               <div className="mt-2 h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-500 rounded-full transition-all duration-700" style={{ width: `${closureRate}%` }} />
+                <div className="h-full bg-blue-500 rounded-full transition-all duration-700 progress-bar-fill" style={{ '--progress': `${closureRate}%` } as React.CSSProperties} />
               </div>
               <p className="text-[10px] text-slate-400 mt-1">{stats.closedActions} of {stats.totalActions} actions closed</p>
             </div>
@@ -762,7 +762,7 @@ export const Dashboard: React.FC = () => {
                   <div className="flex flex-wrap gap-2 justify-center mt-2">
                     {stats.severityBreakdown.filter(s => s.value > 0).map((entry, idx) => (
                       <div key={entry.name} className="flex items-center gap-1">
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: SEVERITY_COLORS[idx % SEVERITY_COLORS.length] }} />
+                        <div className="w-2.5 h-2.5 rounded-full dynamic-bg" style={{ '--bg-color': SEVERITY_COLORS[idx % SEVERITY_COLORS.length] } as React.CSSProperties} />
                         <span className="text-[10px] text-slate-500 dark:text-slate-400">{entry.name} ({entry.value})</span>
                       </div>
                     ))}

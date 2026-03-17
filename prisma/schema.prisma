@@ -1,0 +1,421 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model actions {
+  id                  String     @id @db.Uuid
+  title               String
+  description         String?
+  assignee            String?    @db.Uuid
+  due_date            DateTime?  @db.Timestamp(6)
+  completed_date      DateTime?  @db.Timestamp(6)
+  priority            String     @default("Medium")
+  status              String     @default("Open")
+  action_type         String     @default("Corrective")
+  category            String     @default("Other")
+  indicator           String     @default("Lagging")
+  related_incident_id String?    @db.Uuid
+  verified_by         String?    @db.Uuid
+  effectiveness       String?    @default("Not Assessed")
+  created_at          DateTime?  @default(now()) @db.Timestamp(6)
+  incidents           incidents? @relation(fields: [related_incident_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([assignee], map: "idx_actions_assignee")
+  @@index([due_date], map: "idx_actions_due_date")
+  @@index([indicator], map: "idx_actions_indicator")
+  @@index([status], map: "idx_actions_status")
+}
+
+model agent_conversations {
+  id         String    @id @db.Uuid
+  user_id    String?   @db.Uuid
+  messages   String    @default("[]")
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  updated_at DateTime? @default(now()) @db.Timestamp(6)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model assets {
+  id                   String    @id @db.Uuid
+  name                 String
+  category             String?
+  model_number         String?
+  serial_number        String?
+  location             String?
+  status               String?   @default("Active")
+  last_inspection_date DateTime? @db.Timestamp(6)
+  next_inspection_date DateTime? @db.Timestamp(6)
+  image                String?
+  documents            String?   @default("[]")
+  maintenance_history  String?   @default("[]")
+  created_at           DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model audit_logs {
+  id          String    @id @db.Uuid
+  user_id     String?   @db.Uuid
+  user_email  String?
+  user_role   String?
+  action      String
+  entity_type String?
+  entity_id   String?   @db.Uuid
+  ip_address  String?
+  details     String?
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  user_agent  String?
+  users       users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model contractors {
+  id               String    @id @db.Uuid
+  name             String
+  contact_person   String?
+  email            String?
+  phone            String?
+  status           String?   @default("Pending")
+  documents        String?   @default("[]")
+  compliance_score Int?      @default(0)
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model documents {
+  id            String    @id @db.Uuid
+  title         String
+  category      String?
+  content       String?
+  status        String?   @default("Draft")
+  version       Int?      @default(1)
+  uploaded_by   String?   @db.Uuid
+  approved_by   String?   @db.Uuid
+  approval_date DateTime? @db.Timestamp(6)
+  ai_summary    String?
+  created_at    DateTime? @default(now()) @db.Timestamp(6)
+  updated_at    DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model emergency_contacts {
+  id         String    @id @db.Uuid
+  name       String
+  role       String?
+  phone      String
+  type       String?
+  location   String?
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model emergency_drills {
+  id                 String    @id @db.Uuid
+  type               String
+  date               DateTime  @db.Timestamp(6)
+  location           String
+  participants_count Int?      @default(0)
+  duration_minutes   Int?      @default(0)
+  outcome            String?
+  notes              String?
+  attendance_list    String?
+  created_at         DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model environmental_readings {
+  id           String    @id @db.Uuid
+  reading_type String
+  value        Float     @db.Real
+  unit         String
+  location     String    @default("Site Zone A")
+  zone         String?
+  source       String    @default("manual")
+  recorded_by  String?   @db.Uuid
+  notes        String?
+  latitude     Float?    @db.Real
+  longitude    Float?    @db.Real
+  created_at   DateTime? @default(now()) @db.Timestamp(6)
+  users        users?    @relation(fields: [recorded_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_env_readings_date")
+  @@index([reading_type], map: "idx_env_readings_type")
+}
+
+model incidents {
+  id                 String    @id @db.Uuid
+  description        String
+  location           String?
+  date               DateTime  @db.Timestamp(6)
+  type               String
+  category           String    @default("Near Miss")
+  severity           String
+  status             String    @default("Open")
+  reported_by        String?   @db.Uuid
+  image              String?
+  root_cause         String?
+  corrective_actions String?
+  days_lost          Int?      @default(0)
+  body_part          String?
+  mechanism          String?
+  immediate_action   String?
+  weather_conditions Json?
+  created_at         DateTime? @default(now()) @db.Timestamp(6)
+  updated_at         DateTime? @default(now()) @db.Timestamp(6)
+  images             String[]
+  date_reported      DateTime? @db.Timestamp(6)
+  department         String?
+  shift              String?
+  actions            actions[]
+  users              users?    @relation(fields: [reported_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([category], map: "idx_incidents_category")
+  @@index([date], map: "idx_incidents_date")
+  @@index([reported_by], map: "idx_incidents_reported_by")
+  @@index([severity], map: "idx_incidents_severity")
+  @@index([status], map: "idx_incidents_status")
+}
+
+model inspection_templates {
+  id          String    @id @db.Uuid
+  name        String
+  category    String?
+  description String?
+  items       String?   @default("[]")
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model inspections {
+  id            String    @id @db.Uuid
+  template_name String
+  title         String
+  date          DateTime  @db.Timestamp(6)
+  location      String?
+  inspector     String?   @db.Uuid
+  items         String
+  score         Int?      @default(0)
+  completed     Boolean?  @default(false)
+  signature     String?
+  created_at    DateTime? @default(now()) @db.Timestamp(6)
+  users         users?    @relation(fields: [inspector], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model notification_preferences {
+  user_id            String    @id @db.Uuid
+  email_incidents    Boolean?  @default(true)
+  email_permits      Boolean?  @default(true)
+  email_actions      Boolean?  @default(true)
+  email_training     Boolean?  @default(true)
+  email_observations Boolean?  @default(false)
+  email_digest       Boolean?  @default(true)
+  in_app_all         Boolean?  @default(true)
+  updated_at         DateTime? @default(now()) @db.Timestamp(6)
+  users              users     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model notifications {
+  id          String    @id @db.Uuid
+  user_id     String?   @db.Uuid
+  type        String    @default("info")
+  title       String
+  message     String
+  entity_type String?
+  entity_id   String?   @db.Uuid
+  is_read     Boolean?  @default(false)
+  email_sent  Boolean?  @default(false)
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+  users       users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([is_read], map: "idx_notifications_read")
+  @@index([user_id], map: "idx_notifications_user")
+}
+
+model observations {
+  id               String    @id @db.Uuid
+  type             String
+  category         String?
+  description      String
+  location         String?
+  date             DateTime  @db.Timestamp(6)
+  observer         String?   @db.Uuid
+  is_anonymous     Boolean?  @default(false)
+  status           String    @default("Open")
+  immediate_action String?
+  images           String?
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([date], map: "idx_observations_date")
+  @@index([type], map: "idx_observations_type")
+}
+
+model password_reset_tokens {
+  id         String    @id @db.Uuid
+  user_id    String?   @db.Uuid
+  token      String    @unique
+  expires_at DateTime  @db.Timestamp(6)
+  used       Boolean?  @default(false)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+  users      users?    @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model permits {
+  id                String    @id @db.Uuid
+  type              String
+  location          String?
+  description       String
+  valid_from        DateTime? @db.Timestamp(6)
+  valid_until       DateTime? @db.Timestamp(6)
+  requestor         String?   @db.Uuid
+  approver          String?   @db.Uuid
+  status            String    @default("Draft")
+  controls          String?
+  approver_comments String?
+  ai_audit_issues   String?
+  created_at        DateTime? @default(now()) @db.Timestamp(6)
+
+  @@index([status], map: "idx_permits_status")
+  @@index([valid_until], map: "idx_permits_valid_until")
+}
+
+model ppe_inventory {
+  id                  String         @id @db.Uuid
+  name                String
+  category            String?
+  stock_quantity      Int?           @default(0)
+  min_stock_threshold Int?           @default(5)
+  description         String?
+  created_at          DateTime?      @default(now()) @db.Timestamp(6)
+  ppe_issuance        ppe_issuance[]
+}
+
+model ppe_issuance {
+  id            String         @id @db.Uuid
+  worker_id     String?        @db.Uuid
+  worker_name   String?
+  ppe_item_id   String?        @db.Uuid
+  ppe_item_name String?
+  issue_date    DateTime?      @db.Timestamp(6)
+  expiry_date   DateTime?      @db.Timestamp(6)
+  signature_url String?
+  status        String?        @default("Active")
+  created_at    DateTime?      @default(now()) @db.Timestamp(6)
+  ppe_inventory ppe_inventory? @relation(fields: [ppe_item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  workers       workers?       @relation(fields: [worker_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([status], map: "idx_ppe_issuance_status")
+  @@index([worker_id], map: "idx_ppe_issuance_worker")
+}
+
+model risk_assessments {
+  id               String    @id @db.Uuid
+  title            String
+  task_description String?
+  type             String    @default("JHA")
+  date             DateTime  @db.Timestamp(6)
+  author           String?   @db.Uuid
+  hazards          String?   @default("[]")
+  status           String    @default("Draft")
+  created_at       DateTime? @default(now()) @db.Timestamp(6)
+  updated_at       DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model roles {
+  id          String    @id @db.Uuid
+  name        String    @unique
+  description String?
+  is_system   Boolean?  @default(false)
+  permissions String?   @default("[]")
+  created_at  DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model safety_zones {
+  id                String    @id @db.Uuid
+  name              String
+  type              String    @default("Safe")
+  lat               Float     @db.Real
+  lng               Float     @db.Real
+  radius            Float?    @default(100) @db.Real
+  required_ppe      String?   @default("[]")
+  required_training String?   @default("[]")
+  created_at        DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model site_locations {
+  id         String    @id @db.Uuid
+  name       String
+  latitude   Float?    @db.Real
+  longitude  Float?    @db.Real
+  is_default Boolean?  @default(false)
+  created_at DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model stats_logs {
+  id             String    @id @db.Uuid
+  date           DateTime  @db.Timestamp(6)
+  period         String    @default("Daily")
+  man_hours      Float?    @default(0) @db.Real
+  active_workers Int?      @default(0)
+  remarks        String?
+  created_at     DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model training_modules {
+  id                 String    @id @db.Uuid
+  title              String
+  description        String?
+  required_for_roles String?   @default("[]")
+  validity_months    Int?      @default(0)
+  created_at         DateTime? @default(now()) @db.Timestamp(6)
+}
+
+model training_records {
+  id              String    @id @db.Uuid
+  worker_id       String?   @db.Uuid
+  module_id       String?   @db.Uuid
+  module_title    String?
+  completion_date DateTime? @db.Timestamp(6)
+  expiry_date     DateTime? @db.Timestamp(6)
+  certificate_url String?
+  status          String?   @default("Valid")
+  created_at      DateTime? @default(now()) @db.Timestamp(6)
+  workers         workers?  @relation(fields: [worker_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([status], map: "idx_training_records_status")
+  @@index([worker_id], map: "idx_training_records_worker")
+}
+
+model users {
+  id                       String                    @id @db.Uuid
+  name                     String
+  email                    String                    @unique
+  password_hash            String
+  role                     String                    @default("Worker")
+  tier                     String                    @default("Free")
+  avatar                   String?
+  created_at               DateTime?                 @default(now()) @db.Timestamp(6)
+  agent_conversations      agent_conversations[]
+  audit_logs               audit_logs[]
+  environmental_readings   environmental_readings[]
+  incidents                incidents[]
+  inspections              inspections[]
+  notification_preferences notification_preferences?
+  notifications            notifications[]
+  password_reset_tokens    password_reset_tokens[]
+}
+
+model workers {
+  id               String             @id @db.Uuid
+  name             String
+  role             String?
+  department       String?
+  company_id       String?
+  joined_date      DateTime?          @db.Timestamp(6)
+  email            String?
+  phone            String?
+  points           Int?               @default(0)
+  level            String?            @default("Novice")
+  badges           String?            @default("[]")
+  created_at       DateTime?          @default(now()) @db.Timestamp(6)
+  ppe_issuance     ppe_issuance[]
+  training_records training_records[]
+
+  @@index([department], map: "idx_workers_department")
+}

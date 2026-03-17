@@ -8,6 +8,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../auth.js';
 import { GoogleGenAI } from '@google/genai';
+import { validate, ValidationSchema, sanitizeString } from '../middleware/inputValidation.js';
 
 const router = Router();
 router.use(authenticate);
@@ -16,13 +17,36 @@ router.use(authenticate);
 const apiKey = process.env.GEMINI_API_KEY;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
+// Validation schemas for AI endpoints
+const generateSchema: ValidationSchema = {
+  model: { type: 'string', required: false, maxLength: 100 },
+  contents: { type: 'object', required: true },
+  config: { type: 'object', required: false },
+};
+
+const chatSchema: ValidationSchema = {
+  model: { type: 'string', required: false, maxLength: 100 },
+  history: { type: 'array', required: false, maxLength: 100 },
+  config: { type: 'object', required: false },
+  message: { type: 'object', required: true },
+};
+
+// Allowlist of valid model names
+const ALLOWED_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro',
+  'gemini-pro',
+];
+
 /**
  * POST /api/ai/generate
  * Body: { model?: string, contents: any, config?: any }
  * 
  * Generic proxy for ai.models.generateContent()
  */
-router.post('/generate', async (req: AuthRequest, res: Response) => {
+router.post('/generate', validate(generateSchema), async (req: AuthRequest, res: Response) => {
   if (!ai) {
     res.status(503).json({ error: 'AI service not configured. Set GEMINI_API_KEY on the server.' });
     return;
@@ -36,8 +60,11 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    // Validate model name if provided
+    const safeModel = model && ALLOWED_MODELS.includes(model) ? model : 'gemini-2.5-flash';
+
     const response = await ai.models.generateContent({
-      model: model || 'gemini-2.5-flash',
+      model: safeModel,
       contents,
       config,
     });
@@ -63,7 +90,7 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
  * 
  * Generic proxy for ai.chats.create() + sendMessage()
  */
-router.post('/chat', async (req: AuthRequest, res: Response) => {
+router.post('/chat', validate(chatSchema), async (req: AuthRequest, res: Response) => {
   if (!ai) {
     res.status(503).json({ error: 'AI service not configured. Set GEMINI_API_KEY on the server.' });
     return;
@@ -77,8 +104,11 @@ router.post('/chat', async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    // Validate model name if provided
+    const safeModel = model && ALLOWED_MODELS.includes(model) ? model : 'gemini-2.5-flash';
+
     const chat = ai.chats.create({
-      model: model || 'gemini-2.5-flash',
+      model: safeModel,
       history: history || [],
       config,
     });

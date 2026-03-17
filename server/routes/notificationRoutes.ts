@@ -10,14 +10,25 @@
 import { Router, Response } from 'express';
 import pool from '../postgres';
 import { AuthRequest, authenticate } from '../auth.js';
+import { validateParams, validateQuery, ValidationSchema } from '../middleware/inputValidation.js';
 
 const router = Router();
 router.use(authenticate);
 
+// Validation schemas
+const paginationQuerySchema: ValidationSchema = {
+  limit: { type: 'number', required: false, min: 1, max: 200 },
+  offset: { type: 'number', required: false, min: 0, max: 100000 },
+};
+
+const uuidParamSchema: ValidationSchema = {
+  id: { type: 'uuid', required: true },
+};
+
 // ---------- List notifications for current user ----------
-router.get('/', async (req: AuthRequest, res: Response) => {
-  const limit = parseInt(req.query.limit as string) || 50;
-  const offset = parseInt(req.query.offset as string) || 0;
+router.get('/', validateQuery(paginationQuerySchema), async (req: AuthRequest, res: Response) => {
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+  const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
   const result = await pool.query(
     'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
     [req.user!.id, limit, offset]
@@ -36,7 +47,7 @@ router.get('/unread', async (req: AuthRequest, res: Response) => {
 });
 
 // ---------- Mark one as read ----------
-router.put('/:id/read', async (req: AuthRequest, res: Response) => {
+router.put('/:id/read', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
   await pool.query(
     'UPDATE notifications SET is_read = 1 WHERE id = $1 AND user_id = $2',
     [req.params.id as string, req.user!.id]
@@ -54,7 +65,7 @@ router.put('/read-all', async (req: AuthRequest, res: Response) => {
 });
 
 // ---------- Delete one ----------
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/:id', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
   await pool.query(
     'DELETE FROM notifications WHERE id = $1 AND user_id = $2',
     [req.params.id as string, req.user!.id]

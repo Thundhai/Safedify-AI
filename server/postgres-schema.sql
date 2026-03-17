@@ -381,3 +381,11 @@ CREATE INDEX idx_notifications_user ON notifications(user_id);
 CREATE INDEX idx_notifications_read ON notifications(is_read);
 CREATE INDEX idx_env_readings_type ON environmental_readings(reading_type);
 CREATE INDEX idx_env_readings_date ON environmental_readings(created_at);
+
+-- Full-Text Search (FTS) GIN indexes for fast search queries
+-- These indexes significantly improve search performance over ILIKE
+CREATE INDEX idx_incidents_fts ON incidents USING GIN (to_tsvector('english', COALESCE(description, '')));
+CREATE INDEX idx_observations_fts ON observations USING GIN (to_tsvector('english', COALESCE(description, '')));
+CREATE INDEX idx_actions_fts ON actions USING GIN (to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(description, '')));
+CREATE INDEX idx_permits_fts ON permits USING GIN (to_tsvector('english', COALESCE(description, '')));
+CREATE INDEX idx_documents_fts ON documents USING GIN (to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(content, '')));

@@ -3,6 +3,19 @@ import crypto from 'crypto';
 import pool from '../postgres';
 import { AuthRequest, authenticate } from '../auth.js';
 import { logAudit } from './auditRoutes.js';
+import { validate, ValidationSchema } from '../middleware/inputValidation.js';
+
+const router = Router();
+
+// Validation schemas for 2FA endpoints
+const tokenSchema: ValidationSchema = {
+  token: { type: 'string', required: true, maxLength: 10, pattern: /^\d{6,8}$/ },
+};
+
+const validateSchema: ValidationSchema = {
+  userId: { type: 'uuid', required: true },
+  token: { type: 'string', required: true, maxLength: 10, pattern: /^\d{6,8}$/ },
+};
 
 const router = Router();
 
@@ -93,7 +106,7 @@ router.post('/setup', authenticate, async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/auth/2fa/verify — Confirm setup with a valid TOTP code
-router.post('/verify', authenticate, async (req: AuthRequest, res: Response) => {
+router.post('/verify', authenticate, validate(tokenSchema), async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
     const { token } = req.body;
@@ -125,11 +138,10 @@ router.post('/verify', authenticate, async (req: AuthRequest, res: Response) => 
 });
 
 // POST /api/auth/2fa/validate — Validate TOTP code during login (rate-limited, requires userId + token)
-router.post('/validate', async (req: AuthRequest, res: Response) => {
+router.post('/validate', validate(validateSchema), async (req: AuthRequest, res: Response) => {
   try {
     const { userId, token } = req.body;
     if (!userId || !token) { res.status(400).json({ error: 'User ID and token are required' }); return; }
-    if (typeof token !== 'string' || token.length > 10) { res.status(400).json({ error: 'Invalid token format' }); return; }
 
     const result = await pool.query('SELECT totp_secret, totp_enabled, totp_backup_codes FROM users WHERE id = $1', [userId]);
     const row = result.rows[0];

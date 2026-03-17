@@ -9,9 +9,22 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { sessionRateLimit } from './middleware/sessionRateLimit.js';
 import { sanitizeBody } from './middleware/sanitize.js';
+import { securityMonitor, securityErrorHandler, rateLimitLogger } from './middleware/securityLogger.js';
+import { detectInjections } from './middleware/inputValidation.js';
+import { 
+  trackRequestTiming, 
+  blockedIpCheck, 
+  botProtection, 
+  antiScrapingProtection,
+  loginRateLimiter,
+  registrationRateLimiter,
+  aiGenerationLimiter,
+  honeypotProtection
+} from './middleware/abuseProtection.js';
 
 // Database init (creates tables on import)
 // Removed SQLite db.js import
+import pool from './postgres.js';
 
 // Auth
 import { seedDefaultUsers } from './auth.js';
@@ -37,23 +50,64 @@ const PORT = parseInt(process.env.PORT || '4000');
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const isProduction = NODE_ENV === 'production';
 
-// ---------- Security ----------
+// ---------- Trust Proxy (for correct IP detection behind reverse proxy) ----------
+if (isProduction) {
+  app.set('trust proxy', 1);
+}
+
+// ---------- Security Headers ----------
 app.use(helmet({
-  contentSecurityPolicy: false,  // frontend uses inline styles (Tailwind)
+  contentSecurityPolicy: isProduction ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],  // Needed for Vite/React
+      styleSrc: ["'self'", "'unsafe-inline'"],  // Tailwind uses inline styles
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      connectSrc: ["'self'", "https://generativelanguage.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  } : false,
   crossOriginEmbedderPolicy: false,
   hsts: isProduction ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  xContentTypeOptions: true,
+  xDnsPrefetchControl: { allow: false },
+  xDownloadOptions: true,
+  xFrameOptions: { action: 'deny' },
+  xPermittedCrossDomainPolicies: { permittedPolicies: 'none' },
+  xXssProtection: true,
 }));
 
-// ---------- HTTPS Redirect (Production) ----------
+// ---------- HTTPS Enforcement (Production) ----------
 if (isProduction) {
   app.use((req, res, next) => {
-    // Trust proxy (e.g. nginx, cloud LB) for x-forwarded-proto
+    // Redirect HTTP to HTTPS (trust proxy for x-forwarded-proto)
     if (req.headers['x-forwarded-proto'] === 'http') {
       res.redirect(301, `https://${req.headers.host}${req.url}`);
       return;
     }
+    // Set additional security headers
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), interest-cohort=()');
     next();
   });
+}
+
+// ---------- Security Monitoring (detect suspicious patterns) ----------
+app.use(securityMonitor());
+
+// ---------- Abuse Protection (request tracking, IP blocking, bot detection) ----------
+app.use(trackRequestTiming());
+app.use(blockedIpCheck());
+if (isProduction) {
+  app.use(botProtection({ blockBots: true }));
+  app.use(antiScrapingProtection());
 }
 
 // ---------- Compression ----------
@@ -62,19 +116,21 @@ app.use(compression());
 // ---------- Logging ----------
 app.use(morgan(isProduction ? 'combined' : 'dev'));
 
-// ---------- Rate Limiting ----------
+// ---------- Rate Limiting (with security logging) ----------
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 minutes
   max: isProduction ? 100 : 1000,
-  message: { error: 'Too many requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  handler: rateLimitLogger,
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isProduction ? 20 : 200,
-  message: { error: 'Too many login attempts, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitLogger,
 });
 
 
@@ -113,6 +169,10 @@ app.use(express.json({ limit: '10mb' }));
 // ---------- Input Sanitization ----------
 app.use(sanitizeBody({ stripTags: true, maxLength: 50000 }));
 
+// ---------- Global Injection Detection ----------
+// Detects SQL injection, command injection, XSS, and path traversal attempts
+app.use(detectInjections({ logOnly: false }));
+
 // ---------- Serve Frontend (Production) ----------
 if (isProduction) {
   const frontendDist = path.join(__dirname, '..', 'dist');
@@ -123,23 +183,46 @@ if (isProduction) {
 }
 
 // ---------- Health check (no auth) ----------
-app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'ok',
+app.get('/api/health', async (_req, res) => {
+  let dbStatus = 'disconnected';
+  let dbLatencyMs: number | null = null;
+  
+  try {
+    const start = Date.now();
+    await pool.query('SELECT 1');
+    dbLatencyMs = Date.now() - start;
+    dbStatus = 'connected';
+  } catch (err) {
+    dbStatus = 'error';
+  }
+  
+  const isHealthy = dbStatus === 'connected';
+  
+  res.status(isHealthy ? 200 : 503).json({
+    status: isHealthy ? 'ok' : 'degraded',
     server: 'Safedify AI Backend',
     version: '1.0.0',
     environment: NODE_ENV,
     timestamp: new Date().toISOString(),
     agent: !!process.env.GEMINI_API_KEY ? 'enabled' : 'disabled',
+    database: {
+      status: dbStatus,
+      latencyMs: dbLatencyMs,
+    },
+    // Debug: Show which AI-related env vars are configured (not values, just presence)
+    config: {
+      geminiKey: !!process.env.GEMINI_API_KEY,
+      geminiKeyLength: process.env.GEMINI_API_KEY?.length || 0,
+    },
   });
 });
 
 // ---------- API Routes ----------
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', authLimiter, loginRateLimiter(), authRoutes);
 app.use('/api/auth/2fa', authLimiter, twoFactorRoutes);
 app.use('/api', apiLimiter, dataRoutes);
-app.use('/api/agent', aiLimiter, agentRoutes);
-app.use('/api/ai', aiLimiter, aiRoutes);
+app.use('/api/agent', aiGenerationLimiter(), agentRoutes);
+app.use('/api/ai', aiGenerationLimiter(), aiRoutes);
 app.use('/api/notifications', apiLimiter, notificationRoutes);
 app.use('/api/environmental', apiLimiter, environmentalRoutes);
 app.use('/api/uploads', apiLimiter, uploadRoutes);
@@ -165,7 +248,9 @@ if (isProduction) {
   });
 }
 
-// ---------- Global Error Handler ----------
+// ---------- Global Error Handler (with security logging) ----------
+app.use(securityErrorHandler());
+
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Unhandled error:', err.message);
   if (!isProduction) console.error(err.stack);

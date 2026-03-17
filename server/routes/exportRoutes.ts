@@ -7,6 +7,22 @@ import { Router, Response } from 'express';
 import pool from '../postgres';
 import { AuthRequest, authenticate, requirePermission } from '../auth.js';
 import { logAudit } from './auditRoutes.js';
+import { validateParams, validateQuery, ValidationSchema, sanitizeString } from '../middleware/inputValidation.js';
+
+const router = Router();
+router.use(authenticate);
+router.use(requirePermission('view_analytics'));
+
+// Validation schemas
+const entityParamSchema: ValidationSchema = {
+  entity: { type: 'string', required: true, maxLength: 50 },
+};
+
+const exportQuerySchema: ValidationSchema = {
+  format: { type: 'string', required: false, maxLength: 10, enum: ['csv', 'json'] },
+  from: { type: 'date', required: false },
+  to: { type: 'date', required: false },
+};
 
 const router = Router();
 router.use(authenticate);
@@ -65,15 +81,20 @@ const EXPORTABLE: Record<string, { table: string; dateCol: string; columns: stri
   },
 };
 
-router.get('/:entity', async (req: AuthRequest, res: Response) => {
-  const entity = req.params.entity as string;
+router.get('/:entity', validateParams(entityParamSchema), validateQuery(exportQuerySchema), async (req: AuthRequest, res: Response) => {
+  const entity = sanitizeString(req.params.entity, { stripHtml: true, maxLength: 50 });
   const config = EXPORTABLE[entity];
   if (!config) {
     res.status(400).json({ error: `Unknown entity: ${entity}. Available: ${Object.keys(EXPORTABLE).join(', ')}` });
     return;
   }
 
-  const format = (req.query.format as string || 'csv').toLowerCase();
+  const format = (sanitizeString(req.query.format as string || 'csv', { stripHtml: true, maxLength: 10 })).toLowerCase();
+  if (format !== 'csv' && format !== 'json') {
+    res.status(400).json({ error: 'Invalid format. Use csv or json.' });
+    return;
+  }
+  
   const from = req.query.from as string;
   const to = req.query.to as string;
 

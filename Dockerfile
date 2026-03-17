@@ -6,7 +6,7 @@
 # ==========================================
 
 # --- Stage 1: Build frontend ---
-FROM node:22-slim AS frontend-build
+FROM node:22-alpine AS frontend-build
 WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -16,7 +16,7 @@ COPY public/ ./public/
 RUN npm run build
 
 # --- Stage 2: Production server ---
-FROM node:22-slim
+FROM node:22-alpine
 
 WORKDIR /app/server
 
