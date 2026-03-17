@@ -46,7 +46,7 @@ export const notify = async (params: NotifyParams): Promise<string> => {
         text: `Hi ${user.name || 'there'},\n\n${message}\n\nYou can view details in the Safedify dashboard.`,
       });
       if (emailSent) {
-        await pool.query('UPDATE notifications SET email_sent = 1 WHERE id = $1', [id]);
+        await pool.query('UPDATE notifications SET email_sent = TRUE WHERE id = $1', [id]);
       }
     }
   } catch (err: any) {

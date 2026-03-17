@@ -34,7 +34,7 @@ const ABUSE_CONFIG = {
   // Registration protection
   registration: {
     windowMs: 60 * 60 * 1000,     // 1 hour
-    maxAttempts: 3,               // Max 3 registrations per IP per hour
+    maxAttempts: process.env.NODE_ENV === 'production' ? 3 : 20, // Relaxed in dev/test
   },
   // AI generation protection
   aiGeneration: {
