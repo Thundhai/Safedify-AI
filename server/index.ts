@@ -224,6 +224,37 @@ app.get('/api/health', async (_req, res) => {
   });
 });
 
+// ---------- Debug: Manual seed trigger (temporary) ----------
+app.get('/api/debug-seed', async (_req, res) => {
+  try {
+    // Check if users exist
+    const { rows } = await pool.query('SELECT email, role FROM users LIMIT 10');
+    if (rows.length > 0) {
+      res.json({ status: 'users_exist', count: rows.length, users: rows });
+      return;
+    }
+    // Attempt to seed
+    const bcrypt = await import('bcryptjs');
+    const { v4: uuid } = await import('uuid');
+    const hash = bcrypt.default.hashSync('admin123', 12);
+    const users = [
+      { id: uuid(), name: 'John Doe', email: 'admin@safedify.com', role: 'Admin', tier: 'Enterprise', avatar: 'JD' },
+      { id: uuid(), name: 'Robert Fox', email: 'worker@safedify.com', role: 'Worker', tier: 'Pro', avatar: 'RF' },
+      { id: uuid(), name: 'Sarah Connor', email: 'supervisor@safedify.com', role: 'HSE Supervisor', tier: 'Pro', avatar: 'SC' },
+    ];
+    for (const u of users) {
+      await pool.query(
+        `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, email_verified, must_change_password, password_changed_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, TRUE, NOW())`,
+        [u.id, u.name, u.email, hash, u.role, u.tier, u.avatar]
+      );
+    }
+    res.json({ status: 'seeded', count: users.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message, code: err.code });
+  }
+});
+
 // ---------- API Routes ----------
 app.use('/api/auth', authLimiter, loginRateLimiter(), authRoutes);
 app.use('/api/auth/2fa', authLimiter, twoFactorRoutes);
