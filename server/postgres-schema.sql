@@ -9,6 +9,17 @@ CREATE TABLE users (
     role TEXT NOT NULL DEFAULT 'Worker',
     tier TEXT NOT NULL DEFAULT 'Free',
     avatar TEXT,
+    email_verified BOOLEAN DEFAULT FALSE,
+    email_verification_token TEXT,
+    email_verification_expires TIMESTAMP,
+    failed_login_attempts INTEGER DEFAULT 0,
+    locked_until TIMESTAMP,
+    last_failed_login TIMESTAMP,
+    password_changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    must_change_password BOOLEAN DEFAULT FALSE,
+    totp_secret TEXT,
+    totp_enabled BOOLEAN DEFAULT FALSE,
+    totp_backup_codes TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -358,6 +369,40 @@ CREATE TABLE password_reset_tokens (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE email_verification_tokens (
+    id UUID PRIMARY KEY,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT UNIQUE NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE security_logs (
+    id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    severity TEXT NOT NULL CHECK (severity IN ('info', 'warning', 'critical')),
+    user_id TEXT,
+    email TEXT,
+    ip_address TEXT NOT NULL,
+    user_agent TEXT,
+    endpoint TEXT NOT NULL,
+    method TEXT NOT NULL,
+    status_code INTEGER,
+    details TEXT,
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE blocked_ips (
+    ip_address TEXT PRIMARY KEY,
+    reason TEXT NOT NULL,
+    blocked_at TIMESTAMP DEFAULT NOW(),
+    blocked_until TIMESTAMP,
+    blocked_by TEXT,
+    auto_blocked BOOLEAN DEFAULT TRUE
+);
+
 -- Indexes for query performance
 CREATE INDEX idx_incidents_status ON incidents(status);
 CREATE INDEX idx_incidents_severity ON incidents(severity);
@@ -389,3 +434,16 @@ CREATE INDEX idx_observations_fts ON observations USING GIN (to_tsvector('englis
 CREATE INDEX idx_actions_fts ON actions USING GIN (to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(description, '')));
 CREATE INDEX idx_permits_fts ON permits USING GIN (to_tsvector('english', COALESCE(description, '')));
 CREATE INDEX idx_documents_fts ON documents USING GIN (to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(content, '')));
+
+-- Security indexes
+CREATE INDEX idx_users_email_verification ON users(email_verification_token);
+CREATE INDEX idx_users_locked_until ON users(locked_until);
+CREATE INDEX idx_email_tokens_token ON email_verification_tokens(token);
+CREATE INDEX idx_email_tokens_user ON email_verification_tokens(user_id);
+CREATE INDEX idx_password_reset_expires ON password_reset_tokens(expires_at);
+CREATE INDEX idx_security_logs_created_at ON security_logs(created_at DESC);
+CREATE INDEX idx_security_logs_event_type ON security_logs(event_type);
+CREATE INDEX idx_security_logs_severity ON security_logs(severity);
+CREATE INDEX idx_security_logs_ip ON security_logs(ip_address);
+CREATE INDEX idx_security_logs_user_id ON security_logs(user_id);
+CREATE INDEX idx_blocked_ips_until ON blocked_ips(blocked_until);

@@ -124,7 +124,7 @@ router.post('/verify', authenticate, validate(tokenSchema), async (req: AuthRequ
     const backupCodes = Array.from({ length: 8 }, () => crypto.randomBytes(4).toString('hex'));
     const backupHash = JSON.stringify(backupCodes);
 
-    await pool.query('UPDATE users SET totp_enabled = 1, totp_backup_codes = $1 WHERE id = $2', [backupHash, user.id]);
+    await pool.query('UPDATE users SET totp_enabled = TRUE, totp_backup_codes = $1 WHERE id = $2', [backupHash, user.id]);
 
     logAudit(req, { action: '2fa_enabled', entityType: 'user', entityId: user.id, details: '2FA enabled via TOTP' });
 
@@ -179,7 +179,7 @@ router.post('/validate', validate(validateSchema), async (req: AuthRequest, res:
 router.delete('/', authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const user = req.user!;
-    await pool.query('UPDATE users SET totp_secret = NULL, totp_enabled = 0, totp_backup_codes = NULL WHERE id = $1', [user.id]);
+    await pool.query('UPDATE users SET totp_secret = NULL, totp_enabled = FALSE, totp_backup_codes = NULL WHERE id = $1', [user.id]);
     logAudit(req, { action: '2fa_disabled', entityType: 'user', entityId: user.id, details: '2FA disabled' });
     res.json({ message: '2FA has been disabled' });
   } catch (err: any) {
