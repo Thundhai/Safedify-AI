@@ -192,8 +192,9 @@ app.get('/api/health', async (_req, res) => {
     await pool.query('SELECT 1');
     dbLatencyMs = Date.now() - start;
     dbStatus = 'connected';
-  } catch (err) {
+  } catch (err: any) {
     dbStatus = 'error';
+    console.error('[Health] DB connection error:', err.message);
   }
   
   const isHealthy = dbStatus === 'connected';
@@ -213,6 +214,9 @@ app.get('/api/health', async (_req, res) => {
     config: {
       geminiKey: !!process.env.GEMINI_API_KEY,
       geminiKeyLength: process.env.GEMINI_API_KEY?.length || 0,
+      databaseUrl: !!process.env.DATABASE_URL,
+      postgresUrl: !!process.env.POSTGRES_URL,
+      postgresUrlNonPooling: !!process.env.POSTGRES_URL_NON_POOLING,
     },
   });
 });

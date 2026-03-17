@@ -2,6 +2,9 @@ import { Pool, PoolConfig } from 'pg';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+// Vercel-Supabase integration sets POSTGRES_URL; support both that and DATABASE_URL
+const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL || process.env.POSTGRES_URL_NON_POOLING;
+
 /**
  * PostgreSQL Connection Configuration
  * 
@@ -34,8 +37,8 @@ const poolConfig: PoolConfig = {
   }),
   
   // For Vercel/Neon/Supabase: use connection string if provided
-  ...(process.env.DATABASE_URL && {
-    connectionString: process.env.DATABASE_URL,
+  ...(connectionString && {
+    connectionString,
     ssl: isProduction ? { rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED !== 'false' } : undefined,
   }),
 };
@@ -49,10 +52,10 @@ pool.on('error', (err) => {
 
 // Warn if using insecure defaults in production
 if (isProduction) {
-  if (!process.env.PG_PASSWORD && !process.env.DATABASE_URL) {
+  if (!process.env.PG_PASSWORD && !connectionString) {
     console.warn('\x1b[33m[SECURITY] Using default database password in production!\x1b[0m');
   }
-  if (!process.env.DATABASE_URL && !poolConfig.ssl) {
+  if (!connectionString && !poolConfig.ssl) {
     console.warn('\x1b[33m[SECURITY] Database connection is not using SSL!\x1b[0m');
   }
 }
