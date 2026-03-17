@@ -22,7 +22,8 @@ const poolConfig: PoolConfig = connectionString
     max: parseInt(process.env.PG_POOL_MAX || '20'),
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
-    ssl: isProduction ? { rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED !== 'false' } : undefined,
+    // Supabase/Neon poolers use certs not in Node's default CA store
+    ssl: isProduction ? { rejectUnauthorized: false } : undefined,
   }
   : {
     // Individual connection parameters for local/custom setups
