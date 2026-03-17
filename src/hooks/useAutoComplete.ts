@@ -214,22 +214,22 @@ function levenshtein(a: string, b: string): number {
   if (m === 0) return n;
   if (n === 0) return m;
   const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 0; i <= m; i++) dp[i]![0] = i;
+  for (let j = 0; j <= n; j++) dp[0]![j] = j;
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1]
-        ? dp[i - 1][j - 1]
-        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      dp[i]![j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1]![j - 1]!
+        : 1 + Math.min(dp[i - 1]![j]!, dp[i]![j - 1]!, dp[i - 1]![j - 1]!);
     }
   }
-  return dp[m][n];
+  return dp[m]![n]!;
 }
 
 /** Get the current word being typed (from cursor position backwards) */
 function getCurrentWord(text: string, cursorPos: number): { word: string; start: number; end: number } {
   let start = cursorPos;
-  while (start > 0 && !/\s/.test(text[start - 1])) start--;
+  while (start > 0 && !/\s/.test(text[start - 1]!)) start--;
   let end = cursorPos;
   // word ends at cursor
   return { word: text.slice(start, end), start, end };
@@ -289,7 +289,7 @@ export function useAutoComplete(options: UseAutoCompleteOptions = {}) {
           .filter(w => {
             if (w.toLowerCase().startsWith(fragment)) return false; // already included
             // Only check single words for fuzzy (multi-word phrases checked by first word)
-            const first = w.split(' ')[0].toLowerCase();
+            const first = w.split(' ')[0]!.toLowerCase();
             return levenshtein(fragment, first) <= 2 && levenshtein(fragment, first) > 0;
           })
           .slice(0, remaining);
@@ -345,23 +345,23 @@ export function useAutoComplete(options: UseAutoCompleteOptions = {}) {
       // Find the word that just ended (before the space)
       let end = cursorPos - 1; // before the space
       let start = end;
-      while (start > 0 && !/\s/.test(text[start - 1])) start--;
+      while (start > 0 && !/\s/.test(text[start - 1]!)) start--;
       const word = text.slice(start, end + 1).toLowerCase(); // +1 because end is inclusive-ish
       // Actually let's recalculate: text[cursorPos-1] is the space, word is before it
       // Nah, let me do it properly:
       const beforeSpace = text.slice(0, cursorPos); // includes the space
       const match = beforeSpace.match(/(\S+)\s$/);
       if (!match) return null;
-      const typed = match[1].toLowerCase();
+      const typed = match[1]!.toLowerCase();
       const fix = AUTO_CORRECTIONS[typed];
       if (!fix) return null;
 
       // Preserve original casing of first letter
-      const corrected = match[1][0] === match[1][0].toUpperCase()
+      const corrected = match[1]![0] === match[1]![0]!.toUpperCase()
         ? fix.charAt(0).toUpperCase() + fix.slice(1)
         : fix;
 
-      const wordStart = cursorPos - 1 - match[1].length;
+      const wordStart = cursorPos - 1 - match[1]!.length;
       return text.slice(0, wordStart) + corrected + text.slice(cursorPos - 1);
     },
     [autoCorrect],
@@ -390,13 +390,13 @@ export function useAutoComplete(options: UseAutoCompleteOptions = {}) {
       if (e.key === 'Tab' || e.key === 'Enter') {
         if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
           e.preventDefault();
-          applySuggestion(suggestions[selectedIndex], text, setText, inputRef);
+          applySuggestion(suggestions[selectedIndex]!, text, setText, inputRef);
           return true;
         }
         // If Tab with no selection, accept top suggestion
         if (e.key === 'Tab' && suggestions.length > 0) {
           e.preventDefault();
-          applySuggestion(suggestions[0], text, setText, inputRef);
+          applySuggestion(suggestions[0]!, text, setText, inputRef);
           return true;
         }
       }

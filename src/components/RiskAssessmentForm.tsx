@@ -50,7 +50,7 @@ export const RiskAssessmentForm: React.FC = () => {
 
   const handleSuggestHazards = async () => {
 
-    if (!formData.taskDescription) return toast.error("Please enter a task description first.");
+    if (!formData.taskDescription) { toast.error("Please enter a task description first."); return; }
     setLoadingHazards(true);
     try {
         const result = await identifyHazardsAI(formData.taskDescription, formData.type);
@@ -76,7 +76,7 @@ export const RiskAssessmentForm: React.FC = () => {
   const handleSuggestControls = async (hazardIndex: number) => {
 
     const hazard = formData.hazards[hazardIndex];
-    if (!hazard.description || hazard.description.trim().length < 3) {
+    if (!hazard || !hazard.description || hazard.description.trim().length < 3) {
       toast.error("Please enter a hazard description before generating controls.");
       return;
     }
@@ -92,7 +92,7 @@ export const RiskAssessmentForm: React.FC = () => {
             }));
             
             const updatedHazards = [...formData.hazards];
-            updatedHazards[hazardIndex].controls = [...updatedHazards[hazardIndex].controls, ...newControls];
+            updatedHazards[hazardIndex]!.controls = [...updatedHazards[hazardIndex]!.controls, ...newControls];
             setFormData({ ...formData, hazards: updatedHazards });
         } else {
           toast.error("AI could not generate specific controls for this hazard. Please try refining the description.");
@@ -107,7 +107,7 @@ export const RiskAssessmentForm: React.FC = () => {
 
   const handleReviewRiskAssessment = async () => {
 
-      if (!formData.taskDescription) return toast.error("Task description required for review.");
+      if (!formData.taskDescription) { toast.error("Task description required for review."); return; }
       setLoadingReview(true);
       try {
           const hazardsList = formData.hazards.map(h => h.description);
@@ -138,7 +138,7 @@ export const RiskAssessmentForm: React.FC = () => {
 
   const updateHazard = (index: number, updates: Partial<RiskHazard>) => {
     const updatedHazards = [...formData.hazards];
-    const current = updatedHazards[index];
+    const current = updatedHazards[index]!;
     
     // Recalculate score if prob/sev changes
     if (updates.probability || updates.severity) {
@@ -165,13 +165,13 @@ export const RiskAssessmentForm: React.FC = () => {
 
   const removeControl = (hazardIndex: number, controlIndex: number) => {
     const updatedHazards = [...formData.hazards];
-    updatedHazards[hazardIndex].controls = updatedHazards[hazardIndex].controls.filter((_, i) => i !== controlIndex);
+    updatedHazards[hazardIndex]!.controls = updatedHazards[hazardIndex]!.controls.filter((_, i) => i !== controlIndex);
     setFormData({ ...formData, hazards: updatedHazards });
   };
 
   const addManualControl = (hazardIndex: number, type: RiskControlType = 'Administrative') => {
       const updatedHazards = [...formData.hazards];
-      updatedHazards[hazardIndex].controls.push({
+      updatedHazards[hazardIndex]!.controls.push({
           id: `ctrl-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           type: type,
           description: ''
@@ -181,15 +181,15 @@ export const RiskAssessmentForm: React.FC = () => {
 
   const updateControl = (hazardIndex: number, controlIndex: number, field: keyof RiskControl, value: string) => {
       const updatedHazards = [...formData.hazards];
-      updatedHazards[hazardIndex].controls[controlIndex] = {
-          ...updatedHazards[hazardIndex].controls[controlIndex],
+      updatedHazards[hazardIndex]!.controls[controlIndex] = {
+          ...updatedHazards[hazardIndex]!.controls[controlIndex]!,
           [field]: value
       };
       setFormData({...formData, hazards: updatedHazards});
   };
 
   const handleSave = async () => {
-    if (!formData.title) return toast.error("Title is required");
+    if (!formData.title) { toast.error("Title is required"); return; }
     await saveRiskAssessment(formData);
     toast.success("Risk Assessment Saved!");
     navigate('/risk-assessments');

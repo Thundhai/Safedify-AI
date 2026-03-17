@@ -114,7 +114,7 @@ export const Dashboard: React.FC = () => {
 
         const severityData = Object.keys(severityCounts).map(key => ({
           name: key,
-          value: severityCounts[key]
+          value: severityCounts[key] ?? 0
         }));
 
         // Monthly Trends — aggregate real incident + observation data by month
@@ -147,7 +147,7 @@ export const Dashboard: React.FC = () => {
         let daysSinceLastIncident = 0;
         if (incidents.length > 0) {
           const sorted = [...incidents].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          daysSinceLastIncident = Math.floor((Date.now() - new Date(sorted[0].date).getTime()) / (1000 * 60 * 60 * 24));
+          daysSinceLastIncident = Math.floor((Date.now() - new Date(sorted[0]!.date).getTime()) / (1000 * 60 * 60 * 24));
         }
 
         // Action closure rate
@@ -175,7 +175,7 @@ export const Dashboard: React.FC = () => {
         });
         setError(null);
       } catch (error) {
-        setError('Dashboard data loading error: ' + (error?.message || 'Unknown error'));
+        setError('Dashboard data loading error: ' + ((error as Error)?.message || 'Unknown error'));
         // Set safe defaults to prevent crashes
         setStats({
           totalIncidents: 0,
@@ -227,8 +227,8 @@ export const Dashboard: React.FC = () => {
     generateSafetyReport({
       title: 'HSE Safety Report',
       dateRange: {
-        from: sixMonthsAgo.toISOString().split('T')[0],
-        to: now.toISOString().split('T')[0],
+        from: sixMonthsAgo.toISOString().split('T')[0]!,
+        to: now.toISOString().split('T')[0]!,
       },
       siteName: 'Main Site',
       generatedBy: user?.name || user?.email || 'System',

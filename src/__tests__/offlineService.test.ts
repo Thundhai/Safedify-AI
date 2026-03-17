@@ -28,8 +28,8 @@ describe('offlineService', () => {
         description: 'Incident at Zone A',
         payload: { foo: 1 },
       });
-      expect(q[0].id).toMatch(/^sync-/);
-      expect(q[0].timestamp).toBeGreaterThan(0);
+      expect(q[0]!.id).toMatch(/^sync-/);
+      expect(q[0]!.timestamp).toBeGreaterThan(0);
     });
 
     it('accumulates multiple entries', () => {

@@ -153,7 +153,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
     }
   ];
 
-  const currentStepData = steps[currentStep];
+  const currentStepData = steps[currentStep]!;
   const isLastStep = currentStep === steps.length - 1;
   const isFirstStep = currentStep === 0;
 

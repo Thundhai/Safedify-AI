@@ -19,7 +19,6 @@ window.addEventListener('error', (event) => {
        event.filename?.includes('inpage.js'))) {
     console.warn('MetaMask auto-injection error suppressed:', event.message);
     event.preventDefault();
-    return false;
   }
 });
 
@@ -31,7 +30,6 @@ window.addEventListener('unhandledrejection', (event) => {
        event.reason.toString().includes('Failed to connect'))) {
     console.warn('MetaMask promise rejection suppressed:', event.reason);
     event.preventDefault();
-    return false;
   }
 });
 

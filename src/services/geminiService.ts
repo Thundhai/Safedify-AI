@@ -41,7 +41,7 @@ const safeParseJSON = (text: string | undefined | null, fallback: any = {}): any
   // 2. Strip markdown code fences:  ```json ... ```  or  ``` ... ```
   const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   if (fenceMatch) {
-    try { return JSON.parse(fenceMatch[1].trim()); } catch { /* continue */ }
+    try { return JSON.parse(fenceMatch[1]!.trim()); } catch { /* continue */ }
   }
 
   // 3. Greedy extraction: first { … last }

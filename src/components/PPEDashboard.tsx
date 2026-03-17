@@ -87,7 +87,7 @@ export const PPEDashboard: React.FC = () => {
         workerName: worker.name,
         ppeItemId: item.id,
         ppeItemName: item.name,
-        issueDate: new Date().toISOString().split('T')[0],
+        issueDate: new Date().toISOString().split('T')[0]!,
         expiryDate: expiryDate || undefined,
         status: 'Active',
         signatureUrl: signatureImage || undefined
@@ -151,7 +151,7 @@ export const PPEDashboard: React.FC = () => {
 
   const handleAddItem = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!newItem.category) return toast.error("Please select a category");
+      if (!newItem.category) { toast.error("Please select a category"); return; }
       const item: PPEItem = {
           id: `ppe-${Date.now()}`,
           name: newItem.name,

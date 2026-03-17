@@ -62,7 +62,7 @@ export const RoleManagement: React.FC = () => {
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!editingRole.name) return toast.error("Role name is required");
+        if (!editingRole.name) { toast.error("Role name is required"); return; }
 
         const role: Role = {
             id: editingRole.id || `role-${Date.now()}`,

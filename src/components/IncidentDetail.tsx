@@ -199,7 +199,7 @@ export const IncidentDetail: React.FC = () => {
       id: `act-${Date.now()}`,
       title: newAction.title,
       assignee: newAction.assignee,
-      dueDate: newAction.dueDate,
+      dueDate: newAction.dueDate || new Date().toISOString().split('T')[0]!,
       priority: newAction.priority as any,
       status: 'Open',
       actionType: 'Corrective',
@@ -596,7 +596,7 @@ export const IncidentDetail: React.FC = () => {
                             value={fishbone[category.key as keyof typeof fishbone]}
                             onChange={(e) => setFishbone({...fishbone, [category.key]: e.target.value})}
                             className="w-full text-sm p-2 border border-slate-300 rounded focus:ring-1 focus:ring-slate-400 outline-none resize-none bg-white"
-                            placeholder={`Causes related to ${category.label.split('(')[0].trim()}...`}
+                            placeholder={`Causes related to ${category.label.split('(')[0]?.trim() ?? ''}...`}
                          />
                       </div>
                     ))}

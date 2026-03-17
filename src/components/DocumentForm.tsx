@@ -23,7 +23,7 @@ export const DocumentForm: React.FC = () => {
         category: 'SOP',
         version: 'v1.0',
         status: 'Draft',
-        uploadDate: new Date().toISOString().split('T')[0],
+        uploadDate: new Date().toISOString().split('T')[0]!,
         author: user?.name || 'Unknown',
         description: '',
         expiryDate: '',
@@ -60,7 +60,7 @@ export const DocumentForm: React.FC = () => {
     };
 
     const handleGenerateSummary = async () => {
-        if (!doc.contentUrl) return toast.error("Please upload a document first.");
+        if (!doc.contentUrl) { toast.error("Please upload a document first."); return; }
         setIsSummarizing(true);
         try {
             const result = await summarizeDocumentAI(doc.contentUrl, doc.title);
@@ -74,7 +74,7 @@ export const DocumentForm: React.FC = () => {
     };
 
     const handleSave = async () => {
-        if (!doc.title) return toast.error("Title required");
+        if (!doc.title) { toast.error("Title required"); return; }
         await saveDocument(doc);
         toast.success("Document Saved.");
         navigate('/documents');
@@ -83,7 +83,7 @@ export const DocumentForm: React.FC = () => {
     const handleApprove = async () => {
         const historyEntry = {
             version: doc.version,
-            date: new Date().toISOString().split('T')[0],
+            date: new Date().toISOString().split('T')[0]!,
             author: user?.name || 'Unknown',
             changes: `Approved by ${user?.name || 'Unknown'}`
         };
@@ -91,7 +91,7 @@ export const DocumentForm: React.FC = () => {
             ...doc, 
             status: 'Approved' as const, 
             approvedBy: user?.name || 'Unknown', 
-            approvalDate: new Date().toISOString().split('T')[0],
+            approvalDate: new Date().toISOString().split('T')[0]!,
             versionHistory: [...(doc.versionHistory || []), historyEntry],
         };
         setDoc(updated);
@@ -200,7 +200,7 @@ export const DocumentForm: React.FC = () => {
                             <label className="block text-sm font-semibold text-slate-700 mb-1">Description</label>
                             <SmartTextArea 
                                 rows={3}
-                                value={doc.description}
+                                value={doc.description ?? ''}
                                 onChange={(e) => setDoc({...doc, description: e.target.value})}
                                 onValueChange={(v) => setDoc(d => ({...d, description: v}))}
                                 className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"

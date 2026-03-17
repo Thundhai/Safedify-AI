@@ -50,7 +50,7 @@ describe('apiService', () => {
       const result = await apiGetIncidents();
       expect(result).toEqual([{ id: '1', type: 'Near Miss' }]);
 
-      const [url, opts] = mockFetch.mock.calls[0];
+      const [url, opts] = mockFetch.mock.calls[0]!;
       expect(url).toBe('/api/incidents');
       expect(opts.headers['Authorization']).toBe('Bearer my-jwt');
     });
@@ -79,8 +79,8 @@ describe('apiService', () => {
       // Should be in the offline queue
       const queue = getOfflineQueue();
       expect(queue).toHaveLength(1);
-      expect(queue[0].method).toBe('POST');
-      expect(queue[0].path).toBe('/incidents');
+      expect(queue[0]!.method).toBe('POST');
+      expect(queue[0]!.path).toBe('/incidents');
     });
 
     it('throws on network error when online (not queued)', async () => {

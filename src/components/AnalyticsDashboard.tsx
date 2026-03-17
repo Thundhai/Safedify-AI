@@ -126,7 +126,7 @@ export const AnalyticsDashboard: React.FC = () => {
 
     const locationChartData = useMemo(() => {
         const locationMap = incidents.reduce((acc, curr) => {
-            const loc = curr.location.split('-')[0].trim() || 'Unknown';
+            const loc = curr.location.split('-')[0]?.trim() || 'Unknown';
             acc[loc] = (acc[loc] || 0) + 1;
             return acc;
         }, {} as Record<string, number>);

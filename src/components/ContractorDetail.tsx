@@ -45,7 +45,7 @@ export const ContractorDetail: React.FC = () => {
     }, [id, isNew]);
 
     const handleSave = async () => {
-        if (!contractor.name) return toast.error("Company Name is required");
+        if (!contractor.name) { toast.error("Company Name is required"); return; }
         await saveContractor(contractor);
         toast.success("Contractor Saved Successfully");
         navigate('/contractors');

@@ -142,7 +142,7 @@ export const EmergencyDashboard: React.FC = () => {
             await refreshContacts();
             setDrills(await getEmergencyDrills());
             // Set initial regional contacts
-            setRegionalContacts(GLOBAL_EMERGENCY_DATA['United States']);
+            setRegionalContacts(GLOBAL_EMERGENCY_DATA['United States'] ?? []);
         };
         load();
     }, []);
@@ -234,7 +234,7 @@ export const EmergencyDashboard: React.FC = () => {
 
     const handleSaveDrill = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newDrill.location) return toast.error("Location is required");
+        if (!newDrill.location) { toast.error("Location is required"); return; }
         
         let finalCount = Number(newDrill.participantsCount);
         let finalNames: string[] = [];

@@ -29,7 +29,7 @@ export const Register: React.FC = () => {
         // Default to Worker if available, otherwise first available
         const workerRole = publicRoles.find(r => r.name === UserRoles.WORKER);
         if (workerRole) setRole(workerRole.name);
-        else if (publicRoles.length > 0) setRole(publicRoles[0].name);
+        else if (publicRoles.length > 0) setRole(publicRoles[0]!.name);
       });
   }, []);
 

@@ -42,7 +42,7 @@ export const AssetDetail: React.FC = () => {
                         title: extracted.title || file.name,
                         type: file.type.includes('pdf') ? 'PDF' : 'Image',
                         url: base64, // In prod, upload to storage
-                        uploadDate: new Date().toISOString().split('T')[0],
+                        uploadDate: new Date().toISOString().split('T')[0]!,
                         expiryDate: extracted.expiryDate
                     };
 

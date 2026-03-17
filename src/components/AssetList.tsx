@@ -77,7 +77,7 @@ export const AssetList: React.FC = () => {
             serialNumber: newAsset.serialNumber,
             location: newAsset.location,
             status: 'Operational',
-            nextInspectionDate: newAsset.nextInspectionDate || new Date(Date.now() + 15778463000).toISOString().split('T')[0], // default 6 months
+            nextInspectionDate: newAsset.nextInspectionDate || new Date(Date.now() + 15778463000).toISOString().split('T')[0]!, // default 6 months
             documents: [],
             maintenanceHistory: []
         };

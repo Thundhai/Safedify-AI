@@ -15,7 +15,7 @@ export const ActionList: React.FC = () => {
         title: '',
         assignee: '',
         priority: 'Medium',
-        dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+        dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0]!,
         relatedIncidentId: ''
     });
     const [loading, setLoading] = useState(true);
@@ -64,7 +64,7 @@ export const ActionList: React.FC = () => {
             setShowModal(false);
             setNewItem({
                 title: '', assignee: '', priority: 'Medium',
-                dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+                dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0]!,
                 relatedIncidentId: ''
             });
             toast.success('Action created successfully');

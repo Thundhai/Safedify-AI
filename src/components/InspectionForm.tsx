@@ -74,8 +74,8 @@ export const InspectionForm: React.FC = () => {
   };
 
   const handleSaveTemplate = async () => {
-      if (!newTemplateName.trim()) return toast.error("Template Name is required");
-      if (newTemplateItems.length === 0) return toast.error("Add at least one inspection item");
+      if (!newTemplateName.trim()) { toast.error("Template Name is required"); return; }
+      if (newTemplateItems.length === 0) { toast.error("Add at least one inspection item"); return; }
 
       const template: InspectionTemplate = {
           id: `tmpl-${Date.now()}`,
@@ -151,7 +151,7 @@ export const InspectionForm: React.FC = () => {
   const handleGetSuggestion = async (item: InspectionItem) => {
     setLoadingSuggestion(item.id);
     try {
-      const suggestion = await suggestInspectionFixAI(item.question, item.comment);
+      const suggestion = await suggestInspectionFixAI(item.question, item.comment || '');
       setSuggestions(prev => ({ ...prev, [item.id]: suggestion }));
     } catch (e) {
       console.error(e);
