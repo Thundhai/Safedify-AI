@@ -15,33 +15,31 @@ const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL ||
  * - Do NOT expose database port to public internet
  * - Use connection pooling to prevent connection exhaustion attacks
  */
-const poolConfig: PoolConfig = {
-  host: process.env.PG_HOST || 'localhost',
-  port: parseInt(process.env.PG_PORT || '5432'),
-  user: process.env.PG_USER || 'safedify_user',
-  password: process.env.PG_PASSWORD || 'safedify_pass',
-  database: process.env.PG_DATABASE || 'safedify',
-  
-  // Connection pool settings (prevent connection exhaustion)
-  max: parseInt(process.env.PG_POOL_MAX || '20'),      // Max connections in pool
-  idleTimeoutMillis: 30000,                            // Close idle connections after 30s
-  connectionTimeoutMillis: 5000,                       // Fail fast on connection issues
-  
-  // SSL Configuration for production
-  ...(isProduction && {
-    ssl: {
-      // Require valid SSL certificate in production
-      // Set to false only if using self-signed certs (not recommended)
-      rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED !== 'false',
-    },
-  }),
-  
-  // For Vercel/Neon/Supabase: use connection string if provided
-  ...(connectionString && {
+const poolConfig: PoolConfig = connectionString
+  ? {
+    // When a connection string is provided (Vercel/Supabase/Neon), use it exclusively
     connectionString,
+    max: parseInt(process.env.PG_POOL_MAX || '20'),
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
     ssl: isProduction ? { rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED !== 'false' } : undefined,
-  }),
-};
+  }
+  : {
+    // Individual connection parameters for local/custom setups
+    host: process.env.PG_HOST || 'localhost',
+    port: parseInt(process.env.PG_PORT || '5432'),
+    user: process.env.PG_USER || 'safedify_user',
+    password: process.env.PG_PASSWORD || 'safedify_pass',
+    database: process.env.PG_DATABASE || 'safedify',
+    max: parseInt(process.env.PG_POOL_MAX || '20'),
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
+    ...(isProduction && {
+      ssl: {
+        rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED !== 'false',
+      },
+    }),
+  };
 
 const pool = new Pool(poolConfig);
 
