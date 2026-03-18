@@ -206,12 +206,6 @@ router.post('/login', validate(loginSchema), async (req: AuthRequest, res: Respo
 // Protected by: registration rate limit + honeypot field detection + input validation
 router.post('/register', registrationRateLimiter(), honeypotProtection(), validate(registerSchema), async (req: AuthRequest, res: Response) => {
   try {
-    // Allow disabling registration via env var (for demo/public deployments)
-    if (process.env.REGISTRATION_ENABLED === 'false') {
-      res.status(403).json({ error: 'Registration is currently disabled. Please use the demo credentials provided.' });
-      return;
-    }
-
     const { name, email, password, role } = req.body;
 
     // Validate password strength using centralized function

@@ -121,14 +121,6 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
         return;
       }
 
-      // Block access if password change is required (allow only password-related endpoints)
-      const allowedPaths = ['/change-password', '/reset-password'];
-      const isPasswordEndpoint = allowedPaths.some(p => req.path.endsWith(p) || req.originalUrl.includes(p));
-      if (dbUser.must_change_password && !isPasswordEndpoint) {
-        res.status(403).json({ error: 'Password change required', requiresPasswordChange: true });
-        return;
-      }
-
       // Use DB values (not stale JWT values) for role/tier
       req.user = {
         id: dbUser.id,
