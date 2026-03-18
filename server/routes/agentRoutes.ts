@@ -11,7 +11,7 @@ router.use(authenticate);
 
 // Validation schema for chat endpoint
 const chatSchema: ValidationSchema = {
-  message: { type: 'string', required: true, maxLength: 10000, trim: true },
+  message: { type: 'string', required: true, maxLength: 10000, trim: true, allowInjection: true },
   conversationId: { type: 'uuid', required: false },
 };
 

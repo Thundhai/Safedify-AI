@@ -8,28 +8,12 @@
 import { Router, Response } from 'express';
 import { AuthRequest, authenticate } from '../auth.js';
 import { GoogleGenAI } from '@google/genai';
-import { validate, ValidationSchema, sanitizeString } from '../middleware/inputValidation.js';
-
 const router = Router();
 router.use(authenticate);
 
 // Use consistent GEMINI_API_KEY env var
 const apiKey = process.env.GEMINI_API_KEY;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
-
-// Validation schemas for AI endpoints
-// Note: 'contents' is validated manually in the handler since it accepts string, array, or object
-const generateSchema: ValidationSchema = {
-  model: { type: 'string', required: false, maxLength: 100 },
-  config: { type: 'object', required: false },
-};
-
-const chatSchema: ValidationSchema = {
-  model: { type: 'string', required: false, maxLength: 100 },
-  history: { type: 'array', required: false, maxLength: 100 },
-  config: { type: 'object', required: false },
-  message: { type: 'object', required: true },
-};
 
 // Allowlist of valid model names
 const ALLOWED_MODELS = [
@@ -46,7 +30,7 @@ const ALLOWED_MODELS = [
  * 
  * Generic proxy for ai.models.generateContent()
  */
-router.post('/generate', validate(generateSchema), async (req: AuthRequest, res: Response) => {
+router.post('/generate', async (req: AuthRequest, res: Response) => {
   if (!ai) {
     res.status(503).json({ error: 'AI service not configured. Set GEMINI_API_KEY on the server.' });
     return;
@@ -96,7 +80,7 @@ router.post('/generate', validate(generateSchema), async (req: AuthRequest, res:
  * 
  * Generic proxy for ai.chats.create() + sendMessage()
  */
-router.post('/chat', validate(chatSchema), async (req: AuthRequest, res: Response) => {
+router.post('/chat', async (req: AuthRequest, res: Response) => {
   if (!ai) {
     res.status(503).json({ error: 'AI service not configured. Set GEMINI_API_KEY on the server.' });
     return;
@@ -105,8 +89,14 @@ router.post('/chat', validate(chatSchema), async (req: AuthRequest, res: Respons
   try {
     const { model, history, config, message } = req.body;
 
-    if (!message) {
-      res.status(400).json({ error: 'message is required' });
+    if (!message || typeof message !== 'object') {
+      res.status(400).json({ error: 'message is required and must be an object' });
+      return;
+    }
+
+    // Validate history if provided
+    if (history && (!Array.isArray(history) || history.length > 100)) {
+      res.status(400).json({ error: 'history must be an array with at most 100 items' });
       return;
     }
 
