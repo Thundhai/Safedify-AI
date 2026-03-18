@@ -60,7 +60,7 @@ app.use(helmet({
   contentSecurityPolicy: isProduction ? {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],  // Needed for Vite/React
+      scriptSrc: ["'self'", "'unsafe-inline'"],  // React production builds don't need unsafe-eval
       styleSrc: ["'self'", "'unsafe-inline'"],  // Tailwind uses inline styles
       imgSrc: ["'self'", "data:", "blob:", "https:"],
       connectSrc: ["'self'", "https://generativelanguage.googleapis.com"],
@@ -143,6 +143,16 @@ const aiLimiter = sessionRateLimit({
   legacyHeaders: false,
 });
 
+// Global hourly AI cap (IP-based, limits total Gemini API usage across all users)
+const globalAiLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,  // 1 hour
+  max: isProduction ? 50 : 500,  // 50 AI calls per IP per hour
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: rateLimitLogger,
+  message: { error: 'AI usage limit reached. Please try again later.' },
+});
+
 // ---------- CORS ----------
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
@@ -152,7 +162,8 @@ app.use(cors({
   origin: isProduction
     ? (origin, callback) => {
         // On Vercel, API and frontend are same-origin (no origin header)
-        if (!origin || ALLOWED_ORIGINS.includes(origin) || process.env.VERCEL) {
+        // Same-origin requests on Vercel have no origin header
+        if (!origin || ALLOWED_ORIGINS.includes(origin)) {
           callback(null, true);
         } else {
           callback(new Error('Not allowed by CORS'));
@@ -187,7 +198,6 @@ app.get('/api/health', async (_req, res) => {
   let dbStatus = 'disconnected';
   let dbLatencyMs: number | null = null;
   
-  let dbError: string | null = null;
   try {
     const start = Date.now();
     await pool.query('SELECT 1');
@@ -195,7 +205,6 @@ app.get('/api/health', async (_req, res) => {
     dbStatus = 'connected';
   } catch (err: any) {
     dbStatus = 'error';
-    dbError = err.message;
     console.error('[Health] DB connection error:', err.message);
   }
   
@@ -210,57 +219,19 @@ app.get('/api/health', async (_req, res) => {
     agent: !!process.env.GEMINI_API_KEY ? 'enabled' : 'disabled',
     database: {
       status: dbStatus,
-      error: dbError,
       latencyMs: dbLatencyMs,
-    },
-    // Debug: Show which AI-related env vars are configured (not values, just presence)
-    config: {
-      geminiKey: !!process.env.GEMINI_API_KEY,
-      geminiKeyLength: process.env.GEMINI_API_KEY?.length || 0,
-      databaseUrl: !!process.env.DATABASE_URL,
-      postgresUrl: !!process.env.POSTGRES_URL,
-      postgresUrlNonPooling: !!process.env.POSTGRES_URL_NON_POOLING,
     },
   });
 });
 
-// ---------- Debug: Manual seed trigger (temporary) ----------
-app.get('/api/debug-seed', async (_req, res) => {
-  try {
-    // Check if users exist
-    const { rows } = await pool.query('SELECT email, role FROM users LIMIT 10');
-    if (rows.length > 0) {
-      res.json({ status: 'users_exist', count: rows.length, users: rows });
-      return;
-    }
-    // Attempt to seed
-    const bcrypt = await import('bcryptjs');
-    const { v4: uuid } = await import('uuid');
-    const hash = bcrypt.default.hashSync('admin123', 12);
-    const users = [
-      { id: uuid(), name: 'John Doe', email: 'admin@safedify.com', role: 'Admin', tier: 'Enterprise', avatar: 'JD' },
-      { id: uuid(), name: 'Robert Fox', email: 'worker@safedify.com', role: 'Worker', tier: 'Pro', avatar: 'RF' },
-      { id: uuid(), name: 'Sarah Connor', email: 'supervisor@safedify.com', role: 'HSE Supervisor', tier: 'Pro', avatar: 'SC' },
-    ];
-    for (const u of users) {
-      await pool.query(
-        `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, email_verified, must_change_password, password_changed_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, TRUE, NOW())`,
-        [u.id, u.name, u.email, hash, u.role, u.tier, u.avatar]
-      );
-    }
-    res.json({ status: 'seeded', count: users.length });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message, code: err.code });
-  }
-});
+
 
 // ---------- API Routes ----------
 app.use('/api/auth', authLimiter, loginRateLimiter(), authRoutes);
 app.use('/api/auth/2fa', authLimiter, twoFactorRoutes);
 app.use('/api', apiLimiter, dataRoutes);
-app.use('/api/agent', aiGenerationLimiter(), agentRoutes);
-app.use('/api/ai', aiGenerationLimiter(), aiRoutes);
+app.use('/api/agent', globalAiLimiter, aiGenerationLimiter(), agentRoutes);
+app.use('/api/ai', globalAiLimiter, aiGenerationLimiter(), aiRoutes);
 app.use('/api/notifications', apiLimiter, notificationRoutes);
 app.use('/api/environmental', apiLimiter, environmentalRoutes);
 app.use('/api/uploads', apiLimiter, uploadRoutes);

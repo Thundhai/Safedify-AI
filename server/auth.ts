@@ -114,10 +114,18 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
       const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
 
       // Re-check user still exists and get fresh role/tier from DB
-      const result = await pool.query('SELECT id, name, email, role, tier, avatar FROM users WHERE id = $1', [decoded.id]);
+      const result = await pool.query('SELECT id, name, email, role, tier, avatar, must_change_password FROM users WHERE id = $1', [decoded.id]);
       const dbUser = result.rows[0];
       if (!dbUser) {
         res.status(401).json({ error: 'User account no longer exists' });
+        return;
+      }
+
+      // Block access if password change is required (allow only password-related endpoints)
+      const allowedPaths = ['/change-password', '/reset-password'];
+      const isPasswordEndpoint = allowedPaths.some(p => req.path.endsWith(p) || req.originalUrl.includes(p));
+      if (dbUser.must_change_password && !isPasswordEndpoint) {
+        res.status(403).json({ error: 'Password change required', requiresPasswordChange: true });
         return;
       }
 
