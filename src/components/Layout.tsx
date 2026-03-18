@@ -66,6 +66,7 @@ export const Layout: React.FC = () => {
   // Mobile FAB State & PWA
   const [isFabOpen, setIsFabOpen] = useState(false);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   
   // Navigation State
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
@@ -105,17 +106,39 @@ export const Layout: React.FC = () => {
         setPendingSyncs(getSyncQueue().length);
     }, 2000);
 
-    // Simulate PWA Install Prompt Logic
-    const isMobile = window.innerWidth < 768;
-    // Check if not in standalone mode (browser)
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    if (isMobile && !isStandalone && !localStorage.getItem('pwa_banner_dismissed')) {
-        setTimeout(() => setShowInstallBanner(true), 3000);
+    // PWA Install Prompt — capture the browser's native install event
+    const handleBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      // Show banner on any device if not standalone and not dismissed
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
+        || (window.navigator as any).standalone === true;
+      if (!isStandalone && !localStorage.getItem('pwa_banner_dismissed')) {
+        setShowInstallBanner(true);
+      }
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+
+    // Also show banner on iOS (no beforeinstallprompt support) with manual instructions
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
+      || (window.navigator as any).standalone === true;
+    if (isIOS && !isStandalone && !localStorage.getItem('pwa_banner_dismissed')) {
+      setTimeout(() => setShowInstallBanner(true), 3000);
     }
+
+    // Hide banner if app becomes installed
+    const handleInstalled = () => {
+      setShowInstallBanner(false);
+      setDeferredPrompt(null);
+    };
+    window.addEventListener('appinstalled', handleInstalled);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+      window.removeEventListener('appinstalled', handleInstalled);
       clearInterval(interval);
     };
   }, []);
@@ -161,6 +184,24 @@ export const Layout: React.FC = () => {
   const dismissInstallBanner = () => {
       setShowInstallBanner(false);
       localStorage.setItem('pwa_banner_dismissed', 'true');
+  };
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      // Chrome/Edge/Samsung — trigger native install dialog
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setShowInstallBanner(false);
+      }
+      setDeferredPrompt(null);
+    } else {
+      // iOS Safari — show manual instructions
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+        alert('To install: tap the Share button (□↑) at the bottom of Safari, then tap "Add to Home Screen".');
+      }
+    }
   };
 
   const navGroups = [
@@ -516,10 +557,22 @@ export const Layout: React.FC = () => {
                       </div>
                       <div>
                           <p className="font-bold text-sm">Install Safedify App</p>
-                          <p className="text-xs text-slate-400">Add to home screen for full experience.</p>
+                          <p className="text-xs text-slate-400">
+                            {deferredPrompt
+                              ? 'Add to home screen for full experience.'
+                              : 'Tap Share (□↑) then "Add to Home Screen"'}
+                          </p>
                       </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                      {deferredPrompt && (
+                        <button
+                          onClick={handleInstallClick}
+                          className="bg-brand-orange text-brand-navy font-bold text-sm px-4 py-1.5 rounded-lg hover:bg-orange-400 transition-colors"
+                        >
+                          Install
+                        </button>
+                      )}
                       <button 
                         onClick={dismissInstallBanner} 
                         className="text-slate-400 hover:text-white"

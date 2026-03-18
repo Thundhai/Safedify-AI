@@ -151,7 +151,7 @@ async function doBackgroundSync(): Promise<void> {
 
 self.addEventListener('push', (event) => {
   const pushEvent = event as PushEvent;
-  let data = { title: 'Safedify', body: 'New notification', icon: '/icons/icon-192.png' };
+  let data = { title: 'Safedify', body: 'New notification', icon: '/icons/icon-192.svg' };
   
   if (pushEvent.data) {
     try {
@@ -165,7 +165,7 @@ self.addEventListener('push', (event) => {
     (self as unknown as ServiceWorkerGlobalScope).registration.showNotification(data.title, {
       body: data.body,
       icon: data.icon,
-      badge: '/icons/icon-192.png',
+      badge: '/icons/icon-192.svg',
       tag: 'safedify-notification',
     })
   );

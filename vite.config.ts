@@ -40,6 +40,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      // @reduxjs/toolkit@2.11.2 ships incomplete dist (missing modern.mjs)
+      '@reduxjs/toolkit': path.resolve(__dirname, 'node_modules/@reduxjs/toolkit/dist/redux-toolkit.legacy-esm.js'),
     },
   },
 });
