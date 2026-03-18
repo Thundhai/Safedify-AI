@@ -18,9 +18,9 @@ const apiKey = process.env.GEMINI_API_KEY;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // Validation schemas for AI endpoints
+// Note: 'contents' is validated manually in the handler since it accepts string, array, or object
 const generateSchema: ValidationSchema = {
   model: { type: 'string', required: false, maxLength: 100 },
-  contents: { type: 'object', required: true },
   config: { type: 'object', required: false },
 };
 
@@ -55,8 +55,14 @@ router.post('/generate', validate(generateSchema), async (req: AuthRequest, res:
   try {
     const { model, contents, config } = req.body;
 
-    if (!contents) {
+    if (!contents && contents !== '') {
       res.status(400).json({ error: 'contents is required' });
+      return;
+    }
+
+    // contents must be a string, array, or object (all valid for Google GenAI SDK)
+    if (typeof contents !== 'string' && !Array.isArray(contents) && typeof contents !== 'object') {
+      res.status(400).json({ error: 'contents must be a string, array, or object' });
       return;
     }
 
