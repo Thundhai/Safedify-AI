@@ -1,17 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#3b82f6"/>
-      <stop offset="100%" style="stop-color:#1d4ed8"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="80" fill="url(#bg)"/>
-  <g transform="translate(256,256)">
-    <!-- Shield shape -->
-    <path d="M0-160 L130-105 L130,50 Q130,145 0,185 Q-130,145 -130,50 L-130,-105 Z" 
-          fill="white" fill-opacity="0.95"/>
-    <!-- Check mark -->
-    <path d="M-55,25 L-15,65 L65,-40" 
-          stroke="#22c55e" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <rect width="512" height="512" rx="80" fill="#f99A1D"/>
+  <g transform="translate(256,268)" fill="none">
+    <!-- Hard hat dome -->
+    <path d="M-138,0 C-138,-100 -85,-165 0,-165 C85,-165 138,-100 138,0" 
+          fill="#193153"/>
+    <!-- Hat brim -->
+    <rect x="-165" y="-5" width="330" height="38" rx="19" fill="#193153"/>
+    <!-- Center ridge line -->
+    <rect x="-10" y="-155" width="20" height="140" rx="10" fill="#f99A1D" fill-opacity="0.5"/>
+    <!-- Headband -->
+    <rect x="-128" y="33" width="256" height="32" rx="10" fill="#193153"/>
+    <!-- Inner suspension lines -->
+    <path d="M-96,37 L-74,-52 M96,37 L74,-52 M0,37 L0,-26" 
+          stroke="#f99A1D" stroke-width="7" stroke-opacity="0.4" stroke-linecap="round"/>
   </g>
 </svg>
