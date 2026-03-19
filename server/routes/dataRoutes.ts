@@ -1041,6 +1041,20 @@ router.get('/metrics', async (req: AuthRequest, res: Response) => {
 
 // ============ BULK OPERATIONS ============
 
+// Helper: check if user has privileged role (Admin/Manager bypass ownership)
+function isPrivilegedRole(role?: string): boolean {
+  return role === 'Admin' || role === 'Manager';
+}
+
+// Ownership column mapping for bulk operations
+const BULK_OWNER_COLUMNS: Record<string, { col: string; altCol?: string }> = {
+  incidents: { col: 'reported_by' },
+  actions: { col: 'created_by', altCol: 'assignee' },
+  observations: { col: 'created_by' },
+  risk_assessments: { col: 'author' },
+  permits: { col: 'created_by' },
+};
+
 // ---------- Bulk Delete Incidents ----------
 router.post('/incidents/bulk-delete', requirePermission('DeleteIncidents'), async (req: AuthRequest, res: Response) => {
   const { ids } = req.body;
@@ -1050,9 +1064,16 @@ router.post('/incidents/bulk-delete', requirePermission('DeleteIncidents'), asyn
   if (ids.length > 100) {
     return res.status(400).json({ error: 'Maximum 100 items per bulk operation' });
   }
-  const params = ids.map((_, i) => `$${i + 1}`).join(',');
-  const result = await pool.query(`DELETE FROM incidents WHERE id IN (${params})`, ids);
-  res.json({ deleted: result.rowCount, message: `${result.rowCount} incident(s) deleted` });
+  // Non-privileged users can only delete their own records
+  if (isPrivilegedRole(req.user?.role)) {
+    const params = ids.map((_, i) => `$${i + 1}`).join(',');
+    const result = await pool.query(`DELETE FROM incidents WHERE id IN (${params})`, ids);
+    res.json({ deleted: result.rowCount, message: `${result.rowCount} incident(s) deleted` });
+  } else {
+    const params = ids.map((_, i) => `$${i + 2}`).join(',');
+    const result = await pool.query(`DELETE FROM incidents WHERE id IN (${params}) AND reported_by = $1`, [req.user?.id, ...ids]);
+    res.json({ deleted: result.rowCount, message: `${result.rowCount} incident(s) deleted` });
+  }
 });
 
 // ---------- Bulk Update Incident Status ----------
@@ -1067,9 +1088,16 @@ router.post('/incidents/bulk-status', requirePermission('EditIncidents'), async 
   if (ids.length > 100) {
     return res.status(400).json({ error: 'Maximum 100 items per bulk operation' });
   }
-  const params = ids.map((_, i) => `$${i + 2}`).join(',');
-  const result = await pool.query(`UPDATE incidents SET status = $1, updated_at = NOW() WHERE id IN (${params})`, [status, ...ids]);
-  res.json({ updated: result.rowCount, message: `${result.rowCount} incident(s) updated to ${status}` });
+  // Non-privileged users can only update their own records
+  if (isPrivilegedRole(req.user?.role)) {
+    const params = ids.map((_, i) => `$${i + 2}`).join(',');
+    const result = await pool.query(`UPDATE incidents SET status = $1, updated_at = NOW() WHERE id IN (${params})`, [status, ...ids]);
+    res.json({ updated: result.rowCount, message: `${result.rowCount} incident(s) updated to ${status}` });
+  } else {
+    const params = ids.map((_, i) => `$${i + 3}`).join(',');
+    const result = await pool.query(`UPDATE incidents SET status = $1, updated_at = NOW() WHERE id IN (${params}) AND reported_by = $2`, [status, req.user?.id, ...ids]);
+    res.json({ updated: result.rowCount, message: `${result.rowCount} incident(s) updated to ${status}` });
+  }
 });
 
 // ---------- Bulk Delete Actions ----------
@@ -1081,9 +1109,15 @@ router.post('/actions/bulk-delete', requirePermission('DeleteActions'), async (r
   if (ids.length > 100) {
     return res.status(400).json({ error: 'Maximum 100 items per bulk operation' });
   }
-  const params = ids.map((_, i) => `$${i + 1}`).join(',');
-  const result = await pool.query(`DELETE FROM actions WHERE id IN (${params})`, ids);
-  res.json({ deleted: result.rowCount, message: `${result.rowCount} action(s) deleted` });
+  if (isPrivilegedRole(req.user?.role)) {
+    const params = ids.map((_, i) => `$${i + 1}`).join(',');
+    const result = await pool.query(`DELETE FROM actions WHERE id IN (${params})`, ids);
+    res.json({ deleted: result.rowCount, message: `${result.rowCount} action(s) deleted` });
+  } else {
+    const params = ids.map((_, i) => `$${i + 2}`).join(',');
+    const result = await pool.query(`DELETE FROM actions WHERE id IN (${params}) AND (created_by = $1 OR assignee = $1)`, [req.user?.id, ...ids]);
+    res.json({ deleted: result.rowCount, message: `${result.rowCount} action(s) deleted` });
+  }
 });
 
 // ---------- Bulk Complete Actions ----------
@@ -1095,9 +1129,15 @@ router.post('/actions/bulk-complete', requirePermission('EditActions'), async (r
   if (ids.length > 100) {
     return res.status(400).json({ error: 'Maximum 100 items per bulk operation' });
   }
-  const params = ids.map((_, i) => `$${i + 1}`).join(',');
-  const result = await pool.query(`UPDATE actions SET status = 'Completed', completed_date = NOW() WHERE id IN (${params}) AND status != 'Completed'`, ids);
-  res.json({ updated: result.rowCount, message: `${result.rowCount} action(s) completed` });
+  if (isPrivilegedRole(req.user?.role)) {
+    const params = ids.map((_, i) => `$${i + 1}`).join(',');
+    const result = await pool.query(`UPDATE actions SET status = 'Completed', completed_date = NOW() WHERE id IN (${params}) AND status != 'Completed'`, ids);
+    res.json({ updated: result.rowCount, message: `${result.rowCount} action(s) completed` });
+  } else {
+    const params = ids.map((_, i) => `$${i + 2}`).join(',');
+    const result = await pool.query(`UPDATE actions SET status = 'Completed', completed_date = NOW() WHERE id IN (${params}) AND status != 'Completed' AND (created_by = $1 OR assignee = $1)`, [req.user?.id, ...ids]);
+    res.json({ updated: result.rowCount, message: `${result.rowCount} action(s) completed` });
+  }
 });
 
 // ---------- Bulk Delete Observations ----------
@@ -1109,15 +1149,22 @@ router.post('/observations/bulk-delete', requirePermission('DeleteObservations')
   if (ids.length > 100) {
     return res.status(400).json({ error: 'Maximum 100 items per bulk operation' });
   }
-  const params = ids.map((_, i) => `$${i + 1}`).join(',');
-  const result = await pool.query(`DELETE FROM observations WHERE id IN (${params})`, ids);
-  res.json({ deleted: result.rowCount, message: `${result.rowCount} observation(s) deleted` });
+  if (isPrivilegedRole(req.user?.role)) {
+    const params = ids.map((_, i) => `$${i + 1}`).join(',');
+    const result = await pool.query(`DELETE FROM observations WHERE id IN (${params})`, ids);
+    res.json({ deleted: result.rowCount, message: `${result.rowCount} observation(s) deleted` });
+  } else {
+    const params = ids.map((_, i) => `$${i + 2}`).join(',');
+    const result = await pool.query(`DELETE FROM observations WHERE id IN (${params}) AND created_by = $1`, [req.user?.id, ...ids]);
+    res.json({ deleted: result.rowCount, message: `${result.rowCount} observation(s) deleted` });
+  }
 });
 
-// ---------- Bulk Export (returns IDs for client-side CSV generation) ----------
-router.post('/bulk-export', async (req: AuthRequest, res: Response) => {
+// ---------- Bulk Export (returns records for client-side CSV generation) ----------
+router.post('/bulk-export', requirePermission('view_analytics'), async (req: AuthRequest, res: Response) => {
   const { entity, ids } = req.body;
-  if (!['incidents', 'actions', 'observations', 'risk_assessments', 'permits'].includes(entity)) {
+  const allowedEntities = ['incidents', 'actions', 'observations', 'risk_assessments', 'permits'];
+  if (!allowedEntities.includes(entity)) {
     return res.status(400).json({ error: 'Invalid entity type' });
   }
   if (!Array.isArray(ids) || ids.length === 0) {
@@ -1126,9 +1173,23 @@ router.post('/bulk-export', async (req: AuthRequest, res: Response) => {
   if (ids.length > 500) {
     return res.status(400).json({ error: 'Maximum 500 items per export' });
   }
-  const params = ids.map((_, i) => `$${i + 1}`).join(',');
-  const result = await pool.query(`SELECT * FROM ${entity} WHERE id IN (${params})`, ids);
-  res.json(result.rows);
+  // Non-privileged users can only export their own records
+  const ownerConfig = BULK_OWNER_COLUMNS[entity];
+  if (!isPrivilegedRole(req.user?.role) && ownerConfig) {
+    const idParams = ids.map((_, i) => `$${i + 2}`).join(',');
+    const ownerClause = ownerConfig.altCol
+      ? `(${ownerConfig.col} = $1 OR ${ownerConfig.altCol} = $1)`
+      : `${ownerConfig.col} = $1`;
+    const result = await pool.query(
+      `SELECT * FROM ${entity} WHERE id IN (${idParams}) AND ${ownerClause}`,
+      [req.user?.id, ...ids]
+    );
+    res.json(result.rows);
+  } else {
+    const params = ids.map((_, i) => `$${i + 1}`).join(',');
+    const result = await pool.query(`SELECT * FROM ${entity} WHERE id IN (${params})`, ids);
+    res.json(result.rows);
+  }
 });
 
 export default router;

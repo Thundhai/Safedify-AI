@@ -220,9 +220,11 @@ router.delete('/:filename', authenticate, async (req: AuthRequest, res: Response
         res.status(403).json({ error: 'Access denied: You can only delete your own uploads' });
         return;
       }
+    } else {
+      // No DB record (legacy file) — only Admin/Manager can delete these
+      res.status(403).json({ error: 'Access denied: Cannot verify ownership of this file' });
+      return;
     }
-    // If no record exists (legacy files), allow deletion by any authenticated user
-    // but log for audit purposes
   }
 
   try {

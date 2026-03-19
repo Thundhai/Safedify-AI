@@ -77,6 +77,18 @@ const EXPORTABLE: Record<string, { table: string; dateCol: string; columns: stri
   },
 };
 
+// Ownership columns for data scoping (non-Admin/Manager only see their own records)
+const OWNER_COLUMNS: Record<string, { col: string; altCol?: string }> = {
+  incidents: { col: 'reported_by' },
+  actions: { col: 'created_by', altCol: 'assignee' },
+  observations: { col: 'created_by' },
+  permits: { col: 'created_by' },
+};
+
+function isPrivilegedRole(role?: string): boolean {
+  return role === 'Admin' || role === 'Manager';
+}
+
 router.get('/:entity', validateParams(entityParamSchema), validateQuery(exportQuerySchema), async (req: AuthRequest, res: Response) => {
   const entity = sanitizeString(req.params.entity as string, { stripHtml: true, maxLength: 50 });
   const config = EXPORTABLE[entity];
@@ -98,6 +110,17 @@ router.get('/:entity', validateParams(entityParamSchema), validateQuery(exportQu
   const params: any[] = [];
   if (from) { where.push(`${config.dateCol} >= $${params.length + 1}`); params.push(from); }
   if (to) { where.push(`${config.dateCol} <= $${params.length + 1}`); params.push(to); }
+
+  // Non-privileged users can only export their own records for personal data tables
+  const ownerConfig = OWNER_COLUMNS[entity];
+  if (!isPrivilegedRole(req.user?.role) && ownerConfig) {
+    const ownerClause = ownerConfig.altCol
+      ? `(${ownerConfig.col} = $${params.length + 1} OR ${ownerConfig.altCol} = $${params.length + 1})`
+      : `${ownerConfig.col} = $${params.length + 1}`;
+    where.push(ownerClause);
+    params.push(req.user?.id);
+  }
+
   const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
   const selectCols = config.columns.join(', ');
