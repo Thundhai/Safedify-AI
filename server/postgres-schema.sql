@@ -1,6 +1,33 @@
 -- PostgreSQL schema for Safedify-AI
 -- Review and adjust as needed before applying
 
+-- ============ MULTI-TENANCY: Organizations ============
+
+CREATE TABLE organizations (
+    id UUID PRIMARY KEY,
+    name TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    plan TEXT NOT NULL DEFAULT 'Pro',
+    owner_id UUID,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE org_invites (
+    id UUID PRIMARY KEY,
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'Worker',
+    token TEXT UNIQUE NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    accepted BOOLEAN DEFAULT FALSE,
+    invited_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_org_invites_token ON org_invites(token);
+CREATE INDEX IF NOT EXISTS idx_org_invites_email ON org_invites(email);
+CREATE INDEX IF NOT EXISTS idx_org_invites_org ON org_invites(org_id);
+
 CREATE TABLE users (
     id UUID PRIMARY KEY,
     name TEXT NOT NULL,
@@ -9,6 +36,7 @@ CREATE TABLE users (
     role TEXT NOT NULL DEFAULT 'Worker',
     tier TEXT NOT NULL DEFAULT 'Free',
     avatar TEXT,
+    org_id UUID REFERENCES organizations(id),
     email_verified BOOLEAN DEFAULT FALSE,
     email_verification_token TEXT,
     email_verification_expires TIMESTAMP,
@@ -23,12 +51,17 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Back-reference: organizations.owner_id → users.id
+ALTER TABLE organizations ADD CONSTRAINT fk_organizations_owner FOREIGN KEY (owner_id) REFERENCES users(id);
+CREATE INDEX IF NOT EXISTS idx_users_org ON users(org_id);
+
 -- Security indexes for auth lookups
 CREATE INDEX IF NOT EXISTS idx_users_email_verification_token ON users(email_verification_token) WHERE email_verification_token IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_locked_until ON users(locked_until) WHERE locked_until IS NOT NULL;
 
 CREATE TABLE incidents (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     description TEXT NOT NULL,
     location TEXT,
     date TIMESTAMP NOT NULL,
@@ -65,6 +98,7 @@ CREATE TABLE incidents (
 -- Audit logs table for tracking actions and changes
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     user_id UUID REFERENCES users(id),
     user_email TEXT,
     user_role TEXT,
@@ -79,6 +113,7 @@ CREATE TABLE audit_logs (
 
 CREATE TABLE inspections (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     template_name TEXT NOT NULL,
     title TEXT NOT NULL,
     date TIMESTAMP NOT NULL,
@@ -93,6 +128,7 @@ CREATE TABLE inspections (
 
 CREATE TABLE actions (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     title TEXT NOT NULL,
     description TEXT,
     assignee UUID,
@@ -111,6 +147,7 @@ CREATE TABLE actions (
 
 CREATE TABLE observations (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     type TEXT NOT NULL,
     category TEXT,
     description TEXT NOT NULL,
@@ -126,6 +163,7 @@ CREATE TABLE observations (
 
 CREATE TABLE permits (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     type TEXT NOT NULL,
     location TEXT,
     description TEXT NOT NULL,
@@ -142,6 +180,7 @@ CREATE TABLE permits (
 
 CREATE TABLE workers (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
     role TEXT,
     department TEXT,
@@ -157,6 +196,7 @@ CREATE TABLE workers (
 
 CREATE TABLE contractors (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
     contact_person TEXT,
     email TEXT,
@@ -169,6 +209,7 @@ CREATE TABLE contractors (
 
 CREATE TABLE assets (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
     category TEXT,
     model_number TEXT,
@@ -185,6 +226,7 @@ CREATE TABLE assets (
 
 CREATE TABLE documents (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     title TEXT NOT NULL,
     category TEXT,
     content TEXT,
@@ -200,6 +242,7 @@ CREATE TABLE documents (
 
 CREATE TABLE stats_logs (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     date TIMESTAMP NOT NULL,
     period TEXT NOT NULL DEFAULT 'Daily',
     man_hours REAL DEFAULT 0,
@@ -210,6 +253,7 @@ CREATE TABLE stats_logs (
 
 CREATE TABLE emergency_contacts (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
     role TEXT,
     phone TEXT NOT NULL,
@@ -220,6 +264,7 @@ CREATE TABLE emergency_contacts (
 
 CREATE TABLE emergency_drills (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     type TEXT NOT NULL,
     date TIMESTAMP NOT NULL,
     location TEXT NOT NULL,
@@ -233,6 +278,7 @@ CREATE TABLE emergency_drills (
 
 CREATE TABLE agent_conversations (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     user_id UUID REFERENCES users(id),
     messages TEXT NOT NULL DEFAULT '[]',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -241,6 +287,7 @@ CREATE TABLE agent_conversations (
 
 CREATE TABLE risk_assessments (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     title TEXT NOT NULL,
     task_description TEXT,
     type TEXT NOT NULL DEFAULT 'JHA',
@@ -254,6 +301,7 @@ CREATE TABLE risk_assessments (
 
 CREATE TABLE inspection_templates (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
     category TEXT,
     description TEXT,
@@ -263,6 +311,7 @@ CREATE TABLE inspection_templates (
 
 CREATE TABLE training_modules (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     title TEXT NOT NULL,
     description TEXT,
     required_for_roles TEXT DEFAULT '[]',
@@ -272,6 +321,7 @@ CREATE TABLE training_modules (
 
 CREATE TABLE training_records (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     worker_id UUID REFERENCES workers(id),
     module_id UUID,
     module_title TEXT,
@@ -284,6 +334,7 @@ CREATE TABLE training_records (
 
 CREATE TABLE ppe_inventory (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
     category TEXT,
     stock_quantity INTEGER DEFAULT 0,
@@ -294,6 +345,7 @@ CREATE TABLE ppe_inventory (
 
 CREATE TABLE ppe_issuance (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     worker_id UUID REFERENCES workers(id),
     worker_name TEXT,
     ppe_item_id UUID REFERENCES ppe_inventory(id),
@@ -316,6 +368,7 @@ CREATE TABLE roles (
 
 CREATE TABLE safety_zones (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
     type TEXT NOT NULL DEFAULT 'Safe',
     lat REAL NOT NULL,
@@ -328,6 +381,7 @@ CREATE TABLE safety_zones (
 
 CREATE TABLE notifications (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     user_id UUID REFERENCES users(id),
     type TEXT NOT NULL DEFAULT 'info',
     title TEXT NOT NULL,
@@ -353,6 +407,7 @@ CREATE TABLE notification_preferences (
 
 CREATE TABLE environmental_readings (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     reading_type TEXT NOT NULL,
     value REAL NOT NULL,
     unit TEXT NOT NULL,
@@ -368,6 +423,7 @@ CREATE TABLE environmental_readings (
 
 CREATE TABLE site_locations (
     id UUID PRIMARY KEY,
+    org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
     latitude REAL,
     longitude REAL,
@@ -448,6 +504,32 @@ CREATE INDEX idx_incidents_fts ON incidents USING GIN (to_tsvector('english', CO
 CREATE INDEX idx_observations_fts ON observations USING GIN (to_tsvector('english', COALESCE(description, '')));
 CREATE INDEX idx_actions_fts ON actions USING GIN (to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(description, '')));
 CREATE INDEX idx_permits_fts ON permits USING GIN (to_tsvector('english', COALESCE(description, '')));
+
+-- Multi-tenancy org_id indexes
+CREATE INDEX IF NOT EXISTS idx_incidents_org ON incidents(org_id);
+CREATE INDEX IF NOT EXISTS idx_actions_org ON actions(org_id);
+CREATE INDEX IF NOT EXISTS idx_observations_org ON observations(org_id);
+CREATE INDEX IF NOT EXISTS idx_inspections_org ON inspections(org_id);
+CREATE INDEX IF NOT EXISTS idx_permits_org ON permits(org_id);
+CREATE INDEX IF NOT EXISTS idx_workers_org ON workers(org_id);
+CREATE INDEX IF NOT EXISTS idx_contractors_org ON contractors(org_id);
+CREATE INDEX IF NOT EXISTS idx_assets_org ON assets(org_id);
+CREATE INDEX IF NOT EXISTS idx_documents_org ON documents(org_id);
+CREATE INDEX IF NOT EXISTS idx_risk_assessments_org ON risk_assessments(org_id);
+CREATE INDEX IF NOT EXISTS idx_emergency_contacts_org ON emergency_contacts(org_id);
+CREATE INDEX IF NOT EXISTS idx_emergency_drills_org ON emergency_drills(org_id);
+CREATE INDEX IF NOT EXISTS idx_training_modules_org ON training_modules(org_id);
+CREATE INDEX IF NOT EXISTS idx_training_records_org ON training_records(org_id);
+CREATE INDEX IF NOT EXISTS idx_ppe_inventory_org ON ppe_inventory(org_id);
+CREATE INDEX IF NOT EXISTS idx_ppe_issuance_org ON ppe_issuance(org_id);
+CREATE INDEX IF NOT EXISTS idx_safety_zones_org ON safety_zones(org_id);
+CREATE INDEX IF NOT EXISTS idx_environmental_readings_org ON environmental_readings(org_id);
+CREATE INDEX IF NOT EXISTS idx_site_locations_org ON site_locations(org_id);
+CREATE INDEX IF NOT EXISTS idx_stats_logs_org ON stats_logs(org_id);
+CREATE INDEX IF NOT EXISTS idx_agent_conversations_org ON agent_conversations(org_id);
+CREATE INDEX IF NOT EXISTS idx_inspection_templates_org ON inspection_templates(org_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_org ON audit_logs(org_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_org ON notifications(org_id);
 CREATE INDEX idx_documents_fts ON documents USING GIN (to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(content, '')));
 
 -- Security indexes

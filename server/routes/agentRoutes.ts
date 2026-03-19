@@ -84,8 +84,8 @@ router.post('/chat', validate(chatSchema), async (req: AuthRequest, res: Respons
       );
     } else {
       await pool.query(
-        'INSERT INTO agent_conversations (id, user_id, messages) VALUES ($1, $2, $3)',
-        [convId, req.user?.id, JSON.stringify(history)]
+        'INSERT INTO agent_conversations (id, user_id, messages, org_id) VALUES ($1, $2, $3, $4)',
+        [convId, req.user?.id, JSON.stringify(history), req.user?.org_id]
       );
     }
 

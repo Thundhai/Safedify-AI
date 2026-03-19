@@ -85,7 +85,8 @@ router.get('/weather', validateQuery(weatherQuerySchema), async (req: AuthReques
 
     // Merge latest noise reading from DB into the weather response
     const latestNoiseResult = await pool.query(
-      `SELECT value FROM environmental_readings WHERE reading_type = 'noise' ORDER BY created_at DESC LIMIT 1`
+      `SELECT value FROM environmental_readings WHERE reading_type = 'noise' AND org_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [req.user?.org_id]
     );
     const latestNoise = latestNoiseResult.rows[0];
 
@@ -115,8 +116,8 @@ router.post('/weather/refresh', (_req: AuthRequest, res: Response) => {
 // List all readings (newest first), with optional type & date filters
 router.get('/readings', validateQuery(readingsQuerySchema), async (req: AuthRequest, res: Response) => {
   const { type, from, to, location, limit } = req.query;
-  let sql = 'SELECT * FROM environmental_readings WHERE 1=1';
-  const params: any[] = [];
+  let sql = 'SELECT * FROM environmental_readings WHERE org_id = $1';
+  const params: any[] = [req.user?.org_id];
 
   // Sanitize and validate query parameters
   if (type) { 
@@ -142,16 +143,18 @@ router.get('/readings', validateQuery(readingsQuerySchema), async (req: AuthRequ
 });
 
 // Latest reading per type
-router.get('/readings/latest', async (_req: AuthRequest, res: Response) => {
+router.get('/readings/latest', async (req: AuthRequest, res: Response) => {
   const result = await pool.query(`
     SELECT er.* FROM environmental_readings er
     INNER JOIN (
       SELECT reading_type, MAX(created_at) as max_date
       FROM environmental_readings
+      WHERE org_id = $1
       GROUP BY reading_type
     ) latest ON er.reading_type = latest.reading_type AND er.created_at = latest.max_date
+    WHERE er.org_id = $1
     ORDER BY er.reading_type
-  `);
+  `, [req.user?.org_id]);
   res.json(result.rows);
 });
 
@@ -173,7 +176,9 @@ router.get('/readings/history', validateQuery(historyQuerySchema), async (req: A
   
   let sql = `SELECT id, value, unit, location, zone, source, created_at
     FROM environmental_readings
-    WHERE reading_type = $1 AND created_at >= NOW() - INTERVAL '1 hour' * $${paramIndex}`;
+    WHERE reading_type = $1 AND org_id = $${paramIndex} AND created_at >= NOW() - INTERVAL '1 hour' * $${paramIndex + 1}`;
+  params.push(req.user?.org_id);
+  paramIndex++;
   params.push(hoursBack);
   paramIndex++;
   
@@ -228,8 +233,8 @@ router.post('/readings', validate(readingSchema), async (req: AuthRequest, res: 
   const sanitizedNotes = b.notes ? sanitizeString(b.notes, { stripHtml: true, maxLength: 2000 }) : null;
 
   await pool.query(
-    `INSERT INTO environmental_readings (id, reading_type, value, unit, location, zone, source, recorded_by, notes, latitude, longitude)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    `INSERT INTO environmental_readings (id, reading_type, value, unit, location, zone, source, recorded_by, notes, latitude, longitude, org_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
     [
       id,
       b.reading_type,
@@ -242,6 +247,7 @@ router.post('/readings', validate(readingSchema), async (req: AuthRequest, res: 
       sanitizedNotes,
       b.latitude ?? null,
       b.longitude ?? null,
+      req.user?.org_id,
     ]
   );
 
@@ -253,8 +259,8 @@ router.post('/readings', validate(readingSchema), async (req: AuthRequest, res: 
 //  SITE LOCATIONS
 // ──────────────────────────────────────────
 
-router.get('/locations', async (_req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM site_locations ORDER BY is_default DESC, name ASC');
+router.get('/locations', async (req: AuthRequest, res: Response) => {
+  const result = await pool.query('SELECT * FROM site_locations WHERE org_id = $1 ORDER BY is_default DESC, name ASC', [req.user?.org_id]);
   res.json(result.rows);
 });
 
@@ -270,14 +276,14 @@ router.post('/locations', validate(locationSchema), async (req: AuthRequest, res
     return;
   }
 
-  // If setting as default, unset existing default
+  // If setting as default, only unset within this org
   if (is_default) {
-    await pool.query('UPDATE site_locations SET is_default = 0');
+    await pool.query('UPDATE site_locations SET is_default = 0 WHERE org_id = $1', [req.user?.org_id]);
   }
 
   await pool.query(
-    'INSERT INTO site_locations (id, name, latitude, longitude, is_default) VALUES ($1, $2, $3, $4, $5)',
-    [id, sanitizedName, latitude ?? null, longitude ?? null, is_default ? 1 : 0]
+    'INSERT INTO site_locations (id, name, latitude, longitude, is_default, org_id) VALUES ($1, $2, $3, $4, $5, $6)',
+    [id, sanitizedName, latitude ?? null, longitude ?? null, is_default ? 1 : 0, req.user?.org_id]
   );
 
   const result = await pool.query('SELECT * FROM site_locations WHERE id = $1', [id]);

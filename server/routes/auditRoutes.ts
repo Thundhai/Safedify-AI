@@ -41,8 +41,8 @@ export const logAudit = async (
     const ip = req.ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '';
     const ua = (req.headers['user-agent'] || '').slice(0, 256);
     await pool.query(
-      `INSERT INTO audit_logs (id, user_id, user_email, user_role, action, entity_type, entity_id, details, ip_address, user_agent)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+      `INSERT INTO audit_logs (id, user_id, user_email, user_role, action, entity_type, entity_id, details, ip_address, user_agent, org_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       [
         uuid(),
         req.user?.id || null,
@@ -54,6 +54,7 @@ export const logAudit = async (
         entry.details || null,
         ip,
         ua,
+        req.user?.org_id || null,
       ]
     );
   } catch (err: any) {
@@ -109,6 +110,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   const where: string[] = [];
   const params: any[] = [];
 
+  // Scope to current user's organization
+  where.push('org_id = $' + (params.length + 1));
+  params.push(req.user?.org_id);
+
   if (req.query.action) { where.push('action = $' + (params.length + 1)); params.push(req.query.action); }
   if (req.query.entity_type) { where.push('entity_type = $' + (params.length + 1)); params.push(req.query.entity_type); }
   if (req.query.user_id) { where.push('user_id = $' + (params.length + 1)); params.push(req.query.user_id); }
@@ -136,6 +141,10 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 router.get('/export', async (req: AuthRequest, res: Response) => {
   const where: string[] = [];
   const params: any[] = [];
+
+  // Scope to current user's organization
+  where.push('org_id = $' + (params.length + 1));
+  params.push(req.user?.org_id);
 
   if (req.query.from) { where.push('created_at >= $' + (params.length + 1)); params.push(req.query.from); }
   if (req.query.to) { where.push('created_at <= $' + (params.length + 1)); params.push(req.query.to); }

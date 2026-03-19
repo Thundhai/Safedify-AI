@@ -37,6 +37,8 @@ const registerSchema: ValidationSchema = {
   email: { type: 'email', required: true, maxLength: 255 },
   password: { type: 'string', required: true, minLength: 8, maxLength: 128, allowInjection: true },
   role: { type: 'string', enum: ['Worker', 'HSE Supervisor', 'HSE Manager', 'HSE Officer', 'HSE Advisor', 'HSE Coordinator', 'HSE Technician', 'Engineer', 'Site Supervisor', 'Construction Manager', 'Operations Manager'] },
+  organizationName: { type: 'string', required: false, minLength: 2, maxLength: 200 },
+  inviteToken: { type: 'string', required: false, maxLength: 500 },
 };
 
 const tokenSchema: ValidationSchema = {
@@ -181,7 +183,7 @@ router.post('/login', validate(loginSchema), async (req: AuthRequest, res: Respo
     // Reset failed login attempts on successful login
     await resetFailedLogins(row.id);
 
-    const user = { id: row.id, name: row.name, email: row.email, role: row.role, tier: row.tier, avatar: row.avatar };
+    const user = { id: row.id, name: row.name, email: row.email, role: row.role, tier: row.tier, avatar: row.avatar, org_id: row.org_id };
 
     // Check if 2FA is enabled
     if (row.totp_enabled) {
@@ -206,7 +208,14 @@ router.post('/login', validate(loginSchema), async (req: AuthRequest, res: Respo
     logAudit(req, { action: 'login', entityType: 'user', entityId: row.id, details: `User ${email} logged in` });
     logAuthSuccess(req, row.id, email);
     recordLoginSuccess(getClientIp(req)); // Reset IP-based login attempt counter
-    res.json({ token, user });
+
+    // Fetch org name for the response
+    let org_name: string | undefined;
+    if (row.org_id) {
+      const orgResult = await pool.query('SELECT name FROM organizations WHERE id = $1', [row.org_id]);
+      org_name = orgResult.rows[0]?.name;
+    }
+    res.json({ token, user: { ...user, org_name } });
   } catch (err: any) {
     console.error('[Auth] Login error:', err.message);
     res.status(500).json({ error: 'Login failed. Please try again.' });
@@ -246,6 +255,46 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
     const id = uuid();
     const avatar = name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
 
+    // Handle org: either accept invite to existing org, or create new org
+    let orgId: string;
+    let orgName: string;
+    let assignedRole = safeRole;
+    const { organizationName, inviteToken } = req.body;
+
+    if (inviteToken) {
+      // Joining existing org via invite
+      const { rows: inviteRows } = await pool.query(
+        `SELECT org_id, role, email, expires_at, accepted FROM org_invites WHERE token = $1`,
+        [inviteToken]
+      );
+      const invite = inviteRows[0];
+      if (!invite || invite.accepted || new Date(invite.expires_at) < new Date()) {
+        res.status(400).json({ error: 'Invalid or expired invite' });
+        return;
+      }
+      if (invite.email.toLowerCase() !== email.toLowerCase()) {
+        res.status(400).json({ error: 'Email does not match invite' });
+        return;
+      }
+      orgId = invite.org_id;
+      assignedRole = invite.role || safeRole;
+      const { rows: orgRows } = await pool.query('SELECT name FROM organizations WHERE id = $1', [orgId]);
+      orgName = orgRows[0]?.name || 'Organization';
+      // Mark invite as accepted
+      await pool.query('UPDATE org_invites SET accepted = TRUE WHERE token = $1', [inviteToken]);
+    } else {
+      // Create new organization
+      orgId = uuid();
+      orgName = organizationName || `${name}'s Organization`;
+      const slug = orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + orgId.slice(0, 8);
+      await pool.query(
+        `INSERT INTO organizations (id, name, slug, plan, owner_id) VALUES ($1, $2, $3, 'Pro', $4)`,
+        [orgId, orgName, slug, id]
+      );
+      // Org creator defaults to Admin role
+      assignedRole = 'Admin';
+    }
+
     // Email verification: enabled when Resend API key is configured
     const requireVerification = isEmailConfigured;
     const verificationToken = requireVerification ? generateSecureToken() : null;
@@ -253,9 +302,9 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
     const verificationExpires = requireVerification ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
 
     await pool.query(
-      `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, email_verified, email_verification_token, email_verification_expires, password_changed_at) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
-      [id, name, email, hash, safeRole, 'Pro', avatar, !requireVerification, verificationTokenHash, verificationExpires]
+      `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, org_id, email_verified, email_verification_token, email_verification_expires, password_changed_at) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
+      [id, name, email, hash, assignedRole, 'Pro', avatar, orgId, !requireVerification, verificationTokenHash, verificationExpires]
     );
 
     // Send verification email if required
@@ -283,10 +332,10 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
       return;
     }
 
-    const user = { id, name, email, role: safeRole, tier: 'Pro', avatar };
+    const user = { id, name, email, role: assignedRole, tier: 'Pro', avatar, org_id: orgId };
     const token = generateToken(user);
-    logAudit(req, { action: 'register', entityType: 'user', entityId: id, details: `New user registered: ${email}` });
-    res.status(201).json({ token, user });
+    logAudit(req, { action: 'register', entityType: 'user', entityId: id, details: `New user registered: ${email} (org: ${orgName})` });
+    res.status(201).json({ token, user: { ...user, org_name: orgName } });
   } catch (err: any) {
     console.error('[Auth] Registration error:', err.message);
     res.status(500).json({ error: 'Registration failed. Please try again.' });
@@ -435,10 +484,18 @@ router.post('/login/2fa', sensitiveAuthLimiter, async (req: AuthRequest, res: Re
       return;
     }
 
-    const user = { id: row.id, name: row.name, email: row.email, role: row.role, tier: row.tier, avatar: row.avatar };
+    const user = { id: row.id, name: row.name, email: row.email, role: row.role, tier: row.tier, avatar: row.avatar, org_id: row.org_id };
     const jwtToken = generateToken(user);
+
+    // Fetch org name
+    let org_name = '';
+    if (row.org_id) {
+      const { rows: orgRows } = await pool.query('SELECT name FROM organizations WHERE id = $1', [row.org_id]);
+      org_name = orgRows[0]?.name || '';
+    }
+
     logAudit(req, { action: 'login', entityType: 'user', entityId: row.id, details: `User ${row.email} logged in with 2FA` });
-    res.json({ token: jwtToken, user });
+    res.json({ token: jwtToken, user: { ...user, org_name } });
   } catch (err: any) {
     console.error('[Auth] 2FA login error:', err.message);
     res.status(500).json({ error: '2FA verification failed' });

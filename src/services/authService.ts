@@ -33,6 +33,8 @@ export const login = async (email: string, password: string): Promise<AuthUser |
                 role: data.user.role,
                 tier: (data.user.tier as SubscriptionTier) || SubscriptionTier.FREE,
                 avatar: data.user.avatar,
+                org_id: data.user.org_id,
+                org_name: data.user.org_name,
             };
             localStorage.setItem(AUTH_KEY, JSON.stringify(user));
             return user;
@@ -56,6 +58,8 @@ export const completeLoginWith2FA = async (token: string): Promise<AuthUser | nu
                 role: data.user.role,
                 tier: (data.user.tier as SubscriptionTier) || SubscriptionTier.FREE,
                 avatar: data.user.avatar,
+                org_id: data.user.org_id,
+                org_name: data.user.org_name,
             };
             localStorage.setItem(AUTH_KEY, JSON.stringify(user));
             pending2FAUserId = null;
@@ -68,9 +72,9 @@ export const completeLoginWith2FA = async (token: string): Promise<AuthUser | nu
     }
 };
 
-export const register = async (name: string, email: string, password: string, role: UserRole): Promise<AuthUser | null | 'verification_required'> => {
+export const register = async (name: string, email: string, password: string, role: UserRole, organizationName?: string, inviteToken?: string): Promise<AuthUser | null | 'verification_required'> => {
     try {
-        const data = await apiRegister(name, email, password, role);
+        const data = await apiRegister(name, email, password, role, organizationName, inviteToken);
         
         // Email verification required — user must check inbox
         if (data.requiresVerification) {
@@ -85,6 +89,8 @@ export const register = async (name: string, email: string, password: string, ro
                 role: data.user.role,
                 tier: (data.user.tier as SubscriptionTier) || SubscriptionTier.FREE,
                 avatar: data.user.avatar,
+                org_id: data.user.org_id,
+                org_name: data.user.org_name,
             };
             localStorage.setItem(AUTH_KEY, JSON.stringify(user));
             return user;
@@ -130,6 +136,8 @@ export const verifySession = async (): Promise<AuthUser | null> => {
                 role: data.user.role,
                 tier: (data.user.tier as SubscriptionTier) || SubscriptionTier.FREE,
                 avatar: data.user.avatar,
+                org_id: data.user.org_id,
+                org_name: data.user.org_name,
             };
             localStorage.setItem(AUTH_KEY, JSON.stringify(user));
             return user;
@@ -150,6 +158,8 @@ export const updateProfile = async (data: { name: string }): Promise<AuthUser | 
             role: result.user.role,
             tier: (result.user.tier as SubscriptionTier) || SubscriptionTier.FREE,
             avatar: result.user.avatar,
+            org_id: result.user.org_id,
+            org_name: result.user.org_name,
         };
         localStorage.setItem(AUTH_KEY, JSON.stringify(user));
         return user;

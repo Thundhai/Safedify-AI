@@ -42,6 +42,7 @@ import exportRoutes from './routes/exportRoutes.js';
 import searchRoutes from './routes/searchRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import twoFactorRoutes from './routes/twoFactorRoutes.js';
+import orgRoutes from './routes/orgRoutes.js';
 import { readFileSync, existsSync } from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -229,6 +230,7 @@ app.use('/api/audit-logs', apiLimiter, auditRoutes);
 app.use('/api/export', apiLimiter, exportRoutes);
 app.use('/api/search', apiLimiter, searchRoutes);
 app.use('/api/admin', apiLimiter, adminRoutes);
+app.use('/api/org', apiLimiter, orgRoutes);
 
 // ---------- OpenAPI spec ----------
 const openapiPath = path.join(__dirname, 'openapi.yaml');

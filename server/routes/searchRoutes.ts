@@ -86,18 +86,18 @@ router.get('/', validateQuery(searchQuerySchema), async (req: AuthRequest, res: 
   }
 
   try {
-    // Incidents - search description (scoped by reported_by for non-privileged users)
+    // Incidents - search description (org-scoped + owner-scoped for non-privileged users)
     if (validTypes.length === 0 || validTypes.includes('incident') || validTypes.includes('incidents')) {
       const privileged = isPrivilegedRole(req.user?.role);
-      const ownerFilter = privileged ? '' : ' AND reported_by = $4';
-      const incParams = privileged ? [FTS_CONFIG, tsQuery, limit] : [FTS_CONFIG, tsQuery, limit, req.user?.id];
+      const ownerFilter = privileged ? '' : ' AND reported_by = $5';
+      const incParams = privileged ? [FTS_CONFIG, tsQuery, limit, req.user?.org_id] : [FTS_CONFIG, tsQuery, limit, req.user?.org_id, req.user?.id];
       const incRows = (await pool.query(
         `SELECT id, description, date, status,
                 ts_rank(to_tsvector($1, COALESCE(description, '')), to_tsquery($1, $2)) as rank,
                 ts_headline($1, COALESCE(description, ''), to_tsquery($1, $2), 
                   'MaxWords=30, MinWords=15, StartSel=<mark>, StopSel=</mark>') as snippet
          FROM incidents 
-         WHERE to_tsvector($1, COALESCE(description, '')) @@ to_tsquery($1, $2)${ownerFilter}
+         WHERE to_tsvector($1, COALESCE(description, '')) @@ to_tsquery($1, $2) AND org_id = $4${ownerFilter}
          ORDER BY rank DESC
          LIMIT $3`,
         incParams
@@ -115,18 +115,18 @@ router.get('/', validateQuery(searchQuerySchema), async (req: AuthRequest, res: 
       }
     }
 
-    // Observations - search description (scoped by created_by for non-privileged users)
+    // Observations - search description (org-scoped + owner-scoped for non-privileged users)
     if (types.length === 0 || types.includes('observation') || types.includes('observations')) {
       const privileged = isPrivilegedRole(req.user?.role);
-      const ownerFilter = privileged ? '' : ' AND created_by = $4';
-      const obsParams = privileged ? [FTS_CONFIG, tsQuery, limit] : [FTS_CONFIG, tsQuery, limit, req.user?.id];
+      const ownerFilter = privileged ? '' : ' AND created_by = $5';
+      const obsParams = privileged ? [FTS_CONFIG, tsQuery, limit, req.user?.org_id] : [FTS_CONFIG, tsQuery, limit, req.user?.org_id, req.user?.id];
       const obsRows = (await pool.query(
         `SELECT id, description, date,
                 ts_rank(to_tsvector($1, COALESCE(description, '')), to_tsquery($1, $2)) as rank,
                 ts_headline($1, COALESCE(description, ''), to_tsquery($1, $2),
                   'MaxWords=30, MinWords=15, StartSel=<mark>, StopSel=</mark>') as snippet
          FROM observations 
-         WHERE to_tsvector($1, COALESCE(description, '')) @@ to_tsquery($1, $2)${ownerFilter}
+         WHERE to_tsvector($1, COALESCE(description, '')) @@ to_tsquery($1, $2) AND org_id = $4${ownerFilter}
          ORDER BY rank DESC
          LIMIT $3`,
         obsParams
@@ -143,18 +143,18 @@ router.get('/', validateQuery(searchQuerySchema), async (req: AuthRequest, res: 
       }
     }
 
-    // Actions - search title and description (scoped by created_by/assignee for non-privileged users)
+    // Actions - search title and description (org-scoped + owner-scoped for non-privileged users)
     if (types.length === 0 || types.includes('action') || types.includes('actions')) {
       const privileged = isPrivilegedRole(req.user?.role);
-      const ownerFilter = privileged ? '' : ' AND (created_by = $4 OR assignee = $4)';
-      const actParams = privileged ? [FTS_CONFIG, tsQuery, limit] : [FTS_CONFIG, tsQuery, limit, req.user?.id];
+      const ownerFilter = privileged ? '' : ' AND (created_by = $5 OR assignee = $5)';
+      const actParams = privileged ? [FTS_CONFIG, tsQuery, limit, req.user?.org_id] : [FTS_CONFIG, tsQuery, limit, req.user?.org_id, req.user?.id];
       const actRows = (await pool.query(
         `SELECT id, title, description, created_at as date, status,
                 ts_rank(to_tsvector($1, COALESCE(title, '') || ' ' || COALESCE(description, '')), to_tsquery($1, $2)) as rank,
                 ts_headline($1, COALESCE(title, '') || ' ' || COALESCE(description, ''), to_tsquery($1, $2),
                   'MaxWords=30, MinWords=15, StartSel=<mark>, StopSel=</mark>') as snippet
          FROM actions 
-         WHERE to_tsvector($1, COALESCE(title, '') || ' ' || COALESCE(description, '')) @@ to_tsquery($1, $2)${ownerFilter}
+         WHERE to_tsvector($1, COALESCE(title, '') || ' ' || COALESCE(description, '')) @@ to_tsquery($1, $2) AND org_id = $4${ownerFilter}
          ORDER BY rank DESC
          LIMIT $3`,
         actParams
@@ -172,18 +172,18 @@ router.get('/', validateQuery(searchQuerySchema), async (req: AuthRequest, res: 
       }
     }
 
-    // Permits - search description (scoped by created_by for non-privileged users)
+    // Permits - search description (org-scoped + owner-scoped for non-privileged users)
     if (types.length === 0 || types.includes('permit') || types.includes('permits')) {
       const privileged = isPrivilegedRole(req.user?.role);
-      const ownerFilter = privileged ? '' : ' AND created_by = $4';
-      const perParams = privileged ? [FTS_CONFIG, tsQuery, limit] : [FTS_CONFIG, tsQuery, limit, req.user?.id];
+      const ownerFilter = privileged ? '' : ' AND created_by = $5';
+      const perParams = privileged ? [FTS_CONFIG, tsQuery, limit, req.user?.org_id] : [FTS_CONFIG, tsQuery, limit, req.user?.org_id, req.user?.id];
       const perRows = (await pool.query(
         `SELECT id, description, created_at as date, status,
                 ts_rank(to_tsvector($1, COALESCE(description, '')), to_tsquery($1, $2)) as rank,
                 ts_headline($1, COALESCE(description, ''), to_tsquery($1, $2),
                   'MaxWords=30, MinWords=15, StartSel=<mark>, StopSel=</mark>') as snippet
          FROM permits 
-         WHERE to_tsvector($1, COALESCE(description, '')) @@ to_tsquery($1, $2)${ownerFilter}
+         WHERE to_tsvector($1, COALESCE(description, '')) @@ to_tsquery($1, $2) AND org_id = $4${ownerFilter}
          ORDER BY rank DESC
          LIMIT $3`,
         perParams
@@ -201,7 +201,7 @@ router.get('/', validateQuery(searchQuerySchema), async (req: AuthRequest, res: 
       }
     }
 
-    // Documents - search title and content
+    // Documents - search title and content (org-scoped)
     if (types.length === 0 || types.includes('document') || types.includes('documents')) {
       const docRows = (await pool.query(
         `SELECT id, title, content, created_at as date,
@@ -209,10 +209,10 @@ router.get('/', validateQuery(searchQuerySchema), async (req: AuthRequest, res: 
                 ts_headline($1, COALESCE(title, '') || ' ' || COALESCE(content, ''), to_tsquery($1, $2),
                   'MaxWords=30, MinWords=15, StartSel=<mark>, StopSel=</mark>') as snippet
          FROM documents 
-         WHERE to_tsvector($1, COALESCE(title, '') || ' ' || COALESCE(content, '')) @@ to_tsquery($1, $2)
+         WHERE to_tsvector($1, COALESCE(title, '') || ' ' || COALESCE(content, '')) @@ to_tsquery($1, $2) AND org_id = $4
          ORDER BY rank DESC
          LIMIT $3`,
-        [FTS_CONFIG, tsQuery, limit]
+        [FTS_CONFIG, tsQuery, limit, req.user?.org_id]
       )).rows;
       for (const row of docRows) {
         results.push({

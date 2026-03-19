@@ -62,6 +62,7 @@ export interface AuthUser {
   role: string;
   tier: string;
   avatar?: string;
+  org_id?: string;
 }
 
 export interface AuthRequest extends Request {
@@ -114,7 +115,7 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
       const decoded = jwt.verify(token, JWT_SECRET) as AuthUser;
 
       // Re-check user still exists and get fresh role/tier from DB
-      const result = await pool.query('SELECT id, name, email, role, tier, avatar, must_change_password FROM users WHERE id = $1', [decoded.id]);
+      const result = await pool.query('SELECT id, name, email, role, tier, avatar, org_id, must_change_password FROM users WHERE id = $1', [decoded.id]);
       const dbUser = result.rows[0];
       if (!dbUser) {
         res.status(401).json({ error: 'User account no longer exists' });
@@ -129,6 +130,7 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
         role: dbUser.role,
         tier: dbUser.tier,
         avatar: dbUser.avatar,
+        org_id: dbUser.org_id,
       };
       next();
     } catch {
@@ -187,6 +189,16 @@ export const seedDefaultUsers = () => {
       const result = await pool.query('SELECT id FROM users WHERE email = $1', ['admin@safedify.com']);
       const existing = result.rows[0];
       if (!existing) {
+        // Create a demo organization first
+        const demoOrgId = uuid();
+        await pool.query(
+          `INSERT INTO organizations (id, name, slug, plan) VALUES ($1, $2, $3, $4) ON CONFLICT (slug) DO NOTHING`,
+          [demoOrgId, 'Demo Organization', 'demo', 'Enterprise']
+        );
+        // Check if org was inserted or already existed
+        const orgResult = await pool.query('SELECT id FROM organizations WHERE slug = $1', ['demo']);
+        const orgId = orgResult.rows[0]?.id || demoOrgId;
+
         // Use higher cost factor for seeded users
         const hash = bcrypt.hashSync('admin123', 12);
         // Use valid UUIDs for user IDs
@@ -202,11 +214,18 @@ export const seedDefaultUsers = () => {
 
         for (const u of users) {
           await pool.query(
-            `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, email_verified, must_change_password, password_changed_at) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, $8, NOW())`,[u.id, u.name, u.email, hash, u.role, u.tier, u.avatar, mustChangePassword]
+            `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, org_id, email_verified, must_change_password, password_changed_at) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, $9, NOW())`,[u.id, u.name, u.email, hash, u.role, u.tier, u.avatar, orgId, mustChangePassword]
           );
         }
-        console.log(`[Auth] Seeded demo users (must_change_password: ${mustChangePassword})`);
+
+        // Set the admin as the org owner
+        const adminUser = users.find(u => u.role === 'Admin');
+        if (adminUser) {
+          await pool.query('UPDATE organizations SET owner_id = $1 WHERE id = $2', [adminUser.id, orgId]);
+        }
+
+        console.log(`[Auth] Seeded demo users + org (must_change_password: ${mustChangePassword})`);
       }
     } catch (err: any) {
       console.error('[Auth] Failed to seed users (database may not be configured):', err.message);

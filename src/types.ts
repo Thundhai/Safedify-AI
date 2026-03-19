@@ -52,6 +52,8 @@ export interface AuthUser {
   role: UserRole;
   tier: SubscriptionTier;
   avatar?: string;
+  org_id?: string;
+  org_name?: string;
   companyId?: string;
   siteId?: string; // Current active site
   // Permissions are loaded at runtime based on role

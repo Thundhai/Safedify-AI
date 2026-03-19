@@ -9,7 +9,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean | '2fa_required'>;
   loginWith2FA: (token: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string, role: UserRole) => Promise<boolean | 'verification_required'>;
+  register: (name: string, email: string, password: string, role: UserRole, organizationName?: string, inviteToken?: string) => Promise<boolean | 'verification_required'>;
   logout: () => void;
   loading: boolean;
   checkPermission: (permission: Permission) => boolean;
@@ -83,9 +83,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return false;
   };
 
-  const register = async (name: string, email: string, password: string, role: UserRole): Promise<boolean | 'verification_required'> => {
+  const register = async (name: string, email: string, password: string, role: UserRole, organizationName?: string, inviteToken?: string): Promise<boolean | 'verification_required'> => {
       try {
-          const result = await authRegister(name, email, password, role);
+          const result = await authRegister(name, email, password, role, organizationName, inviteToken);
           if (result === 'verification_required') return 'verification_required';
           if (result && typeof result === 'object') {
               setUser(result);

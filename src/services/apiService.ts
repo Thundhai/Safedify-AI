@@ -77,10 +77,10 @@ export const apiLogin = async (email: string, password: string) => {
   return data;
 };
 
-export const apiRegister = async (name: string, email: string, password: string, role?: string) => {
+export const apiRegister = async (name: string, email: string, password: string, role?: string, organizationName?: string, inviteToken?: string) => {
   const data = await apiFetch('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ name, email, password, role }),
+    body: JSON.stringify({ name, email, password, role, organizationName, inviteToken }),
   });
   if (data.token) setAuthToken(data.token);
   return data;

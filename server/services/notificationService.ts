@@ -14,6 +14,7 @@ export type NotificationType = 'info' | 'success' | 'warning' | 'danger';
 
 export interface NotifyParams {
   userId: string;
+  orgId?: string;
   type?: NotificationType;
   title: string;
   message: string;
@@ -26,13 +27,13 @@ export interface NotifyParams {
  */
 export const notify = async (params: NotifyParams): Promise<string> => {
   const id = uuid();
-  const { userId, type = 'info', title, message, entityType, entityId } = params;
+  const { userId, orgId, type = 'info', title, message, entityType, entityId } = params;
 
   // Insert into DB
   await pool.query(
-    `INSERT INTO notifications (id, user_id, type, title, message, entity_type, entity_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [id, userId, type, title, message, entityType || null, entityId || null]
+    `INSERT INTO notifications (id, user_id, type, title, message, entity_type, entity_id, org_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [id, userId, type, title, message, entityType || null, entityId || null, orgId || null]
   );
 
   // Attempt to send email (async, non-blocking)
@@ -65,9 +66,12 @@ export const notifyAllManagers = async (
 ): Promise<number> => {
   const managerRoles = ['Admin', 'Manager', 'HSE Manager', 'Supervisor', 'HSE Supervisor', 'HSE Coordinator', 'HSE Advisor'];
   const rolePlaceholders = managerRoles.map((_, i) => `$${i + 1}`).join(',');
+  // Scope to the same organization
+  const orgFilter = params.orgId ? ` AND org_id = $${managerRoles.length + 1}` : '';
+  const queryParams = params.orgId ? [...managerRoles, params.orgId] : managerRoles;
   const managersResult = await pool.query(
-    `SELECT id FROM users WHERE role IN (${rolePlaceholders})`,
-    managerRoles
+    `SELECT id FROM users WHERE role IN (${rolePlaceholders})${orgFilter}`,
+    queryParams
   );
   const managers = managersResult.rows;
 
@@ -96,9 +100,13 @@ export const notifyUserAndManagers = async (
   // Then notify managers (skip the specific user to avoid duplicate)
   const managerRoles = ['Admin', 'Manager', 'HSE Manager', 'Supervisor', 'HSE Supervisor', 'HSE Coordinator', 'HSE Advisor'];
   const rolePlaceholders = managerRoles.map((_, i) => `$${i + 1}`).join(',');
+  const orgFilter = params.orgId ? ` AND org_id = $${managerRoles.length + 2}` : '';
+  const queryParams = params.orgId
+    ? [...managerRoles, params.userId, params.orgId]
+    : [...managerRoles, params.userId];
   const managersResult = await pool.query(
-    `SELECT id FROM users WHERE role IN (${rolePlaceholders}) AND id != $${managerRoles.length + 1}`,
-    [...managerRoles, params.userId]
+    `SELECT id FROM users WHERE role IN (${rolePlaceholders}) AND id != $${managerRoles.length + 1}${orgFilter}`,
+    queryParams
   );
   const managers = managersResult.rows;
 

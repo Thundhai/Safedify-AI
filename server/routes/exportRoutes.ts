@@ -108,6 +108,11 @@ router.get('/:entity', validateParams(entityParamSchema), validateQuery(exportQu
 
   const where: string[] = [];
   const params: any[] = [];
+
+  // Always scope to the user's organization
+  where.push(`org_id = $${params.length + 1}`);
+  params.push(req.user?.org_id);
+
   if (from) { where.push(`${config.dateCol} >= $${params.length + 1}`); params.push(from); }
   if (to) { where.push(`${config.dateCol} <= $${params.length + 1}`); params.push(to); }
 

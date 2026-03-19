@@ -167,14 +167,10 @@ function requireOwnership(
     const userId = req.user?.id;
     const userName = req.user?.name;
     const userRole = req.user?.role;
-
-    // Admins and Managers can modify any record
-    if (userRole === 'Admin' || userRole === 'Manager') {
-      return next();
-    }
+    const orgId = req.user?.org_id;
 
     try {
-      const selectColumns = altColumn ? `${ownerColumn}, ${altColumn}` : ownerColumn;
+      const selectColumns = altColumn ? `${ownerColumn}, ${altColumn}, org_id` : `${ownerColumn}, org_id`;
       const result = await pool.query(
         `SELECT ${selectColumns} FROM ${table} WHERE id = $1`,
         [resourceId]
@@ -186,6 +182,18 @@ function requireOwnership(
       }
 
       const row = result.rows[0];
+
+      // Org isolation: resource must belong to user's org
+      if (orgId && row.org_id && row.org_id !== orgId) {
+        res.status(404).json({ error: 'Resource not found' });
+        return;
+      }
+
+      // Admins and Managers can modify any record within their org
+      if (userRole === 'Admin' || userRole === 'Manager') {
+        return next();
+      }
+
       const ownerValue = row[ownerColumn];
       const altValue = altColumn ? row[altColumn] : null;
       const currentUserValue = ownerIsName ? userName : userId;
@@ -215,10 +223,20 @@ async function paginate(req: AuthRequest, res: Response, table: string, orderBy 
   const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
   const offset = (page - 1) * limit;
 
-  const whereClause = where ? `WHERE ${where}` : '';
-  const countResult = await pool.query(`SELECT COUNT(*) as total FROM ${table} ${whereClause}`, whereParams);
+  // Inject org_id filter for multi-tenancy
+  const orgId = req.user?.org_id;
+  let finalWhere = where;
+  let finalParams = [...whereParams];
+  if (orgId) {
+    const orgParamIdx = finalParams.length + 1;
+    finalWhere = where ? `org_id = $${orgParamIdx} AND (${where})` : `org_id = $${orgParamIdx}`;
+    finalParams.push(orgId);
+  }
+
+  const whereClause = finalWhere ? `WHERE ${finalWhere}` : '';
+  const countResult = await pool.query(`SELECT COUNT(*) as total FROM ${table} ${whereClause}`, finalParams);
   const total = countResult.rows[0]?.total || 0;
-  const rowsResult = await pool.query(`SELECT * FROM ${table} ${whereClause} ORDER BY ${orderBy} LIMIT $${whereParams.length + 1} OFFSET $${whereParams.length + 2}`, [...whereParams, limit, offset]);
+  const rowsResult = await pool.query(`SELECT * FROM ${table} ${whereClause} ORDER BY ${orderBy} LIMIT $${finalParams.length + 1} OFFSET $${finalParams.length + 2}`, [...finalParams, limit, offset]);
   const rows = rowsResult.rows;
 
   res.set('X-Total-Count', String(total));
@@ -235,7 +253,7 @@ router.get('/incidents', validateQuery(paginationQuerySchema), async (req: AuthR
 });
 
 router.get('/incidents/:id', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM incidents WHERE id = $1', [req.params.id]);
+  const result = await pool.query('SELECT * FROM incidents WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   const row = result.rows[0];
   if (!row) { res.status(404).json({ error: 'Not found' }); return; }
   res.json(row);
@@ -249,8 +267,8 @@ router.post('/incidents', validate(incidentSchema), async (req: AuthRequest, res
       root_cause, corrective_actions, days_lost, body_part, mechanism, immediate_action,
       date_reported, department, shift, weather_conditions, task_being_performed,
       injured_persons, witnesses, ppe_worn, ppe_adequate, environmental_impact,
-      immediate_actions_taken, area_secured, emergency_services_notified, regulatory_notification)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31)`
+      immediate_actions_taken, area_secured, emergency_services_notified, regulatory_notification, org_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)`
   , [id, b.description ?? null, b.location ?? null, b.date || new Date().toISOString(), b.type ?? null, b.category || 'Near Miss',
     b.severity ?? null, b.status || 'Open', req.user?.id ?? null,
     b.image || (b.images?.[0] ?? null),
@@ -263,11 +281,12 @@ router.post('/incidents', validate(incidentSchema), async (req: AuthRequest, res
     b.ppe_worn ? JSON.stringify(b.ppe_worn) : null,
     b.ppe_adequate != null ? b.ppe_adequate : null,
     b.environmental_impact ?? null, b.immediate_actions_taken ?? null,
-    b.area_secured ? true : false, b.emergency_services_notified ? true : false, b.regulatory_notification ? true : false]);
+    b.area_secured ? true : false, b.emergency_services_notified ? true : false, b.regulatory_notification ? true : false, req.user?.org_id]);
   res.status(201).json({ id, message: 'Incident created' });
 
   // Fire-and-forget notification
   notifyAllManagers({
+    orgId: req.user?.org_id,
     type: b.severity === 'Critical' || b.severity === 'High' ? 'danger' : 'warning',
     title: `New Incident Reported`,
     message: `A ${b.severity || 'new'} ${b.type || 'incident'} has been reported at ${b.location || 'site'}. Description: ${(b.description || '').slice(0, 120)}`,
@@ -342,8 +361,8 @@ router.post('/actions', validate(actionSchema), requirePermission('create_incide
   const { title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, effectiveness } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO actions (id, title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, effectiveness, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',
-    [id, title, description, assignee, due_date, priority || 'Medium', status || 'Open', action_type || 'Corrective', category || 'Other', indicator || 'Lagging', related_incident_id, effectiveness || 'Not Assessed', req.user?.id]
+    'INSERT INTO actions (id, title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, effectiveness, created_by, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',
+    [id, title, description, assignee, due_date, priority || 'Medium', status || 'Open', action_type || 'Corrective', category || 'Other', indicator || 'Lagging', related_incident_id, effectiveness || 'Not Assessed', req.user?.id, req.user?.org_id]
   );
   res.status(201).json({ id });
 
@@ -411,8 +430,8 @@ router.post('/observations', validate(observationSchema), requirePermission('cre
   const { type, category, description, location, date, observer, is_anonymous, immediate_action, images } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO observations (id, type, category, description, location, date, observer, is_anonymous, immediate_action, images, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
-    [id, type, category, description, location, date || new Date().toISOString(), observer, is_anonymous ? 1 : 0, immediate_action, JSON.stringify(images || []), req.user?.id]
+    'INSERT INTO observations (id, type, category, description, location, date, observer, is_anonymous, immediate_action, images, created_by, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
+    [id, type, category, description, location, date || new Date().toISOString(), observer, is_anonymous ? 1 : 0, immediate_action, JSON.stringify(images || []), req.user?.id, req.user?.org_id]
   );
   res.status(201).json({ id });
 });
@@ -443,8 +462,8 @@ router.post('/inspections', validate(inspectionSchema), requirePermission('perfo
   const { template_name, title, date, location, items, score, completed, signature } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO inspections (id, template_name, title, date, location, inspector, items, score, completed, signature) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
-    [id, template_name, title, date, location, req.user?.id, JSON.stringify(items || []), score || 0, completed ? 1 : 0, signature]
+    'INSERT INTO inspections (id, template_name, title, date, location, inspector, items, score, completed, signature, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+    [id, template_name, title, date, location, req.user?.id, JSON.stringify(items || []), score || 0, completed ? 1 : 0, signature, req.user?.org_id]
   );
   res.status(201).json({ id });
 });
@@ -459,8 +478,8 @@ router.post('/permits', validate(permitSchema), requirePermission('create_permit
   const { type, location, description, valid_from, valid_until, requestor, status, controls } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO permits (id, type, location, description, valid_from, valid_until, requestor, status, controls, created_by) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
-    [id, type, location, description, valid_from, valid_until, requestor, status || 'Draft', JSON.stringify(controls || []), req.user?.id]
+    'INSERT INTO permits (id, type, location, description, valid_from, valid_until, requestor, status, controls, created_by, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+    [id, type, location, description, valid_from, valid_until, requestor, status || 'Draft', JSON.stringify(controls || []), req.user?.id, req.user?.org_id]
   );
   res.status(201).json({ id });
 });
@@ -493,6 +512,7 @@ router.put('/permits/:id', validateParams(uuidParamSchema), validate(permitSchem
     }
     // Also notify managers of permit approval/rejection
     notifyAllManagers({
+      orgId: req.user?.org_id,
       type: status === 'Active' ? 'success' : status === 'Rejected' ? 'warning' : 'info',
       title: `Permit ${status}: ${permit?.type || 'Unknown'}`,
       message: `${permit?.type || 'Permit'} at ${permit?.location || 'site'} has been ${status.toLowerCase()}.`,
@@ -514,7 +534,7 @@ router.get('/workers', validateQuery(paginationQuerySchema), async (req: AuthReq
 });
 
 router.get('/workers/:id', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM workers WHERE id = $1', [req.params.id]);
+  const result = await pool.query('SELECT * FROM workers WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   const row = result.rows[0];
   if (!row) { res.status(404).json({ error: 'Worker not found' }); return; }
   res.json(row);
@@ -524,8 +544,8 @@ router.post('/workers', validate(workerSchema), requirePermission('manage_users'
   const { name, role, department, company_id, joined_date, email, phone } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO workers (id, name, role, department, company_id, joined_date, email, phone) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-    [id, name, role, department, company_id, joined_date, email, phone]
+    'INSERT INTO workers (id, name, role, department, company_id, joined_date, email, phone, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+    [id, name, role, department, company_id, joined_date, email, phone, req.user?.org_id]
   );
   res.status(201).json({ id });
 });
@@ -533,14 +553,14 @@ router.post('/workers', validate(workerSchema), requirePermission('manage_users'
 router.put('/workers/:id', validateParams(uuidParamSchema), validate(workerSchema), requirePermission('manage_users'), async (req: AuthRequest, res: Response) => {
   const { name, role, department, email, phone, points, level } = req.body;
   await pool.query(
-    'UPDATE workers SET name=COALESCE($1,name), role=COALESCE($2,role), department=COALESCE($3,department), email=COALESCE($4,email), phone=COALESCE($5,phone), points=COALESCE($6,points), level=COALESCE($7,level) WHERE id=$8',
-    [name, role, department, email, phone, points, level, req.params.id]
+    'UPDATE workers SET name=COALESCE($1,name), role=COALESCE($2,role), department=COALESCE($3,department), email=COALESCE($4,email), phone=COALESCE($5,phone), points=COALESCE($6,points), level=COALESCE($7,level) WHERE id=$8 AND org_id=$9',
+    [name, role, department, email, phone, points, level, req.params.id, req.user?.org_id]
   );
   res.json({ message: 'Updated' });
 });
 
 router.delete('/workers/:id', validateParams(uuidParamSchema), requirePermission('manage_users'), async (req: AuthRequest, res: Response) => {
-  await pool.query('DELETE FROM workers WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM workers WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   res.json({ message: 'Deleted' });
 });
 
@@ -551,7 +571,7 @@ router.get('/contractors', validateQuery(paginationQuerySchema), async (req: Aut
 });
 
 router.get('/contractors/:id', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM contractors WHERE id = $1', [req.params.id]);
+  const result = await pool.query('SELECT * FROM contractors WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   const row = result.rows[0];
   if (!row) { res.status(404).json({ error: 'Contractor not found' }); return; }
   res.json(row);
@@ -561,8 +581,8 @@ router.post('/contractors', validate(contractorSchema), requirePermission('manag
   const { name, contact_person, email, phone, status } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO contractors (id, name, contact_person, email, phone, status) VALUES ($1,$2,$3,$4,$5,$6)',
-    [id, name, contact_person, email, phone, status || 'Pending']
+    'INSERT INTO contractors (id, name, contact_person, email, phone, status, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+    [id, name, contact_person, email, phone, status || 'Pending', req.user?.org_id]
   );
   res.status(201).json({ id });
 });
@@ -572,14 +592,14 @@ router.put('/contractors/:id', validateParams(uuidParamSchema), validate(contrac
   await pool.query(
     `UPDATE contractors SET name=COALESCE($1,name), contact_person=COALESCE($2,contact_person),
      email=COALESCE($3,email), phone=COALESCE($4,phone), status=COALESCE($5,status),
-     updated_at=NOW() WHERE id=$6`,
-    [name, contact_person, email, phone, status, req.params.id]
+     updated_at=NOW() WHERE id=$6 AND org_id=$7`,
+    [name, contact_person, email, phone, status, req.params.id, req.user?.org_id]
   );
   res.json({ message: 'Updated' });
 });
 
 router.delete('/contractors/:id', validateParams(uuidParamSchema), requirePermission('manage_users'), async (req: AuthRequest, res: Response) => {
-  await pool.query('DELETE FROM contractors WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM contractors WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   res.json({ message: 'Deleted' });
 });
 
@@ -590,7 +610,7 @@ router.get('/assets', validateQuery(paginationQuerySchema), async (req: AuthRequ
 });
 
 router.get('/assets/:id', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM assets WHERE id = $1', [req.params.id]);
+  const result = await pool.query('SELECT * FROM assets WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   const row = result.rows[0];
   if (!row) { res.status(404).json({ error: 'Asset not found' }); return; }
   res.json(row);
@@ -600,8 +620,8 @@ router.post('/assets', validate(assetSchema), requirePermission('manage_incident
   const { name, category, model_number, serial_number, location, status, next_inspection_date } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO assets (id, name, category, model_number, serial_number, location, status, next_inspection_date) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-    [id, name, category, model_number, serial_number, location, status || 'Active', next_inspection_date]
+    'INSERT INTO assets (id, name, category, model_number, serial_number, location, status, next_inspection_date, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+    [id, name, category, model_number, serial_number, location, status || 'Active', next_inspection_date, req.user?.org_id]
   );
   res.status(201).json({ id });
 });
@@ -613,14 +633,14 @@ router.put('/assets/:id', validateParams(uuidParamSchema), validate(assetSchema)
      model_number=COALESCE($3,model_number), serial_number=COALESCE($4,serial_number),
      location=COALESCE($5,location), status=COALESCE($6,status),
      next_inspection_date=COALESCE($7,next_inspection_date),
-     updated_at=NOW() WHERE id=$8`,
-    [name, category, model_number, serial_number, location, status, next_inspection_date, req.params.id]
+     updated_at=NOW() WHERE id=$8 AND org_id=$9`,
+    [name, category, model_number, serial_number, location, status, next_inspection_date, req.params.id, req.user?.org_id]
   );
   res.json({ message: 'Updated' });
 });
 
 router.delete('/assets/:id', validateParams(uuidParamSchema), requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
-  await pool.query('DELETE FROM assets WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM assets WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   res.json({ message: 'Deleted' });
 });
 
@@ -631,7 +651,7 @@ router.get('/documents', validateQuery(paginationQuerySchema), async (req: AuthR
 });
 
 router.get('/documents/:id', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM documents WHERE id = $1', [req.params.id]);
+  const result = await pool.query('SELECT * FROM documents WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   const row = result.rows[0];
   if (!row) { res.status(404).json({ error: 'Document not found' }); return; }
   res.json(row);
@@ -641,8 +661,8 @@ router.post('/documents', validate(documentSchema), requirePermission('manage_do
   const { title, category, content, status } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO documents (id, title, category, content, status, uploaded_by) VALUES ($1,$2,$3,$4,$5,$6)',
-    [id, title, category, content, status || 'Draft', req.user?.id]
+    'INSERT INTO documents (id, title, category, content, status, uploaded_by, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+    [id, title, category, content, status || 'Draft', req.user?.id, req.user?.org_id]
   );
   res.status(201).json({ id });
 });
@@ -652,31 +672,32 @@ router.put('/documents/:id', validateParams(uuidParamSchema), validate(documentS
   await pool.query(
     `UPDATE documents SET title=COALESCE($1,title), category=COALESCE($2,category),
      content=COALESCE($3,content), status=COALESCE($4,status),
-     updated_at=NOW() WHERE id=$5`,
-    [title, category, content, status, req.params.id]
+     updated_at=NOW() WHERE id=$5 AND org_id=$6`,
+    [title, category, content, status, req.params.id, req.user?.org_id]
   );
   res.json({ message: 'Updated' });
 });
 
 router.delete('/documents/:id', validateParams(uuidParamSchema), requirePermission('manage_documents'), async (req: AuthRequest, res: Response) => {
-  await pool.query('DELETE FROM documents WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM documents WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   res.json({ message: 'Deleted' });
 });
 
 // ---------- STATS ----------
 
 router.get('/stats', async (req: AuthRequest, res: Response) => {
-  const incidents = (await pool.query('SELECT COUNT(*) as count FROM incidents')).rows[0];
-  const openActions = (await pool.query("SELECT COUNT(*) as count FROM actions WHERE status != 'Done' ")).rows[0];
-  const inspections = (await pool.query('SELECT COUNT(*) as count FROM inspections WHERE completed = 1')).rows[0];
-  const workers = (await pool.query('SELECT COUNT(*) as count FROM workers')).rows[0];
-  const observations = (await pool.query('SELECT COUNT(*) as count FROM observations')).rows[0];
-  const permits = (await pool.query('SELECT COUNT(*) as count FROM permits')).rows[0];
+  const orgId = req.user?.org_id;
+  const incidents = (await pool.query('SELECT COUNT(*) as count FROM incidents WHERE org_id = $1', [orgId])).rows[0];
+  const openActions = (await pool.query("SELECT COUNT(*) as count FROM actions WHERE status != 'Done' AND org_id = $1", [orgId])).rows[0];
+  const inspections = (await pool.query('SELECT COUNT(*) as count FROM inspections WHERE completed = 1 AND org_id = $1', [orgId])).rows[0];
+  const workers = (await pool.query('SELECT COUNT(*) as count FROM workers WHERE org_id = $1', [orgId])).rows[0];
+  const observations = (await pool.query('SELECT COUNT(*) as count FROM observations WHERE org_id = $1', [orgId])).rows[0];
+  const permits = (await pool.query('SELECT COUNT(*) as count FROM permits WHERE org_id = $1', [orgId])).rows[0];
 
-  const severityBreakdown = (await pool.query('SELECT severity as name, COUNT(*) as value FROM incidents GROUP BY severity')).rows;
-  const monthlyTrends = (await pool.query(`SELECT TO_CHAR(date, 'YYYY-MM') as month, COUNT(*) as incidents FROM incidents GROUP BY month ORDER BY month DESC LIMIT 12`)).rows;
-  const statsLogs = (await pool.query('SELECT * FROM stats_logs ORDER BY date DESC LIMIT 30')).rows;
-  const totalManHours = (await pool.query('SELECT COALESCE(SUM(man_hours), 0) as total FROM stats_logs')).rows[0];
+  const severityBreakdown = (await pool.query('SELECT severity as name, COUNT(*) as value FROM incidents WHERE org_id = $1 GROUP BY severity', [orgId])).rows;
+  const monthlyTrends = (await pool.query(`SELECT TO_CHAR(date, 'YYYY-MM') as month, COUNT(*) as incidents FROM incidents WHERE org_id = $1 GROUP BY month ORDER BY month DESC LIMIT 12`, [orgId])).rows;
+  const statsLogs = (await pool.query('SELECT * FROM stats_logs WHERE org_id = $1 ORDER BY date DESC LIMIT 30', [orgId])).rows;
+  const totalManHours = (await pool.query('SELECT COALESCE(SUM(man_hours), 0) as total FROM stats_logs WHERE org_id = $1', [orgId])).rows[0];
 
   res.json({
     totalIncidents: incidents.count,
@@ -696,8 +717,8 @@ router.post('/stats/log', requirePermission('view_analytics'), async (req: AuthR
   const { date, period, man_hours, active_workers, remarks } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO stats_logs (id, date, period, man_hours, active_workers, remarks) VALUES ($1,$2,$3,$4,$5,$6)',
-    [id, date, period || 'Daily', man_hours || 0, active_workers || 0, remarks]
+    'INSERT INTO stats_logs (id, date, period, man_hours, active_workers, remarks, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+    [id, date, period || 'Daily', man_hours || 0, active_workers || 0, remarks, req.user?.org_id]
   );
   res.status(201).json({ id });
 });
@@ -705,7 +726,7 @@ router.post('/stats/log', requirePermission('view_analytics'), async (req: AuthR
 // ---------- EMERGENCY ----------
 
 router.get('/emergency/contacts', async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM emergency_contacts ORDER BY created_at DESC');
+  const result = await pool.query('SELECT * FROM emergency_contacts WHERE org_id = $1 ORDER BY created_at DESC', [req.user?.org_id]);
   res.json(result.rows);
 });
 
@@ -713,19 +734,19 @@ router.post('/emergency/contacts', requirePermission('manage_incidents'), async 
   const { name, role, phone, type, location } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO emergency_contacts (id, name, role, phone, type, location) VALUES ($1,$2,$3,$4,$5,$6)',
-    [id, name, role, phone, type, location]
+    'INSERT INTO emergency_contacts (id, name, role, phone, type, location, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+    [id, name, role, phone, type, location, req.user?.org_id]
   );
   res.status(201).json({ id });
 });
 
 router.delete('/emergency/contacts/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
-  await pool.query('DELETE FROM emergency_contacts WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM emergency_contacts WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   res.json({ message: 'Deleted' });
 });
 
 router.get('/emergency/drills', async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM emergency_drills ORDER BY created_at DESC');
+  const result = await pool.query('SELECT * FROM emergency_drills WHERE org_id = $1 ORDER BY created_at DESC', [req.user?.org_id]);
   res.json(result.rows);
 });
 
@@ -733,8 +754,8 @@ router.post('/emergency/drills', requirePermission('manage_incidents'), async (r
   const { type, date, location, participants_count, duration_minutes, outcome, notes, attendance_list } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO emergency_drills (id, type, date, location, participants_count, duration_minutes, outcome, notes, attendance_list) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-    [id, type, date, location, participants_count, duration_minutes, outcome, notes, JSON.stringify(attendance_list || [])]
+    'INSERT INTO emergency_drills (id, type, date, location, participants_count, duration_minutes, outcome, notes, attendance_list, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+    [id, type, date, location, participants_count, duration_minutes, outcome, notes, JSON.stringify(attendance_list || []), req.user?.org_id]
   );
   res.status(201).json({ id });
 });
@@ -745,9 +766,10 @@ router.get('/risk-assessments', async (req: AuthRequest, res: Response) => {
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
   const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
   const offset = (page - 1) * limit;
-  const countResult = await pool.query('SELECT COUNT(*) as total FROM risk_assessments');
+  const orgId = req.user?.org_id;
+  const countResult = await pool.query('SELECT COUNT(*) as total FROM risk_assessments WHERE org_id = $1', [orgId]);
   const total = countResult.rows[0]?.total || 0;
-  const rowsResult = await pool.query('SELECT * FROM risk_assessments ORDER BY created_at DESC LIMIT $1 OFFSET $2', [limit, offset]);
+  const rowsResult = await pool.query('SELECT * FROM risk_assessments WHERE org_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3', [orgId, limit, offset]);
   const rows = rowsResult.rows;
   res.set('X-Total-Count', String(total));
   res.set('X-Page', String(page));
@@ -757,7 +779,7 @@ router.get('/risk-assessments', async (req: AuthRequest, res: Response) => {
 });
 
 router.get('/risk-assessments/:id', async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM risk_assessments WHERE id = $1', [req.params.id]);
+  const result = await pool.query('SELECT * FROM risk_assessments WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   const row = result.rows[0];
   if (!row) { res.status(404).json({ error: 'Not found' }); return; }
   res.json({ ...row, hazards: JSON.parse(row.hazards || '[]') });
@@ -767,8 +789,8 @@ router.post('/risk-assessments', requirePermission('create_incident'), async (re
   const { title, task_description, taskDescription, type, date, author, hazards, status } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO risk_assessments (id, title, task_description, type, date, author, hazards, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-    [id, title, task_description || taskDescription, type || 'JHA', date || new Date().toISOString(), author || req.user?.name, JSON.stringify(hazards || []), status || 'Draft']
+    'INSERT INTO risk_assessments (id, title, task_description, type, date, author, hazards, status, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+    [id, title, task_description || taskDescription, type || 'JHA', date || new Date().toISOString(), author || req.user?.name, JSON.stringify(hazards || []), status || 'Draft', req.user?.org_id]
   );
   res.status(201).json({ id });
 });
@@ -778,21 +800,21 @@ router.put('/risk-assessments/:id', requirePermission('manage_incidents'), async
   await pool.query(
     `UPDATE risk_assessments SET title=COALESCE($1,title), task_description=COALESCE($2,task_description),
      type=COALESCE($3,type), date=COALESCE($4,date), hazards=COALESCE($5,hazards), status=COALESCE($6,status),
-     updated_at=NOW() WHERE id=$7`,
-    [title, task_description || taskDescription, type, date, hazards ? JSON.stringify(hazards) : null, status, req.params.id]
+     updated_at=NOW() WHERE id=$7 AND org_id=$8`,
+    [title, task_description || taskDescription, type, date, hazards ? JSON.stringify(hazards) : null, status, req.params.id, req.user?.org_id]
   );
   res.json({ message: 'Updated' });
 });
 
 router.delete('/risk-assessments/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
-  await pool.query('DELETE FROM risk_assessments WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM risk_assessments WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   res.json({ message: 'Deleted' });
 });
 
 // ---------- INSPECTION TEMPLATES ----------
 
 router.get('/inspection-templates', async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM inspection_templates ORDER BY created_at DESC');
+  const result = await pool.query('SELECT * FROM inspection_templates WHERE org_id = $1 ORDER BY created_at DESC', [req.user?.org_id]);
   res.json(result.rows.map((r: any) => ({ ...r, items: JSON.parse(r.items || '[]') })));
 });
 
@@ -800,8 +822,8 @@ router.post('/inspection-templates', requirePermission('perform_inspection'), as
   const { name, category, description, items } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO inspection_templates (id, name, category, description, items) VALUES ($1,$2,$3,$4,$5)',
-    [id, name, category, description, JSON.stringify(items || [])]
+    'INSERT INTO inspection_templates (id, name, category, description, items, org_id) VALUES ($1,$2,$3,$4,$5,$6)',
+    [id, name, category, description, JSON.stringify(items || []), req.user?.org_id]
   );
   res.status(201).json({ id });
 });
@@ -809,7 +831,7 @@ router.post('/inspection-templates', requirePermission('perform_inspection'), as
 // ---------- TRAINING MODULES ----------
 
 router.get('/training-modules', async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM training_modules ORDER BY created_at DESC');
+  const result = await pool.query('SELECT * FROM training_modules WHERE org_id = $1 ORDER BY created_at DESC', [req.user?.org_id]);
   res.json(result.rows.map((r: any) => ({ ...r, required_for_roles: JSON.parse(r.required_for_roles || '[]') })));
 });
 
@@ -817,8 +839,8 @@ router.post('/training-modules', requirePermission('manage_users'), async (req: 
   const { title, description, required_for_roles, requiredForRoles, validity_months, validityMonths } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO training_modules (id, title, description, required_for_roles, validity_months) VALUES ($1,$2,$3,$4,$5)',
-    [id, title, description, JSON.stringify(required_for_roles || requiredForRoles || []), validity_months ?? validityMonths ?? 0]
+    'INSERT INTO training_modules (id, title, description, required_for_roles, validity_months, org_id) VALUES ($1,$2,$3,$4,$5,$6)',
+    [id, title, description, JSON.stringify(required_for_roles || requiredForRoles || []), validity_months ?? validityMonths ?? 0, req.user?.org_id]
   );
   res.status(201).json({ id });
 });
@@ -826,7 +848,7 @@ router.post('/training-modules', requirePermission('manage_users'), async (req: 
 // ---------- TRAINING RECORDS ----------
 
 router.get('/training-records', async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM training_records ORDER BY created_at DESC');
+  const result = await pool.query('SELECT * FROM training_records WHERE org_id = $1 ORDER BY created_at DESC', [req.user?.org_id]);
   res.json(result.rows);
 });
 
@@ -834,8 +856,8 @@ router.post('/training-records', requirePermission('manage_users'), async (req: 
   const { worker_id, workerId, module_id, moduleId, module_title, moduleTitle, completion_date, completionDate, expiry_date, expiryDate, certificate_url, certificateUrl, status } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO training_records (id, worker_id, module_id, module_title, completion_date, expiry_date, certificate_url, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-    [id, worker_id || workerId, module_id || moduleId, module_title || moduleTitle, completion_date || completionDate, expiry_date || expiryDate, certificate_url || certificateUrl, status || 'Valid']
+    'INSERT INTO training_records (id, worker_id, module_id, module_title, completion_date, expiry_date, certificate_url, status, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+    [id, worker_id || workerId, module_id || moduleId, module_title || moduleTitle, completion_date || completionDate, expiry_date || expiryDate, certificate_url || certificateUrl, status || 'Valid', req.user?.org_id]
   );
   res.status(201).json({ id });
 });
@@ -843,7 +865,7 @@ router.post('/training-records', requirePermission('manage_users'), async (req: 
 // ---------- PPE INVENTORY ----------
 
 router.get('/ppe/inventory', async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM ppe_inventory ORDER BY created_at DESC');
+  const result = await pool.query('SELECT * FROM ppe_inventory WHERE org_id = $1 ORDER BY created_at DESC', [req.user?.org_id]);
   res.json(result.rows);
 });
 
@@ -851,8 +873,8 @@ router.post('/ppe/inventory', requirePermission('manage_incidents'), async (req:
   const { name, category, stock_quantity, stockQuantity, min_stock_threshold, minStockThreshold, description } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO ppe_inventory (id, name, category, stock_quantity, min_stock_threshold, description) VALUES ($1,$2,$3,$4,$5,$6)',
-    [id, name, category, stock_quantity ?? stockQuantity ?? 0, min_stock_threshold ?? minStockThreshold ?? 5, description]
+    'INSERT INTO ppe_inventory (id, name, category, stock_quantity, min_stock_threshold, description, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+    [id, name, category, stock_quantity ?? stockQuantity ?? 0, min_stock_threshold ?? minStockThreshold ?? 5, description, req.user?.org_id]
   );
   res.status(201).json({ id });
 });
@@ -860,8 +882,8 @@ router.post('/ppe/inventory', requirePermission('manage_incidents'), async (req:
 router.put('/ppe/inventory/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
   const { stock_quantity, stockQuantity, name, category } = req.body;
   await pool.query(
-    'UPDATE ppe_inventory SET stock_quantity=COALESCE($1,stock_quantity), name=COALESCE($2,name), category=COALESCE($3,category) WHERE id=$4',
-    [stock_quantity ?? stockQuantity, name, category, req.params.id]
+    'UPDATE ppe_inventory SET stock_quantity=COALESCE($1,stock_quantity), name=COALESCE($2,name), category=COALESCE($3,category) WHERE id=$4 AND org_id=$5',
+    [stock_quantity ?? stockQuantity, name, category, req.params.id, req.user?.org_id]
   );
   res.json({ message: 'Updated' });
 });
@@ -869,7 +891,7 @@ router.put('/ppe/inventory/:id', requirePermission('manage_incidents'), async (r
 // ---------- PPE ISSUANCE ----------
 
 router.get('/ppe/issuance', async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM ppe_issuance ORDER BY created_at DESC');
+  const result = await pool.query('SELECT * FROM ppe_issuance WHERE org_id = $1 ORDER BY created_at DESC', [req.user?.org_id]);
   res.json(result.rows);
 });
 
@@ -878,8 +900,8 @@ router.post('/ppe/issuance', requirePermission('manage_incidents'), async (req: 
   const id = uuid();
   const ppeId = ppe_item_id || ppeItemId;
   await pool.query(
-    'INSERT INTO ppe_issuance (id, worker_id, worker_name, ppe_item_id, ppe_item_name, issue_date, expiry_date, signature_url, status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-    [id, worker_id || workerId, worker_name || workerName, ppeId, ppe_item_name || ppeItemName, issue_date || issueDate, expiry_date || expiryDate, signature_url || signatureUrl, status || 'Active']
+    'INSERT INTO ppe_issuance (id, worker_id, worker_name, ppe_item_id, ppe_item_name, issue_date, expiry_date, signature_url, status, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+    [id, worker_id || workerId, worker_name || workerName, ppeId, ppe_item_name || ppeItemName, issue_date || issueDate, expiry_date || expiryDate, signature_url || signatureUrl, status || 'Active', req.user?.org_id]
   );
   // Deduct stock
   if (ppeId) {
@@ -890,10 +912,10 @@ router.post('/ppe/issuance', requirePermission('manage_incidents'), async (req: 
 
 router.put('/ppe/issuance/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
   const { status } = req.body;
-  const logResult = await pool.query('SELECT * FROM ppe_issuance WHERE id = $1', [req.params.id]);
+  const logResult = await pool.query('SELECT * FROM ppe_issuance WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   const log = logResult.rows[0];
   if (!log) { res.status(404).json({ error: 'Not found' }); return; }
-  await pool.query('UPDATE ppe_issuance SET status = $1 WHERE id = $2', [status, req.params.id]);
+  await pool.query('UPDATE ppe_issuance SET status = $1 WHERE id = $2 AND org_id = $3', [status, req.params.id, req.user?.org_id]);
   // Return stock if returning
   if (status === 'Returned' && log.status === 'Active') {
     await pool.query('UPDATE ppe_inventory SET stock_quantity = stock_quantity + 1 WHERE id = $1', [log.ppe_item_id]);
@@ -942,7 +964,7 @@ router.delete('/roles/:id', requirePermission('manage_roles'), async (req: AuthR
 // ---------- SAFETY ZONES ----------
 
 router.get('/safety-zones', async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM safety_zones ORDER BY created_at DESC');
+  const result = await pool.query('SELECT * FROM safety_zones WHERE org_id = $1 ORDER BY created_at DESC', [req.user?.org_id]);
   res.json(result.rows.map((r: any) => ({ ...r, required_ppe: JSON.parse(r.required_ppe || '[]'), required_training: JSON.parse(r.required_training || '[]') })));
 });
 
@@ -950,39 +972,40 @@ router.post('/safety-zones', requirePermission('manage_incidents'), async (req: 
   const { name, type, lat, lng, radius, required_ppe, requiredPPE, required_training, requiredTraining } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO safety_zones (id, name, type, lat, lng, radius, required_ppe, required_training) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)',
-    [id, name, type || 'Safe', lat, lng, radius || 100, JSON.stringify(required_ppe || requiredPPE || []), JSON.stringify(required_training || requiredTraining || [])]
+    'INSERT INTO safety_zones (id, name, type, lat, lng, radius, required_ppe, required_training, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+    [id, name, type || 'Safe', lat, lng, radius || 100, JSON.stringify(required_ppe || requiredPPE || []), JSON.stringify(required_training || requiredTraining || []), req.user?.org_id]
   );
   res.status(201).json({ id });
 });
 
 router.delete('/safety-zones/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
-  await pool.query('DELETE FROM safety_zones WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM safety_zones WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   res.json({ message: 'Deleted' });
 });
 
 // ---------- HSE METRICS (Calculated) ----------
 
 router.get('/metrics', async (req: AuthRequest, res: Response) => {
+  const orgId = req.user?.org_id;
   const [totalIncidents, ltiCount, rwcCount, mtcCount, facCount, nmCount, fatalityCount, totalDaysLost, totalManHours, totalActions, closedActions, totalInspections, passedInspections, leadingActions, leadingClosed, laggingActions, laggingClosed, inspectionsCompleted] = await Promise.all([
-    pool.query('SELECT COUNT(*) as c FROM incidents'),
-    pool.query("SELECT COUNT(*) as c FROM incidents WHERE category = 'Lost Time Injury' OR type = 'Lost Time Injury'"),
-    pool.query("SELECT COUNT(*) as c FROM incidents WHERE category = 'Restricted Work Case' OR type = 'Restricted Work Case'"),
-    pool.query("SELECT COUNT(*) as c FROM incidents WHERE category = 'Medical Treatment Case' OR type = 'Medical Treatment'"),
-    pool.query("SELECT COUNT(*) as c FROM incidents WHERE category = 'First Aid Case' OR type = 'First Aid'"),
-    pool.query("SELECT COUNT(*) as c FROM incidents WHERE category = 'Near Miss' OR type = 'Near Miss'"),
-    pool.query("SELECT COUNT(*) as c FROM incidents WHERE category = 'Fatality'"),
-    pool.query('SELECT COALESCE(SUM(days_lost),0) as t FROM incidents'),
-    pool.query('SELECT COALESCE(SUM(man_hours),0) as t FROM stats_logs'),
-    pool.query('SELECT COUNT(*) as c FROM actions'),
-    pool.query("SELECT COUNT(*) as c FROM actions WHERE status IN ('Done','Verified')"),
-    pool.query('SELECT COUNT(*) as c FROM inspections'),
-    pool.query('SELECT COUNT(*) as c FROM inspections WHERE score >= 80'),
-    pool.query("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Leading'"),
-    pool.query("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Leading' AND status IN ('Done','Verified')"),
-    pool.query("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Lagging'"),
-    pool.query("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Lagging' AND status IN ('Done','Verified')"),
-    pool.query('SELECT COUNT(*) as c FROM inspections WHERE completed = 1'),
+    pool.query('SELECT COUNT(*) as c FROM incidents WHERE org_id = $1', [orgId]),
+    pool.query("SELECT COUNT(*) as c FROM incidents WHERE (category = 'Lost Time Injury' OR type = 'Lost Time Injury') AND org_id = $1", [orgId]),
+    pool.query("SELECT COUNT(*) as c FROM incidents WHERE (category = 'Restricted Work Case' OR type = 'Restricted Work Case') AND org_id = $1", [orgId]),
+    pool.query("SELECT COUNT(*) as c FROM incidents WHERE (category = 'Medical Treatment Case' OR type = 'Medical Treatment') AND org_id = $1", [orgId]),
+    pool.query("SELECT COUNT(*) as c FROM incidents WHERE (category = 'First Aid Case' OR type = 'First Aid') AND org_id = $1", [orgId]),
+    pool.query("SELECT COUNT(*) as c FROM incidents WHERE (category = 'Near Miss' OR type = 'Near Miss') AND org_id = $1", [orgId]),
+    pool.query("SELECT COUNT(*) as c FROM incidents WHERE category = 'Fatality' AND org_id = $1", [orgId]),
+    pool.query('SELECT COALESCE(SUM(days_lost),0) as t FROM incidents WHERE org_id = $1', [orgId]),
+    pool.query('SELECT COALESCE(SUM(man_hours),0) as t FROM stats_logs WHERE org_id = $1', [orgId]),
+    pool.query('SELECT COUNT(*) as c FROM actions WHERE org_id = $1', [orgId]),
+    pool.query("SELECT COUNT(*) as c FROM actions WHERE status IN ('Done','Verified') AND org_id = $1", [orgId]),
+    pool.query('SELECT COUNT(*) as c FROM inspections WHERE org_id = $1', [orgId]),
+    pool.query('SELECT COUNT(*) as c FROM inspections WHERE score >= 80 AND org_id = $1', [orgId]),
+    pool.query("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Leading' AND org_id = $1", [orgId]),
+    pool.query("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Leading' AND status IN ('Done','Verified') AND org_id = $1", [orgId]),
+    pool.query("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Lagging' AND org_id = $1", [orgId]),
+    pool.query("SELECT COUNT(*) as c FROM actions WHERE indicator = 'Lagging' AND status IN ('Done','Verified') AND org_id = $1", [orgId]),
+    pool.query('SELECT COUNT(*) as c FROM inspections WHERE completed = 1 AND org_id = $1', [orgId]),
   ]);
 
   const totalIncidentsVal = Number(totalIncidents.rows[0]?.c || 0);
@@ -1066,12 +1089,12 @@ router.post('/incidents/bulk-delete', requirePermission('DeleteIncidents'), asyn
   }
   // Non-privileged users can only delete their own records
   if (isPrivilegedRole(req.user?.role)) {
-    const params = ids.map((_, i) => `$${i + 1}`).join(',');
-    const result = await pool.query(`DELETE FROM incidents WHERE id IN (${params})`, ids);
+    const params = ids.map((_: any, i: number) => `$${i + 2}`).join(',');
+    const result = await pool.query(`DELETE FROM incidents WHERE id IN (${params}) AND org_id = $1`, [req.user?.org_id, ...ids]);
     res.json({ deleted: result.rowCount, message: `${result.rowCount} incident(s) deleted` });
   } else {
-    const params = ids.map((_, i) => `$${i + 2}`).join(',');
-    const result = await pool.query(`DELETE FROM incidents WHERE id IN (${params}) AND reported_by = $1`, [req.user?.id, ...ids]);
+    const params = ids.map((_: any, i: number) => `$${i + 3}`).join(',');
+    const result = await pool.query(`DELETE FROM incidents WHERE id IN (${params}) AND reported_by = $1 AND org_id = $2`, [req.user?.id, req.user?.org_id, ...ids]);
     res.json({ deleted: result.rowCount, message: `${result.rowCount} incident(s) deleted` });
   }
 });
@@ -1090,12 +1113,12 @@ router.post('/incidents/bulk-status', requirePermission('EditIncidents'), async 
   }
   // Non-privileged users can only update their own records
   if (isPrivilegedRole(req.user?.role)) {
-    const params = ids.map((_, i) => `$${i + 2}`).join(',');
-    const result = await pool.query(`UPDATE incidents SET status = $1, updated_at = NOW() WHERE id IN (${params})`, [status, ...ids]);
+    const params = ids.map((_: any, i: number) => `$${i + 3}`).join(',');
+    const result = await pool.query(`UPDATE incidents SET status = $1, updated_at = NOW() WHERE id IN (${params}) AND org_id = $2`, [status, req.user?.org_id, ...ids]);
     res.json({ updated: result.rowCount, message: `${result.rowCount} incident(s) updated to ${status}` });
   } else {
-    const params = ids.map((_, i) => `$${i + 3}`).join(',');
-    const result = await pool.query(`UPDATE incidents SET status = $1, updated_at = NOW() WHERE id IN (${params}) AND reported_by = $2`, [status, req.user?.id, ...ids]);
+    const params = ids.map((_: any, i: number) => `$${i + 4}`).join(',');
+    const result = await pool.query(`UPDATE incidents SET status = $1, updated_at = NOW() WHERE id IN (${params}) AND reported_by = $2 AND org_id = $3`, [status, req.user?.id, req.user?.org_id, ...ids]);
     res.json({ updated: result.rowCount, message: `${result.rowCount} incident(s) updated to ${status}` });
   }
 });
@@ -1110,12 +1133,12 @@ router.post('/actions/bulk-delete', requirePermission('DeleteActions'), async (r
     return res.status(400).json({ error: 'Maximum 100 items per bulk operation' });
   }
   if (isPrivilegedRole(req.user?.role)) {
-    const params = ids.map((_, i) => `$${i + 1}`).join(',');
-    const result = await pool.query(`DELETE FROM actions WHERE id IN (${params})`, ids);
+    const params = ids.map((_: any, i: number) => `$${i + 2}`).join(',');
+    const result = await pool.query(`DELETE FROM actions WHERE id IN (${params}) AND org_id = $1`, [req.user?.org_id, ...ids]);
     res.json({ deleted: result.rowCount, message: `${result.rowCount} action(s) deleted` });
   } else {
-    const params = ids.map((_, i) => `$${i + 2}`).join(',');
-    const result = await pool.query(`DELETE FROM actions WHERE id IN (${params}) AND (created_by = $1 OR assignee = $1)`, [req.user?.id, ...ids]);
+    const params = ids.map((_: any, i: number) => `$${i + 3}`).join(',');
+    const result = await pool.query(`DELETE FROM actions WHERE id IN (${params}) AND (created_by = $1 OR assignee = $1) AND org_id = $2`, [req.user?.id, req.user?.org_id, ...ids]);
     res.json({ deleted: result.rowCount, message: `${result.rowCount} action(s) deleted` });
   }
 });
@@ -1130,12 +1153,12 @@ router.post('/actions/bulk-complete', requirePermission('EditActions'), async (r
     return res.status(400).json({ error: 'Maximum 100 items per bulk operation' });
   }
   if (isPrivilegedRole(req.user?.role)) {
-    const params = ids.map((_, i) => `$${i + 1}`).join(',');
-    const result = await pool.query(`UPDATE actions SET status = 'Completed', completed_date = NOW() WHERE id IN (${params}) AND status != 'Completed'`, ids);
+    const params = ids.map((_: any, i: number) => `$${i + 2}`).join(',');
+    const result = await pool.query(`UPDATE actions SET status = 'Completed', completed_date = NOW() WHERE id IN (${params}) AND status != 'Completed' AND org_id = $1`, [req.user?.org_id, ...ids]);
     res.json({ updated: result.rowCount, message: `${result.rowCount} action(s) completed` });
   } else {
-    const params = ids.map((_, i) => `$${i + 2}`).join(',');
-    const result = await pool.query(`UPDATE actions SET status = 'Completed', completed_date = NOW() WHERE id IN (${params}) AND status != 'Completed' AND (created_by = $1 OR assignee = $1)`, [req.user?.id, ...ids]);
+    const params = ids.map((_: any, i: number) => `$${i + 3}`).join(',');
+    const result = await pool.query(`UPDATE actions SET status = 'Completed', completed_date = NOW() WHERE id IN (${params}) AND status != 'Completed' AND (created_by = $1 OR assignee = $1) AND org_id = $2`, [req.user?.id, req.user?.org_id, ...ids]);
     res.json({ updated: result.rowCount, message: `${result.rowCount} action(s) completed` });
   }
 });
@@ -1150,12 +1173,12 @@ router.post('/observations/bulk-delete', requirePermission('DeleteObservations')
     return res.status(400).json({ error: 'Maximum 100 items per bulk operation' });
   }
   if (isPrivilegedRole(req.user?.role)) {
-    const params = ids.map((_, i) => `$${i + 1}`).join(',');
-    const result = await pool.query(`DELETE FROM observations WHERE id IN (${params})`, ids);
+    const params = ids.map((_: any, i: number) => `$${i + 2}`).join(',');
+    const result = await pool.query(`DELETE FROM observations WHERE id IN (${params}) AND org_id = $1`, [req.user?.org_id, ...ids]);
     res.json({ deleted: result.rowCount, message: `${result.rowCount} observation(s) deleted` });
   } else {
-    const params = ids.map((_, i) => `$${i + 2}`).join(',');
-    const result = await pool.query(`DELETE FROM observations WHERE id IN (${params}) AND created_by = $1`, [req.user?.id, ...ids]);
+    const params = ids.map((_: any, i: number) => `$${i + 3}`).join(',');
+    const result = await pool.query(`DELETE FROM observations WHERE id IN (${params}) AND created_by = $1 AND org_id = $2`, [req.user?.id, req.user?.org_id, ...ids]);
     res.json({ deleted: result.rowCount, message: `${result.rowCount} observation(s) deleted` });
   }
 });
@@ -1176,18 +1199,18 @@ router.post('/bulk-export', requirePermission('view_analytics'), async (req: Aut
   // Non-privileged users can only export their own records
   const ownerConfig = BULK_OWNER_COLUMNS[entity];
   if (!isPrivilegedRole(req.user?.role) && ownerConfig) {
-    const idParams = ids.map((_, i) => `$${i + 2}`).join(',');
+    const idParams = ids.map((_: any, i: number) => `$${i + 3}`).join(',');
     const ownerClause = ownerConfig.altCol
       ? `(${ownerConfig.col} = $1 OR ${ownerConfig.altCol} = $1)`
       : `${ownerConfig.col} = $1`;
     const result = await pool.query(
-      `SELECT * FROM ${entity} WHERE id IN (${idParams}) AND ${ownerClause}`,
-      [req.user?.id, ...ids]
+      `SELECT * FROM ${entity} WHERE id IN (${idParams}) AND ${ownerClause} AND org_id = $2`,
+      [req.user?.id, req.user?.org_id, ...ids]
     );
     res.json(result.rows);
   } else {
-    const params = ids.map((_, i) => `$${i + 1}`).join(',');
-    const result = await pool.query(`SELECT * FROM ${entity} WHERE id IN (${params})`, ids);
+    const params = ids.map((_: any, i: number) => `$${i + 2}`).join(',');
+    const result = await pool.query(`SELECT * FROM ${entity} WHERE id IN (${params}) AND org_id = $1`, [req.user?.org_id, ...ids]);
     res.json(result.rows);
   }
 });

@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getRoles } from '../services/storageService';
 import { Role, UserRoles } from '../types';
-import { Loader2, ShieldCheck, Lock, Mail, User, Briefcase, AlertCircle, ArrowLeft, HardHat, CheckSquare } from 'lucide-react';
+import { Loader2, ShieldCheck, Lock, Mail, User, Briefcase, AlertCircle, ArrowLeft, HardHat, CheckSquare, Building2 } from 'lucide-react';
 
 export const Register: React.FC = () => {
   const [name, setName] = useState('');
@@ -12,6 +12,7 @@ export const Register: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState(UserRoles.WORKER);
+  const [organizationName, setOrganizationName] = useState('');
   const [availableRoles, setAvailableRoles] = useState<Role[]>([]);
   const [agreed, setAgreed] = useState(false);
   
@@ -19,6 +20,8 @@ export const Register: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const inviteToken = searchParams.get('invite') || undefined;
 
   useEffect(() => {
       getRoles().then(roles => {
@@ -55,7 +58,7 @@ export const Register: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const result = await register(name, email, password, role);
+      const result = await register(name, email, password, role, organizationName || undefined, inviteToken);
       if (result === 'verification_required') {
         navigate('/verify-email');
       } else if (result === true) {
@@ -151,6 +154,29 @@ export const Register: React.FC = () => {
               <Briefcase className="absolute left-3 top-2.5 text-slate-400" size={18} />
             </div>
           </div>
+
+          {!inviteToken && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-700 uppercase">Organization Name</label>
+              <div className="relative">
+                <input 
+                  type="text" 
+                  value={organizationName}
+                  onChange={(e) => setOrganizationName(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
+                  placeholder="Your company name (optional)"
+                />
+                <Building2 className="absolute left-3 top-2.5 text-slate-400" size={18} />
+              </div>
+              <p className="text-xs text-slate-400">Leave blank to create a personal workspace.</p>
+            </div>
+          )}
+
+          {inviteToken && (
+            <div className="bg-blue-50 text-blue-700 text-sm p-3 rounded-lg border border-blue-100">
+              You've been invited to join an organization. Complete registration to accept.
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
