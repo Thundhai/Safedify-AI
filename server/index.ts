@@ -143,16 +143,6 @@ const aiLimiter = sessionRateLimit({
   legacyHeaders: false,
 });
 
-// Global hourly AI cap (IP-based, limits total Gemini API usage across all users)
-const globalAiLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000,  // 1 hour
-  max: isProduction ? 50 : 500,  // 50 AI calls per IP per hour
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: rateLimitLogger,
-  message: { error: 'AI usage limit reached. Please try again later.' },
-});
-
 // ---------- CORS ----------
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim())
@@ -230,8 +220,8 @@ app.get('/api/health', async (_req, res) => {
 app.use('/api/auth', authLimiter, loginRateLimiter(), authRoutes);
 app.use('/api/auth/2fa', authLimiter, twoFactorRoutes);
 app.use('/api', apiLimiter, dataRoutes);
-app.use('/api/agent', globalAiLimiter, aiGenerationLimiter(), agentRoutes);
-app.use('/api/ai', globalAiLimiter, aiGenerationLimiter(), aiRoutes);
+app.use('/api/agent', aiGenerationLimiter(), agentRoutes);
+app.use('/api/ai', aiGenerationLimiter(), aiRoutes);
 app.use('/api/notifications', apiLimiter, notificationRoutes);
 app.use('/api/environmental', apiLimiter, environmentalRoutes);
 app.use('/api/uploads', apiLimiter, uploadRoutes);
