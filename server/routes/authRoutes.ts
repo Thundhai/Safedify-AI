@@ -157,15 +157,8 @@ router.post('/login', validate(loginSchema), async (req: AuthRequest, res: Respo
       return;
     }
 
-    // Check email verification (skip for existing users who registered before verification was required)
-    const requireVerification = process.env.REQUIRE_EMAIL_VERIFICATION === 'true';
-    if (requireVerification && row.email_verified === false && row.email_verification_token) {
-      res.status(403).json({ 
-        error: 'Please verify your email address before logging in. Check your inbox for the verification link.',
-        requiresVerification: true
-      });
-      return;
-    }
+    // Email verification check disabled for demo
+    // Existing unverified users can log in without issues
 
     // Reset failed login attempts on successful login
     await resetFailedLogins(row.id);
@@ -230,10 +223,10 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
     const id = uuid();
     const avatar = name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
 
-    // Email verification setup
-    const requireVerification = process.env.REQUIRE_EMAIL_VERIFICATION === 'true';
-    const verificationToken = requireVerification ? generateSecureToken() : null;
-    const verificationExpires = requireVerification ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
+    // Email verification setup – disabled for demo (no email service configured)
+    const requireVerification = false;
+    const verificationToken = null;
+    const verificationExpires = null;
 
     await pool.query(
       `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, email_verified, email_verification_token, email_verification_expires, password_changed_at) 
