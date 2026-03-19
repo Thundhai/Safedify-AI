@@ -46,7 +46,7 @@ const ABUSE_CONFIG = {
   api: {
     windowMs: 60 * 1000,          // 1 minute
     maxRequests: 60,              // Per IP
-    scrapeThreshold: 100,         // Requests/min to flag as scraping
+    scrapeThreshold: 300,         // Requests/min to flag as scraping (SPA makes many parallel calls)
   },
   // Bot detection thresholds
   bot: {
@@ -444,6 +444,11 @@ export function aiGenerationLimiter(): RateLimitRequestHandler {
  */
 export function antiScrapingProtection() {
   return (req: Request, res: Response, next: NextFunction) => {
+    // Skip scraping check for auth endpoints (they have dedicated rate limiters)
+    if (req.path.startsWith('/api/auth')) {
+      return next();
+    }
+
     const ip = getClientIp(req);
     const tracker = ipTrackers.get(ip);
     
