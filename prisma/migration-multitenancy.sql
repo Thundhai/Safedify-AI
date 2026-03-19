@@ -96,7 +96,11 @@ SET owner_id = (SELECT id FROM users WHERE role = 'Admin' ORDER BY created_at AS
 WHERE id = '00000000-0000-0000-0000-000000000001' AND owner_id IS NULL;
 
 -- 7. Add the foreign key constraint for organizations.owner_id
-ALTER TABLE organizations ADD CONSTRAINT IF NOT EXISTS fk_organizations_owner FOREIGN KEY (owner_id) REFERENCES users(id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_organizations_owner') THEN
+    ALTER TABLE organizations ADD CONSTRAINT fk_organizations_owner FOREIGN KEY (owner_id) REFERENCES users(id);
+  END IF;
+END $$;
 
 -- 8. Create indexes for org_id on all tables
 CREATE INDEX IF NOT EXISTS idx_users_org ON users(org_id);
