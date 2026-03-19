@@ -973,6 +973,12 @@ export const getRoles = async (): Promise<Role[]> => {
     return [
       { id: 'role-admin', name: UserRoles.ADMIN, description: 'Full system access.', isSystem: true, permissions: ['manage_roles','manage_users','view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','approve_permit','manage_documents','ai_features'] },
       { id: 'role-manager', name: UserRoles.MANAGER, description: 'HSE Dept Lead.', isSystem: true, permissions: ['manage_users','view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','approve_permit','manage_documents','ai_features'] },
+      { id: 'role-supervisor', name: UserRoles.SUPERVISOR, description: 'HSE Supervisor.', isSystem: true, permissions: ['view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','manage_documents','ai_features'] },
+      { id: 'role-officer', name: UserRoles.OFFICER, description: 'HSE Officer.', isSystem: true, permissions: ['view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','manage_documents','ai_features'] },
+      { id: 'role-engineer', name: UserRoles.ENGINEER, description: 'Site Engineer.', isSystem: true, permissions: ['view_analytics','create_incident','perform_inspection','create_permit','manage_documents'] },
+      { id: 'role-site-supervisor', name: UserRoles.SITE_SUPERVISOR, description: 'Site Supervisor.', isSystem: true, permissions: ['view_analytics','create_incident','manage_incidents','perform_inspection','create_permit'] },
+      { id: 'role-construction-manager', name: UserRoles.CONSTRUCTION_MANAGER, description: 'Construction Manager.', isSystem: true, permissions: ['view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','approve_permit','manage_documents'] },
+      { id: 'role-operations-manager', name: UserRoles.OPERATIONS_MANAGER, description: 'Operations Manager.', isSystem: true, permissions: ['view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','approve_permit','manage_documents','ai_features'] },
       { id: 'role-worker', name: UserRoles.WORKER, description: 'General staff.', isSystem: true, permissions: ['create_incident'] },
     ];
   }

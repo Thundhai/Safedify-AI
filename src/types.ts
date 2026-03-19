@@ -29,6 +29,10 @@ export const UserRoles = {
   ADVISOR: 'HSE Advisor',
   COORDINATOR: 'HSE Coordinator',
   TECHNICIAN: 'HSE Technician',
+  ENGINEER: 'Engineer',
+  SITE_SUPERVISOR: 'Site Supervisor',
+  CONSTRUCTION_MANAGER: 'Construction Manager',
+  OPERATIONS_MANAGER: 'Operations Manager',
   WORKER: 'Worker',
   EXECUTIVE: 'Executive Management'
 };
