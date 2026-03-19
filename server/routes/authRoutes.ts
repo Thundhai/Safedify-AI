@@ -24,7 +24,7 @@ const registerSchema: ValidationSchema = {
   name: { type: 'string', required: true, minLength: 2, maxLength: 100 },
   email: { type: 'email', required: true, maxLength: 255 },
   password: { type: 'string', required: true, minLength: 8, maxLength: 128, allowInjection: true },
-  role: { type: 'string', enum: ['Worker', 'HSE Supervisor', 'Manager', 'Admin'] },
+  role: { type: 'string', enum: ['Worker', 'HSE Supervisor', 'HSE Manager', 'HSE Officer', 'HSE Advisor', 'HSE Coordinator', 'HSE Technician', 'Manager', 'Admin', 'Executive Management'] },
 };
 
 const tokenSchema: ValidationSchema = {
@@ -215,8 +215,8 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
       return;
     }
 
-    // Restrict self-registration to safe roles only
-    const allowedSelfRegRoles = ['Worker', 'HSE Supervisor'];
+    // Restrict self-registration to safe roles only (no Admin or Executive)
+    const allowedSelfRegRoles = ['Worker', 'HSE Supervisor', 'HSE Manager', 'HSE Officer', 'HSE Advisor', 'HSE Coordinator', 'HSE Technician'];
     const safeRole = (role && allowedSelfRegRoles.includes(role)) ? role : 'Worker';
 
     const { rows: existingRows } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
