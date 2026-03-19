@@ -12,6 +12,7 @@ import { Layout } from './components/Layout';
 // Auth pages (not lazy — first interaction)
 import { Login } from './components/Login';
 import { Register } from './components/Register';
+import { VerifyEmail } from './components/VerifyEmail';
 import { LandingPage } from './components/LandingPage';
 
 /**
@@ -182,6 +183,7 @@ function App() {
             <Route path="/plans" element={<PublicPricing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/terms" element={<LegalPage />} />

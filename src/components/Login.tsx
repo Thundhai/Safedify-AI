@@ -28,8 +28,13 @@ export const Login: React.FC = () => {
       } else {
         setError('Invalid email or password. Please try again.');
       }
-    } catch (err) {
-      setError('An error occurred during login.');
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.toLowerCase().includes('verify your email')) {
+        setError('Please verify your email before logging in. Check your inbox for the verification link.');
+      } else {
+        setError(msg || 'An error occurred during login.');
+      }
     } finally {
       setIsSubmitting(false);
     }

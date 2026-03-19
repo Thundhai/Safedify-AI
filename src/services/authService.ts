@@ -40,7 +40,7 @@ export const login = async (email: string, password: string): Promise<AuthUser |
         return null;
     } catch (error: any) {
         console.error('Login failed:', error.message);
-        return null;
+        throw error;
     }
 };
 
@@ -68,9 +68,15 @@ export const completeLoginWith2FA = async (token: string): Promise<AuthUser | nu
     }
 };
 
-export const register = async (name: string, email: string, password: string, role: UserRole): Promise<AuthUser | null> => {
+export const register = async (name: string, email: string, password: string, role: UserRole): Promise<AuthUser | null | 'verification_required'> => {
     try {
         const data = await apiRegister(name, email, password, role);
+        
+        // Email verification required — user must check inbox
+        if (data.requiresVerification) {
+            return 'verification_required';
+        }
+        
         if (data.token && data.user) {
             const user: AuthUser = {
                 id: data.user.id,

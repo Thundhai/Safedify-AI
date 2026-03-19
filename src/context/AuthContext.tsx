@@ -9,7 +9,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<boolean | '2fa_required'>;
   loginWith2FA: (token: string) => Promise<boolean>;
-  register: (name: string, email: string, password: string, role: UserRole) => Promise<boolean>;
+  register: (name: string, email: string, password: string, role: UserRole) => Promise<boolean | 'verification_required'>;
   logout: () => void;
   loading: boolean;
   checkPermission: (permission: Permission) => boolean;
@@ -59,14 +59,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean | '2fa_required'> => {
-    const result = await authLogin(email, password);
-    if (result === '2fa_required') return '2fa_required';
-    if (result && typeof result === 'object') {
-      setUser(result);
-      await loadRoles();
-      return true;
+    try {
+      const result = await authLogin(email, password);
+      if (result === '2fa_required') return '2fa_required';
+      if (result && typeof result === 'object') {
+        setUser(result);
+        await loadRoles();
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
     }
-    return false;
   };
 
   const loginWith2FA = async (token: string): Promise<boolean> => {
@@ -79,11 +83,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return false;
   };
 
-  const register = async (name: string, email: string, password: string, role: UserRole): Promise<boolean> => {
+  const register = async (name: string, email: string, password: string, role: UserRole): Promise<boolean | 'verification_required'> => {
       try {
-          const registeredUser = await authRegister(name, email, password, role);
-          if (registeredUser) {
-              setUser(registeredUser);
+          const result = await authRegister(name, email, password, role);
+          if (result === 'verification_required') return 'verification_required';
+          if (result && typeof result === 'object') {
+              setUser(result);
               await loadRoles();
               return true;
           }

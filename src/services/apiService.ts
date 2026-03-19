@@ -82,7 +82,7 @@ export const apiRegister = async (name: string, email: string, password: string,
     method: 'POST',
     body: JSON.stringify({ name, email, password, role }),
   });
-  setAuthToken(data.token);
+  if (data.token) setAuthToken(data.token);
   return data;
 };
 

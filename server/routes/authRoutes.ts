@@ -7,7 +7,7 @@ import {
   LOCKOUT_CONFIG, validatePasswordStrength, generateSecureToken, hashToken
 } from '../auth.js';
 import { logAudit } from './auditRoutes.js';
-import { sendEmail } from '../services/emailService.js';
+import { sendEmail, isEmailConfigured } from '../services/emailService.js';
 import { logAuthSuccess, logAuthFailure, logSecurityEvent, getClientIp } from '../middleware/securityLogger.js';
 import { registrationRateLimiter, honeypotProtection, recordLoginSuccess } from '../middleware/abuseProtection.js';
 import { validate, ValidationSchema } from '../middleware/inputValidation.js';
@@ -157,8 +157,15 @@ router.post('/login', validate(loginSchema), async (req: AuthRequest, res: Respo
       return;
     }
 
-    // Email verification check disabled for demo
-    // Existing unverified users can log in without issues
+    // Block login for unverified users (only when email service is configured)
+    if (isEmailConfigured && row.email_verified === false && row.email_verification_token) {
+      res.status(403).json({ 
+        error: 'Please verify your email address before logging in. Check your inbox for the verification link.',
+        requiresVerification: true,
+        email: row.email
+      });
+      return;
+    }
 
     // Reset failed login attempts on successful login
     await resetFailedLogins(row.id);
@@ -228,10 +235,10 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
     const id = uuid();
     const avatar = name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
 
-    // Email verification setup – disabled for demo (no email service configured)
-    const requireVerification = false;
-    const verificationToken = null;
-    const verificationExpires = null;
+    // Email verification: enabled when Resend API key is configured
+    const requireVerification = isEmailConfigured;
+    const verificationToken = requireVerification ? generateSecureToken() : null;
+    const verificationExpires = requireVerification ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
 
     await pool.query(
       `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, email_verified, email_verification_token, email_verification_expires, password_changed_at) 

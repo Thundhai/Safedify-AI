@@ -55,8 +55,10 @@ export const Register: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const success = await register(name, email, password, role);
-      if (success) {
+      const result = await register(name, email, password, role);
+      if (result === 'verification_required') {
+        navigate('/verify-email');
+      } else if (result === true) {
         navigate('/');
       } else {
         setError('Registration failed. Please try again.');

@@ -1,37 +1,22 @@
 /**
- * Email Service — Sends notification emails via SMTP (Nodemailer).
+ * Email Service — Sends emails via Resend HTTP API (serverless-friendly).
  * 
- * Configure in .env:
- *   SMTP_HOST=smtp.gmail.com
- *   SMTP_PORT=587
- *   SMTP_USER=your@email.com
- *   SMTP_PASS=app-password
- *   SMTP_FROM=Safedify <noreply@safedify.com>
+ * Configure in env:
+ *   RESEND_API_KEY=re_xxxxxxxx
+ *   EMAIL_FROM=Safedify <noreply@yourdomain.com>   (must be verified in Resend)
  * 
- * If SMTP is not configured, emails are logged to console instead.
+ * If RESEND_API_KEY is not set, emails are logged to console instead.
  */
-import nodemailer from 'nodemailer';
 
-const SMTP_HOST = process.env.SMTP_HOST;
-const SMTP_PORT = parseInt(process.env.SMTP_PORT || '587');
-const SMTP_USER = process.env.SMTP_USER;
-const SMTP_PASS = process.env.SMTP_PASS;
-const SMTP_FROM = process.env.SMTP_FROM || 'Safedify HSE <noreply@safedify.com>';
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const EMAIL_FROM = process.env.EMAIL_FROM || 'Safedify <onboarding@resend.dev>';
 
-const isConfigured = !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
-
-let transporter: nodemailer.Transporter | null = null;
+const isConfigured = !!RESEND_API_KEY;
 
 if (isConfigured) {
-  transporter = nodemailer.createTransport({
-    host: SMTP_HOST,
-    port: SMTP_PORT,
-    secure: SMTP_PORT === 465,
-    auth: { user: SMTP_USER, pass: SMTP_PASS },
-  });
-  console.log(`[Email] SMTP configured → ${SMTP_HOST}:${SMTP_PORT}`);
+  console.log('[Email] Resend API configured');
 } else {
-  console.log('[Email] SMTP not configured — emails will be logged to console');
+  console.log('[Email] Resend API key not set — emails will be logged to console');
 }
 
 export interface EmailPayload {
@@ -42,18 +27,32 @@ export interface EmailPayload {
 }
 
 /**
- * Send an email notification. Falls back to console.log if SMTP is not configured.
+ * Send an email via Resend HTTP API. Falls back to console.log if not configured.
  */
 export const sendEmail = async (payload: EmailPayload): Promise<boolean> => {
   try {
-    if (transporter) {
-      await transporter.sendMail({
-        from: SMTP_FROM,
-        to: payload.to,
-        subject: payload.subject,
-        text: payload.text,
-        html: payload.html || wrapHtml(payload.subject, payload.text),
+    if (isConfigured) {
+      const res = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${RESEND_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: EMAIL_FROM,
+          to: [payload.to],
+          subject: payload.subject,
+          text: payload.text,
+          html: payload.html || wrapHtml(payload.subject, payload.text),
+        }),
       });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: res.statusText }));
+        console.error(`[Email] Resend API error (${res.status}):`, err);
+        return false;
+      }
+
       console.log(`[Email] Sent to ${payload.to}: ${payload.subject}`);
       return true;
     } else {
