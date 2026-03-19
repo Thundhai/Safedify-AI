@@ -212,11 +212,16 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
     const allowedSelfRegRoles = ['Worker', 'HSE Supervisor', 'HSE Manager', 'HSE Officer', 'HSE Advisor', 'HSE Coordinator', 'HSE Technician', 'Engineer', 'Site Supervisor', 'Construction Manager', 'Operations Manager'];
     const safeRole = (role && allowedSelfRegRoles.includes(role)) ? role : 'Worker';
 
-    const { rows: existingRows } = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    const { rows: existingRows } = await pool.query('SELECT id, email_verified FROM users WHERE email = $1', [email]);
     const existing = existingRows[0];
     if (existing) {
-      res.status(409).json({ error: 'Email already registered' });
-      return;
+      // If the previous account was never verified (stuck from old flow), allow re-registration
+      if (existing.email_verified === false) {
+        await pool.query('DELETE FROM users WHERE id = $1', [existing.id]);
+      } else {
+        res.status(409).json({ error: 'Email already registered' });
+        return;
+      }
     }
 
     const hash = await hashPassword(password);
