@@ -4,8 +4,35 @@ import pool from '../postgres';
 import { AuthRequest, authenticate } from '../auth.js';
 import { logAudit } from './auditRoutes.js';
 import { validate, ValidationSchema } from '../middleware/inputValidation.js';
+import { logSecurityEvent, getClientIp } from '../middleware/securityLogger.js';
+import rateLimit from 'express-rate-limit';
 
 const router = Router();
+
+// Rate limit 2FA validation to prevent brute-force of 6-digit codes
+const twoFAValidateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,                    // 5 attempts per window
+  keyGenerator: (req) => {
+    // Rate limit by userId + IP to prevent distributed attacks
+    const userId = req.body?.userId || 'unknown';
+    return `2fa:${userId}:${getClientIp(req as any)}`;
+  },
+  handler: (req, res) => {
+    logSecurityEvent({
+      type: 'rate_limit_hit',
+      severity: 'critical',
+      ip: getClientIp(req as any),
+      userAgent: (req.headers['user-agent'] || '').slice(0, 512),
+      endpoint: req.path,
+      method: req.method,
+      details: '2FA validation rate limit — possible brute force attempt',
+    });
+    res.status(429).json({ error: 'Too many 2FA attempts. Please try again later.' });
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Validation schemas for 2FA endpoints
 const tokenSchema: ValidationSchema = {
@@ -136,7 +163,7 @@ router.post('/verify', authenticate, validate(tokenSchema), async (req: AuthRequ
 });
 
 // POST /api/auth/2fa/validate — Validate TOTP code during login (rate-limited, requires userId + token)
-router.post('/validate', validate(validateSchema), async (req: AuthRequest, res: Response) => {
+router.post('/validate', twoFAValidateLimit, validate(validateSchema), async (req: AuthRequest, res: Response) => {
   try {
     const { userId, token } = req.body;
     if (!userId || !token) { res.status(400).json({ error: 'User ID and token are required' }); return; }
@@ -144,7 +171,8 @@ router.post('/validate', validate(validateSchema), async (req: AuthRequest, res:
     const result = await pool.query('SELECT totp_secret, totp_enabled, totp_backup_codes FROM users WHERE id = $1', [userId]);
     const row = result.rows[0];
     if (!row?.totp_enabled || !row?.totp_secret) {
-      res.status(400).json({ error: '2FA is not enabled for this account' });
+      // Generic error to prevent enumeration of which accounts have 2FA
+      res.status(401).json({ valid: false, error: 'Invalid 2FA code' });
       return;
     }
 

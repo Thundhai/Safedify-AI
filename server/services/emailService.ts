@@ -68,6 +68,12 @@ export const sendEmail = async (payload: EmailPayload): Promise<boolean> => {
 };
 
 /**
+ * Escape HTML special characters to prevent XSS in email templates.
+ */
+const escapeHtml = (str: string): string =>
+  str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+
+/**
  * Wrap plain text in a simple branded HTML email template.
  */
 const wrapHtml = (subject: string, text: string): string => `
@@ -77,12 +83,12 @@ const wrapHtml = (subject: string, text: string): string => `
 <body style="margin:0;padding:0;font-family:Arial,sans-serif;background:#f1f5f9">
   <div style="max-width:600px;margin:24px auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
     <div style="background:#0f172a;padding:24px 32px;text-align:center">
-      <h1 style="color:#f97316;margin:0;font-size:22px">🛡️ Safedify</h1>
+      <h1 style="color:#f97316;margin:0;font-size:22px">&#128737;&#65039; Safedify</h1>
       <p style="color:#94a3b8;margin:4px 0 0;font-size:12px">HSE Platform Notification</p>
     </div>
     <div style="padding:32px">
-      <h2 style="color:#0f172a;margin:0 0 16px;font-size:18px">${subject}</h2>
-      <p style="color:#475569;line-height:1.6;font-size:14px;white-space:pre-line">${text}</p>
+      <h2 style="color:#0f172a;margin:0 0 16px;font-size:18px">${escapeHtml(subject)}</h2>
+      <p style="color:#475569;line-height:1.6;font-size:14px;white-space:pre-line">${escapeHtml(text)}</p>
     </div>
     <div style="background:#f8fafc;padding:16px 32px;text-align:center;border-top:1px solid #e2e8f0">
       <p style="color:#94a3b8;font-size:11px;margin:0">This is an automated notification from Safedify HSE Platform.</p>

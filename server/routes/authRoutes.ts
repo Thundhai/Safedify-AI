@@ -11,6 +11,18 @@ import { sendEmail, isEmailConfigured } from '../services/emailService.js';
 import { logAuthSuccess, logAuthFailure, logSecurityEvent, getClientIp } from '../middleware/securityLogger.js';
 import { registrationRateLimiter, honeypotProtection, recordLoginSuccess } from '../middleware/abuseProtection.js';
 import { validate, ValidationSchema } from '../middleware/inputValidation.js';
+import rateLimit from 'express-rate-limit';
+
+// Rate limiter for sensitive auth actions (verify-email, resend-verification, forgot-password, reset-password)
+const sensitiveAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,                    // 5 attempts per window per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (_req, res) => {
+    res.status(429).json({ error: 'Too many requests. Please try again later.' });
+  },
+});
 
 // ============================================
 // Validation Schemas
@@ -24,7 +36,7 @@ const registerSchema: ValidationSchema = {
   name: { type: 'string', required: true, minLength: 2, maxLength: 100 },
   email: { type: 'email', required: true, maxLength: 255 },
   password: { type: 'string', required: true, minLength: 8, maxLength: 128, allowInjection: true },
-  role: { type: 'string', enum: ['Worker', 'HSE Supervisor', 'HSE Manager', 'HSE Officer', 'HSE Advisor', 'HSE Coordinator', 'HSE Technician', 'Engineer', 'Site Supervisor', 'Construction Manager', 'Operations Manager', 'Manager', 'Admin', 'Executive Management'] },
+  role: { type: 'string', enum: ['Worker', 'HSE Supervisor', 'HSE Manager', 'HSE Officer', 'HSE Advisor', 'HSE Coordinator', 'HSE Technician', 'Engineer', 'Site Supervisor', 'Construction Manager', 'Operations Manager'] },
 };
 
 const tokenSchema: ValidationSchema = {
@@ -161,8 +173,7 @@ router.post('/login', validate(loginSchema), async (req: AuthRequest, res: Respo
     if (isEmailConfigured && row.email_verified === false && row.email_verification_token) {
       res.status(403).json({ 
         error: 'Please verify your email address before logging in. Check your inbox for the verification link.',
-        requiresVerification: true,
-        email: row.email
+        requiresVerification: true
       });
       return;
     }
@@ -238,12 +249,13 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
     // Email verification: enabled when Resend API key is configured
     const requireVerification = isEmailConfigured;
     const verificationToken = requireVerification ? generateSecureToken() : null;
+    const verificationTokenHash = verificationToken ? hashToken(verificationToken) : null;
     const verificationExpires = requireVerification ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
 
     await pool.query(
       `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, email_verified, email_verification_token, email_verification_expires, password_changed_at) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
-      [id, name, email, hash, safeRole, 'Pro', avatar, !requireVerification, verificationToken, verificationExpires]
+      [id, name, email, hash, safeRole, 'Pro', avatar, !requireVerification, verificationTokenHash, verificationExpires]
     );
 
     // Send verification email if required
@@ -282,7 +294,7 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
 });
 
 // POST /api/auth/verify-email
-router.post('/verify-email', async (req: AuthRequest, res: Response) => {
+router.post('/verify-email', sensitiveAuthLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const { token } = req.body;
     if (!token) {
@@ -290,9 +302,12 @@ router.post('/verify-email', async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    // Hash the incoming token to compare with the stored hash
+    const tokenHash = hashToken(token);
+
     const { rows } = await pool.query(
       'SELECT id, email, email_verification_expires FROM users WHERE email_verification_token = $1 AND email_verified = FALSE',
-      [token]
+      [tokenHash]
     );
     const user = rows[0];
 
@@ -322,7 +337,7 @@ router.post('/verify-email', async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/auth/resend-verification
-router.post('/resend-verification', async (req: AuthRequest, res: Response) => {
+router.post('/resend-verification', sensitiveAuthLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const { email } = req.body;
     if (!email) {
@@ -342,13 +357,14 @@ router.post('/resend-verification', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Generate new token
+    // Generate new token and store only the hash
     const verificationToken = generateSecureToken();
+    const verificationTokenHash = hashToken(verificationToken);
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
     await pool.query(
       'UPDATE users SET email_verification_token = $1, email_verification_expires = $2 WHERE id = $3',
-      [verificationToken, verificationExpires, user.id]
+      [verificationTokenHash, verificationExpires, user.id]
     );
 
     const baseUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 4500}`;
@@ -369,7 +385,7 @@ router.post('/resend-verification', async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/auth/login/2fa — Complete login after 2FA verification
-router.post('/login/2fa', async (req: AuthRequest, res: Response) => {
+router.post('/login/2fa', sensitiveAuthLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const { userId, token: totpToken } = req.body;
     if (!userId || !totpToken) {
@@ -435,7 +451,7 @@ router.get('/me', authenticate, (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/auth/forgot-password
-router.post('/forgot-password', async (req: AuthRequest, res: Response) => {
+router.post('/forgot-password', sensitiveAuthLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const { email } = req.body;
     if (!email) {
@@ -501,7 +517,7 @@ router.post('/forgot-password', async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/auth/reset-password
-router.post('/reset-password', async (req: AuthRequest, res: Response) => {
+router.post('/reset-password', sensitiveAuthLimiter, async (req: AuthRequest, res: Response) => {
   try {
     const { token, password } = req.body;
     if (!token || !password) {
