@@ -69,7 +69,7 @@ const actionSchema: ValidationSchema = {
 };
 
 const observationSchema: ValidationSchema = {
-  type: { type: 'string', required: true, maxLength: 100, trim: true, enum: ['Safe', 'Unsafe', 'Near Miss', 'Positive Recognition'] },
+  type: { type: 'string', required: true, maxLength: 100, trim: true, enum: ['Unsafe Act', 'Unsafe Condition', 'Safe Behavior', 'Near Miss'] },
   category: { type: 'string', required: false, maxLength: 100, trim: true },
   description: { type: 'string', required: false, maxLength: 5000, trim: true },
   location: { type: 'string', required: false, maxLength: 500, trim: true },

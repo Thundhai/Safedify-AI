@@ -859,7 +859,7 @@ Based on the description, suggest:
           properties: {
             type: { 
               type: Type.STRING, 
-              enum: ["Unsafe Act", "Unsafe Condition", "Near Miss", "Good Practice"] 
+              enum: ["Unsafe Act", "Unsafe Condition", "Safe Behavior", "Near Miss"] 
             },
             category: { 
               type: Type.STRING, 
