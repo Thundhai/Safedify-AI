@@ -3,7 +3,7 @@
 
 -- ============ MULTI-TENANCY: Organizations ============
 
-CREATE TABLE organizations (
+CREATE TABLE IF NOT EXISTS organizations (
     id UUID PRIMARY KEY,
     name TEXT NOT NULL,
     slug TEXT UNIQUE NOT NULL,
@@ -12,23 +12,7 @@ CREATE TABLE organizations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE org_invites (
-    id UUID PRIMARY KEY,
-    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-    email TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'Worker',
-    token TEXT UNIQUE NOT NULL,
-    expires_at TIMESTAMP NOT NULL,
-    accepted BOOLEAN DEFAULT FALSE,
-    invited_by UUID REFERENCES users(id),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX IF NOT EXISTS idx_org_invites_token ON org_invites(token);
-CREATE INDEX IF NOT EXISTS idx_org_invites_email ON org_invites(email);
-CREATE INDEX IF NOT EXISTS idx_org_invites_org ON org_invites(org_id);
-
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
@@ -52,14 +36,33 @@ CREATE TABLE users (
 );
 
 -- Back-reference: organizations.owner_id → users.id
-ALTER TABLE organizations ADD CONSTRAINT fk_organizations_owner FOREIGN KEY (owner_id) REFERENCES users(id);
+DO $$ BEGIN
+  ALTER TABLE organizations ADD CONSTRAINT fk_organizations_owner FOREIGN KEY (owner_id) REFERENCES users(id);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_users_org ON users(org_id);
 
 -- Security indexes for auth lookups
 CREATE INDEX IF NOT EXISTS idx_users_email_verification_token ON users(email_verification_token) WHERE email_verification_token IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_users_locked_until ON users(locked_until) WHERE locked_until IS NOT NULL;
 
-CREATE TABLE incidents (
+CREATE TABLE IF NOT EXISTS org_invites (
+    id UUID PRIMARY KEY,
+    org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'Worker',
+    token TEXT UNIQUE NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    accepted BOOLEAN DEFAULT FALSE,
+    invited_by UUID REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_org_invites_token ON org_invites(token);
+CREATE INDEX IF NOT EXISTS idx_org_invites_email ON org_invites(email);
+CREATE INDEX IF NOT EXISTS idx_org_invites_org ON org_invites(org_id);
+
+CREATE TABLE IF NOT EXISTS incidents (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     description TEXT NOT NULL,
@@ -96,7 +99,7 @@ CREATE TABLE incidents (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 -- Audit logs table for tracking actions and changes
-CREATE TABLE audit_logs (
+CREATE TABLE IF NOT EXISTS audit_logs (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     user_id UUID REFERENCES users(id),
@@ -111,7 +114,7 @@ CREATE TABLE audit_logs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE inspections (
+CREATE TABLE IF NOT EXISTS inspections (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     template_name TEXT NOT NULL,
@@ -126,7 +129,7 @@ CREATE TABLE inspections (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE actions (
+CREATE TABLE IF NOT EXISTS actions (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     title TEXT NOT NULL,
@@ -145,7 +148,7 @@ CREATE TABLE actions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE observations (
+CREATE TABLE IF NOT EXISTS observations (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     type TEXT NOT NULL,
@@ -161,7 +164,7 @@ CREATE TABLE observations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE permits (
+CREATE TABLE IF NOT EXISTS permits (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     type TEXT NOT NULL,
@@ -178,7 +181,7 @@ CREATE TABLE permits (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE workers (
+CREATE TABLE IF NOT EXISTS workers (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
@@ -194,7 +197,7 @@ CREATE TABLE workers (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE contractors (
+CREATE TABLE IF NOT EXISTS contractors (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
@@ -207,7 +210,7 @@ CREATE TABLE contractors (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE assets (
+CREATE TABLE IF NOT EXISTS assets (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
@@ -224,7 +227,7 @@ CREATE TABLE assets (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE documents (
+CREATE TABLE IF NOT EXISTS documents (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     title TEXT NOT NULL,
@@ -240,7 +243,7 @@ CREATE TABLE documents (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE stats_logs (
+CREATE TABLE IF NOT EXISTS stats_logs (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     date TIMESTAMP NOT NULL,
@@ -251,7 +254,7 @@ CREATE TABLE stats_logs (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE emergency_contacts (
+CREATE TABLE IF NOT EXISTS emergency_contacts (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
@@ -262,7 +265,7 @@ CREATE TABLE emergency_contacts (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE emergency_drills (
+CREATE TABLE IF NOT EXISTS emergency_drills (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     type TEXT NOT NULL,
@@ -276,7 +279,7 @@ CREATE TABLE emergency_drills (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE agent_conversations (
+CREATE TABLE IF NOT EXISTS agent_conversations (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     user_id UUID REFERENCES users(id),
@@ -285,7 +288,7 @@ CREATE TABLE agent_conversations (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE risk_assessments (
+CREATE TABLE IF NOT EXISTS risk_assessments (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     title TEXT NOT NULL,
@@ -299,7 +302,7 @@ CREATE TABLE risk_assessments (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE inspection_templates (
+CREATE TABLE IF NOT EXISTS inspection_templates (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
@@ -309,7 +312,7 @@ CREATE TABLE inspection_templates (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE training_modules (
+CREATE TABLE IF NOT EXISTS training_modules (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     title TEXT NOT NULL,
@@ -319,7 +322,7 @@ CREATE TABLE training_modules (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE training_records (
+CREATE TABLE IF NOT EXISTS training_records (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     worker_id UUID REFERENCES workers(id),
@@ -332,7 +335,7 @@ CREATE TABLE training_records (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE ppe_inventory (
+CREATE TABLE IF NOT EXISTS ppe_inventory (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
@@ -343,7 +346,7 @@ CREATE TABLE ppe_inventory (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE ppe_issuance (
+CREATE TABLE IF NOT EXISTS ppe_issuance (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     worker_id UUID REFERENCES workers(id),
@@ -357,7 +360,7 @@ CREATE TABLE ppe_issuance (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE roles (
+CREATE TABLE IF NOT EXISTS roles (
     id UUID PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
     description TEXT,
@@ -366,7 +369,7 @@ CREATE TABLE roles (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE safety_zones (
+CREATE TABLE IF NOT EXISTS safety_zones (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
@@ -379,7 +382,7 @@ CREATE TABLE safety_zones (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE notifications (
+CREATE TABLE IF NOT EXISTS notifications (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     user_id UUID REFERENCES users(id),
@@ -393,7 +396,7 @@ CREATE TABLE notifications (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE notification_preferences (
+CREATE TABLE IF NOT EXISTS notification_preferences (
     user_id UUID PRIMARY KEY REFERENCES users(id),
     email_incidents BOOLEAN DEFAULT TRUE,
     email_permits BOOLEAN DEFAULT TRUE,
@@ -405,7 +408,7 @@ CREATE TABLE notification_preferences (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE environmental_readings (
+CREATE TABLE IF NOT EXISTS environmental_readings (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     reading_type TEXT NOT NULL,
@@ -421,7 +424,7 @@ CREATE TABLE environmental_readings (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE site_locations (
+CREATE TABLE IF NOT EXISTS site_locations (
     id UUID PRIMARY KEY,
     org_id UUID REFERENCES organizations(id),
     name TEXT NOT NULL,
@@ -431,7 +434,7 @@ CREATE TABLE site_locations (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE password_reset_tokens (
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
     id UUID PRIMARY KEY,
     user_id UUID REFERENCES users(id),
     token TEXT UNIQUE NOT NULL,
@@ -440,7 +443,7 @@ CREATE TABLE password_reset_tokens (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE email_verification_tokens (
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
     id UUID PRIMARY KEY,
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     token TEXT UNIQUE NOT NULL,
@@ -449,7 +452,7 @@ CREATE TABLE email_verification_tokens (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE security_logs (
+CREATE TABLE IF NOT EXISTS security_logs (
     id TEXT PRIMARY KEY,
     event_type TEXT NOT NULL,
     severity TEXT NOT NULL CHECK (severity IN ('info', 'warning', 'critical')),
@@ -465,7 +468,7 @@ CREATE TABLE security_logs (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE blocked_ips (
+CREATE TABLE IF NOT EXISTS blocked_ips (
     ip_address TEXT PRIMARY KEY,
     reason TEXT NOT NULL,
     blocked_at TIMESTAMP DEFAULT NOW(),
@@ -475,35 +478,35 @@ CREATE TABLE blocked_ips (
 );
 
 -- Indexes for query performance
-CREATE INDEX idx_incidents_status ON incidents(status);
-CREATE INDEX idx_incidents_severity ON incidents(severity);
-CREATE INDEX idx_incidents_date ON incidents(date);
-CREATE INDEX idx_incidents_reported_by ON incidents(reported_by);
-CREATE INDEX idx_incidents_category ON incidents(category);
-CREATE INDEX idx_actions_status ON actions(status);
-CREATE INDEX idx_actions_due_date ON actions(due_date);
-CREATE INDEX idx_actions_assignee ON actions(assignee);
-CREATE INDEX idx_actions_indicator ON actions(indicator);
-CREATE INDEX idx_observations_type ON observations(type);
-CREATE INDEX idx_observations_date ON observations(date);
-CREATE INDEX idx_permits_status ON permits(status);
-CREATE INDEX idx_permits_valid_until ON permits(valid_until);
-CREATE INDEX idx_workers_department ON workers(department);
-CREATE INDEX idx_training_records_worker ON training_records(worker_id);
-CREATE INDEX idx_training_records_status ON training_records(status);
-CREATE INDEX idx_ppe_issuance_worker ON ppe_issuance(worker_id);
-CREATE INDEX idx_ppe_issuance_status ON ppe_issuance(status);
-CREATE INDEX idx_notifications_user ON notifications(user_id);
-CREATE INDEX idx_notifications_read ON notifications(is_read);
-CREATE INDEX idx_env_readings_type ON environmental_readings(reading_type);
-CREATE INDEX idx_env_readings_date ON environmental_readings(created_at);
+CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);
+CREATE INDEX IF NOT EXISTS idx_incidents_severity ON incidents(severity);
+CREATE INDEX IF NOT EXISTS idx_incidents_date ON incidents(date);
+CREATE INDEX IF NOT EXISTS idx_incidents_reported_by ON incidents(reported_by);
+CREATE INDEX IF NOT EXISTS idx_incidents_category ON incidents(category);
+CREATE INDEX IF NOT EXISTS idx_actions_status ON actions(status);
+CREATE INDEX IF NOT EXISTS idx_actions_due_date ON actions(due_date);
+CREATE INDEX IF NOT EXISTS idx_actions_assignee ON actions(assignee);
+CREATE INDEX IF NOT EXISTS idx_actions_indicator ON actions(indicator);
+CREATE INDEX IF NOT EXISTS idx_observations_type ON observations(type);
+CREATE INDEX IF NOT EXISTS idx_observations_date ON observations(date);
+CREATE INDEX IF NOT EXISTS idx_permits_status ON permits(status);
+CREATE INDEX IF NOT EXISTS idx_permits_valid_until ON permits(valid_until);
+CREATE INDEX IF NOT EXISTS idx_workers_department ON workers(department);
+CREATE INDEX IF NOT EXISTS idx_training_records_worker ON training_records(worker_id);
+CREATE INDEX IF NOT EXISTS idx_training_records_status ON training_records(status);
+CREATE INDEX IF NOT EXISTS idx_ppe_issuance_worker ON ppe_issuance(worker_id);
+CREATE INDEX IF NOT EXISTS idx_ppe_issuance_status ON ppe_issuance(status);
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_env_readings_type ON environmental_readings(reading_type);
+CREATE INDEX IF NOT EXISTS idx_env_readings_date ON environmental_readings(created_at);
 
 -- Full-Text Search (FTS) GIN indexes for fast search queries
 -- These indexes significantly improve search performance over ILIKE
-CREATE INDEX idx_incidents_fts ON incidents USING GIN (to_tsvector('english', COALESCE(description, '')));
-CREATE INDEX idx_observations_fts ON observations USING GIN (to_tsvector('english', COALESCE(description, '')));
-CREATE INDEX idx_actions_fts ON actions USING GIN (to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(description, '')));
-CREATE INDEX idx_permits_fts ON permits USING GIN (to_tsvector('english', COALESCE(description, '')));
+CREATE INDEX IF NOT EXISTS idx_incidents_fts ON incidents USING GIN (to_tsvector('english', COALESCE(description, '')));
+CREATE INDEX IF NOT EXISTS idx_observations_fts ON observations USING GIN (to_tsvector('english', COALESCE(description, '')));
+CREATE INDEX IF NOT EXISTS idx_actions_fts ON actions USING GIN (to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(description, '')));
+CREATE INDEX IF NOT EXISTS idx_permits_fts ON permits USING GIN (to_tsvector('english', COALESCE(description, '')));
 
 -- Multi-tenancy org_id indexes
 CREATE INDEX IF NOT EXISTS idx_incidents_org ON incidents(org_id);
@@ -530,17 +533,16 @@ CREATE INDEX IF NOT EXISTS idx_agent_conversations_org ON agent_conversations(or
 CREATE INDEX IF NOT EXISTS idx_inspection_templates_org ON inspection_templates(org_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_org ON audit_logs(org_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_org ON notifications(org_id);
-CREATE INDEX idx_documents_fts ON documents USING GIN (to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(content, '')));
+CREATE INDEX IF NOT EXISTS idx_documents_fts ON documents USING GIN (to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(content, '')));
 
 -- Security indexes
-CREATE INDEX idx_users_email_verification ON users(email_verification_token);
-CREATE INDEX idx_users_locked_until ON users(locked_until);
-CREATE INDEX idx_email_tokens_token ON email_verification_tokens(token);
-CREATE INDEX idx_email_tokens_user ON email_verification_tokens(user_id);
-CREATE INDEX idx_password_reset_expires ON password_reset_tokens(expires_at);
-CREATE INDEX idx_security_logs_created_at ON security_logs(created_at DESC);
-CREATE INDEX idx_security_logs_event_type ON security_logs(event_type);
-CREATE INDEX idx_security_logs_severity ON security_logs(severity);
-CREATE INDEX idx_security_logs_ip ON security_logs(ip_address);
-CREATE INDEX idx_security_logs_user_id ON security_logs(user_id);
-CREATE INDEX idx_blocked_ips_until ON blocked_ips(blocked_until);
+CREATE INDEX IF NOT EXISTS idx_users_email_verification ON users(email_verification_token);
+CREATE INDEX IF NOT EXISTS idx_email_tokens_token ON email_verification_tokens(token);
+CREATE INDEX IF NOT EXISTS idx_email_tokens_user ON email_verification_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_expires ON password_reset_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_security_logs_created_at ON security_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_security_logs_event_type ON security_logs(event_type);
+CREATE INDEX IF NOT EXISTS idx_security_logs_severity ON security_logs(severity);
+CREATE INDEX IF NOT EXISTS idx_security_logs_ip ON security_logs(ip_address);
+CREATE INDEX IF NOT EXISTS idx_security_logs_user_id ON security_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_blocked_ips_until ON blocked_ips(blocked_until);

@@ -27,7 +27,7 @@ test.describe('Authentication', () => {
     const body = await res.json();
     expect(body.token).toBeTruthy();
     expect(body.user.email).toBe(testUser.email);
-    expect(body.user.role).toBe('Worker');
+    expect(body.user.role).toBe('Admin');
   });
 
   test('Reject duplicate registration', async ({ request }) => {
@@ -263,9 +263,9 @@ test.describe('RBAC enforcement', () => {
   let workerToken: string;
 
   test.beforeAll(async ({ request }) => {
-    // Register a worker
-    const res = await request.post('/api/auth/register', {
-      data: { name: 'Worker User', email: `worker-${Date.now()}@test.com`, password: 'Worker1234!' },
+    // Login as the seeded worker user (new registrations become org Admins)
+    const res = await request.post('/api/auth/login', {
+      data: { email: 'worker@safedify.com', password: 'admin123' },
     });
     workerToken = (await res.json()).token;
   });

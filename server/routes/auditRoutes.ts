@@ -97,6 +97,21 @@ export const auditMiddleware = (entityType: string) => {
 
 // ---------- Routes ----------
 
+// Cache whether audit_logs has org_id column (checked once at first query)
+let auditHasOrgId: boolean | null = null;
+async function checkAuditOrgId(): Promise<boolean> {
+  if (auditHasOrgId !== null) return auditHasOrgId;
+  try {
+    const r = await pool.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'org_id'`
+    );
+    auditHasOrgId = r.rows.length > 0;
+  } catch {
+    auditHasOrgId = false;
+  }
+  return auditHasOrgId;
+}
+
 const router = Router();
 router.use(authenticate);
 router.use(requireRole('Admin'));
@@ -110,9 +125,11 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   const where: string[] = [];
   const params: any[] = [];
 
-  // Scope to current user's organization
-  where.push('org_id = $' + (params.length + 1));
-  params.push(req.user?.org_id);
+  // Scope to current user's organization (only if column exists)
+  if (await checkAuditOrgId()) {
+    where.push('org_id = $' + (params.length + 1));
+    params.push(req.user?.org_id);
+  }
 
   if (req.query.action) { where.push('action = $' + (params.length + 1)); params.push(req.query.action); }
   if (req.query.entity_type) { where.push('entity_type = $' + (params.length + 1)); params.push(req.query.entity_type); }
@@ -142,9 +159,11 @@ router.get('/export', async (req: AuthRequest, res: Response) => {
   const where: string[] = [];
   const params: any[] = [];
 
-  // Scope to current user's organization
-  where.push('org_id = $' + (params.length + 1));
-  params.push(req.user?.org_id);
+  // Scope to current user's organization (only if column exists)
+  if (await checkAuditOrgId()) {
+    where.push('org_id = $' + (params.length + 1));
+    params.push(req.user?.org_id);
+  }
 
   if (req.query.from) { where.push('created_at >= $' + (params.length + 1)); params.push(req.query.from); }
   if (req.query.to) { where.push('created_at <= $' + (params.length + 1)); params.push(req.query.to); }

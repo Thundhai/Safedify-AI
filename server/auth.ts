@@ -189,16 +189,6 @@ export const seedDefaultUsers = () => {
       const result = await pool.query('SELECT id FROM users WHERE email = $1', ['admin@safedify.com']);
       const existing = result.rows[0];
       if (!existing) {
-        // Create a demo organization first
-        const demoOrgId = uuid();
-        await pool.query(
-          `INSERT INTO organizations (id, name, slug, plan) VALUES ($1, $2, $3, $4) ON CONFLICT (slug) DO NOTHING`,
-          [demoOrgId, 'Demo Organization', 'demo', 'Enterprise']
-        );
-        // Check if org was inserted or already existed
-        const orgResult = await pool.query('SELECT id FROM organizations WHERE slug = $1', ['demo']);
-        const orgId = orgResult.rows[0]?.id || demoOrgId;
-
         // Use higher cost factor for seeded users
         const hash = bcrypt.hashSync('admin123', 12);
         // Use valid UUIDs for user IDs
@@ -212,17 +202,28 @@ export const seedDefaultUsers = () => {
         // This prevents usage of the well-known demo password 'admin123'
         const mustChangePassword = isProduction;
 
+        // Step 1: Insert users with org_id = NULL to avoid circular FK
+        // (organizations.owner_id → users AND users.org_id → organizations)
         for (const u of users) {
           await pool.query(
             `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, org_id, email_verified, must_change_password, password_changed_at) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE, $9, NOW())`,[u.id, u.name, u.email, hash, u.role, u.tier, u.avatar, orgId, mustChangePassword]
+             VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, TRUE, $8, NOW())`,
+            [u.id, u.name, u.email, hash, u.role, u.tier, u.avatar, mustChangePassword]
           );
         }
 
-        // Set the admin as the org owner
-        const adminUser = users.find(u => u.role === 'Admin');
-        if (adminUser) {
-          await pool.query('UPDATE organizations SET owner_id = $1 WHERE id = $2', [adminUser.id, orgId]);
+        // Step 2: Create org with admin as owner
+        const adminUser = users.find(u => u.role === 'Admin')!;
+        const demoOrgId = uuid();
+        const orgInsert = await pool.query(
+          `INSERT INTO organizations (id, name, slug, plan, owner_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (slug) DO NOTHING RETURNING id`,
+          [demoOrgId, 'Demo Organization', 'demo', 'Enterprise', adminUser.id]
+        );
+        const orgId = orgInsert.rows[0]?.id || (await pool.query('SELECT id FROM organizations WHERE slug = $1', ['demo'])).rows[0]?.id;
+
+        // Step 3: Update all users with org_id
+        for (const u of users) {
+          await pool.query('UPDATE users SET org_id = $1 WHERE id = $2', [orgId, u.id]);
         }
 
         console.log(`[Auth] Seeded demo users + org (must_change_password: ${mustChangePassword})`);

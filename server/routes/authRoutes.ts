@@ -9,7 +9,7 @@ import {
 import { logAudit } from './auditRoutes.js';
 import { sendEmail, isEmailConfigured } from '../services/emailService.js';
 import { logAuthSuccess, logAuthFailure, logSecurityEvent, getClientIp } from '../middleware/securityLogger.js';
-import { registrationRateLimiter, honeypotProtection, recordLoginSuccess } from '../middleware/abuseProtection.js';
+import { registrationRateLimiter, honeypotProtection, recordLoginSuccess, loginRateLimiter } from '../middleware/abuseProtection.js';
 import { validate, ValidationSchema } from '../middleware/inputValidation.js';
 import rateLimit from 'express-rate-limit';
 
@@ -116,7 +116,7 @@ async function resetFailedLogins(userId: string): Promise<void> {
 }
 
 // POST /api/auth/login
-router.post('/login', validate(loginSchema), async (req: AuthRequest, res: Response) => {
+router.post('/login', loginRateLimiter(), validate(loginSchema), async (req: AuthRequest, res: Response) => {
   try {
     const { email, password } = req.body;
 
@@ -283,14 +283,9 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
       // Mark invite as accepted
       await pool.query('UPDATE org_invites SET accepted = TRUE WHERE token = $1', [inviteToken]);
     } else {
-      // Create new organization
+      // Create new organization — must insert user first (without org_id) to satisfy FK constraint
       orgId = uuid();
       orgName = organizationName || `${name}'s Organization`;
-      const slug = orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + orgId.slice(0, 8);
-      await pool.query(
-        `INSERT INTO organizations (id, name, slug, plan, owner_id) VALUES ($1, $2, $3, 'Pro', $4)`,
-        [orgId, orgName, slug, id]
-      );
       // Org creator defaults to Admin role
       assignedRole = 'Admin';
     }
@@ -301,11 +296,24 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
     const verificationTokenHash = verificationToken ? hashToken(verificationToken) : null;
     const verificationExpires = requireVerification ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
 
+    // Insert user first (org_id set for invite path, NULL for new-org path until org is created)
+    const userOrgId = inviteToken ? orgId : null;
     await pool.query(
       `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, org_id, email_verified, email_verification_token, email_verification_expires, password_changed_at) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
-      [id, name, email, hash, assignedRole, 'Pro', avatar, orgId, !requireVerification, verificationTokenHash, verificationExpires]
+      [id, name, email, hash, assignedRole, 'Pro', avatar, userOrgId, !requireVerification, verificationTokenHash, verificationExpires]
     );
+
+    // Now create the organization (user exists, so FK on owner_id is satisfied)
+    if (!inviteToken) {
+      const slug = orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + orgId.slice(0, 8);
+      await pool.query(
+        `INSERT INTO organizations (id, name, slug, plan, owner_id) VALUES ($1, $2, $3, 'Pro', $4)`,
+        [orgId, orgName, slug, id]
+      );
+      // Update user with org_id now that org exists
+      await pool.query('UPDATE users SET org_id = $1 WHERE id = $2', [orgId, id]);
+    }
 
     // Send verification email if required
     if (requireVerification && verificationToken) {

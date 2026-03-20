@@ -16,7 +16,6 @@ import {
   blockedIpCheck, 
   botProtection, 
   antiScrapingProtection,
-  loginRateLimiter,
   registrationRateLimiter,
   aiGenerationLimiter,
   honeypotProtection
@@ -218,7 +217,7 @@ app.get('/api/health', async (_req, res) => {
 
 
 // ---------- API Routes ----------
-app.use('/api/auth', authLimiter, loginRateLimiter(), authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/auth/2fa', authLimiter, twoFactorRoutes);
 app.use('/api', apiLimiter, dataRoutes);
 app.use('/api/agent', aiGenerationLimiter(), agentRoutes);
