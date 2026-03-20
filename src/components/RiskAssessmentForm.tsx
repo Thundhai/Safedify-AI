@@ -190,9 +190,14 @@ export const RiskAssessmentForm: React.FC = () => {
 
   const handleSave = async () => {
     if (!formData.title) { toast.error("Title is required"); return; }
-    await saveRiskAssessment(formData);
-    toast.success("Risk Assessment Saved!");
-    navigate('/risk-assessments');
+    try {
+      await saveRiskAssessment(formData);
+      toast.success("Risk Assessment Saved!");
+      navigate('/risk-assessments');
+    } catch (err: any) {
+      console.error("Save risk assessment failed", err);
+      toast.error(err?.message || "Failed to save risk assessment. Please try again.");
+    }
   };
 
   const handlePrint = () => {

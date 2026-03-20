@@ -75,27 +75,38 @@ export const DocumentForm: React.FC = () => {
 
     const handleSave = async () => {
         if (!doc.title) { toast.error("Title required"); return; }
-        await saveDocument(doc);
-        toast.success("Document Saved.");
-        navigate('/documents');
+        try {
+          await saveDocument(doc);
+          toast.success("Document Saved.");
+          navigate('/documents');
+        } catch (err: any) {
+          console.error("Save document failed", err);
+          toast.error(err?.message || "Failed to save document. Please try again.");
+        }
     };
 
     const handleApprove = async () => {
-        const historyEntry = {
-            version: doc.version,
-            date: new Date().toISOString().split('T')[0]!,
-            author: user?.name || 'Unknown',
-            changes: `Approved by ${user?.name || 'Unknown'}`
-        };
-        const updated = { 
-            ...doc, 
-            status: 'Approved' as const, 
-            approvedBy: user?.name || 'Unknown', 
-            approvalDate: new Date().toISOString().split('T')[0]!,
-            versionHistory: [...(doc.versionHistory || []), historyEntry],
-        };
-        setDoc(updated);
-        await saveDocument(updated);
+        try {
+          const historyEntry = {
+              version: doc.version,
+              date: new Date().toISOString().split('T')[0]!,
+              author: user?.name || 'Unknown',
+              changes: `Approved by ${user?.name || 'Unknown'}`
+          };
+          const updated = { 
+              ...doc, 
+              status: 'Approved' as const, 
+              approvedBy: user?.name || 'Unknown', 
+              approvalDate: new Date().toISOString().split('T')[0]!,
+              versionHistory: [...(doc.versionHistory || []), historyEntry],
+          };
+          setDoc(updated);
+          await saveDocument(updated);
+          toast.success("Document Approved.");
+        } catch (err: any) {
+          console.error("Approve document failed", err);
+          toast.error(err?.message || "Failed to approve document. Please try again.");
+        }
     };
 
     const addTag = () => {

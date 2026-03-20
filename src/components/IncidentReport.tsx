@@ -27,17 +27,20 @@ declare global {
 /* ── Collapsible Section ─────────────────────────────── */
 const Section: React.FC<{
   title: string; icon: React.ReactNode; defaultOpen?: boolean;
-  children: React.ReactNode; badge?: string;
-}> = ({ title, icon, defaultOpen = true, children, badge }) => {
+  children: React.ReactNode; badge?: string; id?: string; hasError?: boolean;
+}> = ({ title, icon, defaultOpen = true, children, badge, id, hasError }) => {
   const [open, setOpen] = useState(defaultOpen);
+  // Auto-open when flagged with error
+  React.useEffect(() => { if (hasError) setOpen(true); }, [hasError]);
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div id={id} className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-colors ${hasError ? 'border-red-400 ring-2 ring-red-200' : 'border-slate-200'}`}>
       <button type="button" onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors text-left">
+        className={`w-full flex items-center justify-between p-4 transition-colors text-left ${hasError ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-slate-50'}`}>
         <div className="flex items-center gap-3">
-          <div className="text-blue-600">{icon}</div>
-          <h3 className="font-bold text-slate-800">{title}</h3>
-          {badge && <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">{badge}</span>}
+          <div className={hasError ? 'text-red-500' : 'text-blue-600'}>{icon}</div>
+          <h3 className={`font-bold ${hasError ? 'text-red-700' : 'text-slate-800'}`}>{title}</h3>
+          {hasError && <span className="bg-red-100 text-red-700 text-xs font-bold px-2 py-0.5 rounded-full">Required</span>}
+          {!hasError && badge && <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">{badge}</span>}
         </div>
         {open ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
       </button>
@@ -116,6 +119,8 @@ export const IncidentReport: React.FC = () => {
   const [isClassifying, setIsClassifying] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [recognition, setRecognition] = useState<any>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sectionErrors, setSectionErrors] = useState<Record<string, boolean>>({});
   const [aiResult, setAiResult] = useState<{
     type: IncidentType; severity: IncidentSeverity; confidence: number;
     reasoning: string; causes?: string[]; contributingFactors?: string[];
@@ -193,37 +198,80 @@ export const IncidentReport: React.FC = () => {
   /* ── Submit ── */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!description) { toast.error('Describe the incident.'); return; }
-    if (!location) { toast.error('Enter the location.'); return; }
-    if (!incidentCategory) { toast.error('Select incident category.'); return; }
 
-    const newInc: Incident = {
-      id: `inc-${Date.now()}`,
-      description,
-      date: incidentDate || new Date().toISOString(),
-      dateReported: new Date().toISOString(),
-      location, department,
-      type: (incidentType || aiResult?.type || IncidentType.NEAR_MISS) as IncidentType,
-      category: (incidentCategory || IncidentCategory.NEAR_MISS) as IncidentCategory,
-      severity: (severity || aiResult?.severity || IncidentSeverity.LOW) as IncidentSeverity,
-      status: 'Open',
-      images: selectedImages,
-      reporter: user?.name || 'Current User',
-      shift, weatherConditions, taskBeingPerformed,
-      injuredPersons, witnesses,
-      daysLost: injuredPersons.reduce((s, p) => s + (p.daysLost || 0), 0),
-      bodyPart: injuredPersons[0]?.bodyPart || '',
-      mechanism, immediateAction: immediateActionsTaken,
-      ppeWorn, ppeAdequate, environmentalImpact,
-      immediateActionsTaken, areaSecured, emergencyServicesNotified, regulatoryNotification,
-      aiClassification: aiResult ? {
-        confidence: aiResult.confidence, reasoning: aiResult.reasoning,
-        causes: aiResult.causes, contributingFactors: aiResult.contributingFactors,
-      } : undefined,
-    };
+    // Validate required fields and flag sections
+    const errors: Record<string, boolean> = {};
+    const missing: string[] = [];
 
-    await saveIncident(newInc);
-    navigate('/incidents');
+    if (!description || description.length < 5) {
+      errors.description = true;
+      missing.push('Incident Description');
+    }
+    if (!location) {
+      errors.description = true;
+      missing.push('Exact Location');
+    }
+    if (!incidentCategory) {
+      errors.classification = true;
+      missing.push('Incident Category');
+    }
+    if (!incidentType) {
+      errors.classification = true;
+      missing.push('Incident Type');
+    }
+    if (!severity) {
+      errors.classification = true;
+      missing.push('Severity');
+    }
+
+    setSectionErrors(errors);
+
+    if (missing.length > 0) {
+      toast.error(`Please complete: ${missing.join(', ')}`, { duration: 5000 });
+      // Scroll to first flagged section
+      const firstKey = Object.keys(errors)[0];
+      if (firstKey) {
+        document.getElementById(`section-${firstKey}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const newInc: Incident = {
+        id: `inc-${Date.now()}`,
+        description,
+        date: incidentDate || new Date().toISOString(),
+        dateReported: new Date().toISOString(),
+        location, department,
+        type: (incidentType || aiResult?.type || IncidentType.NEAR_MISS) as IncidentType,
+        category: (incidentCategory || IncidentCategory.NEAR_MISS) as IncidentCategory,
+        severity: (severity || aiResult?.severity || IncidentSeverity.LOW) as IncidentSeverity,
+        status: 'Open',
+        images: selectedImages,
+        reporter: user?.name || 'Current User',
+        shift, weatherConditions, taskBeingPerformed,
+        injuredPersons, witnesses,
+        daysLost: injuredPersons.reduce((s, p) => s + (p.daysLost || 0), 0),
+        bodyPart: injuredPersons[0]?.bodyPart || '',
+        mechanism, immediateAction: immediateActionsTaken,
+        ppeWorn, ppeAdequate, environmentalImpact,
+        immediateActionsTaken, areaSecured, emergencyServicesNotified, regulatoryNotification,
+        aiClassification: aiResult ? {
+          confidence: aiResult.confidence, reasoning: aiResult.reasoning,
+          causes: aiResult.causes, contributingFactors: aiResult.contributingFactors,
+        } : undefined,
+      };
+
+      await saveIncident(newInc);
+      toast.success('Incident report submitted successfully!');
+      navigate('/incidents');
+    } catch (err: any) {
+      console.error('Save incident error:', err);
+      toast.error(err?.message || 'Failed to submit incident report. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   /* ══════════════════════════════════════════════════════
@@ -246,12 +294,12 @@ export const IncidentReport: React.FC = () => {
       </div>
 
       {/* ═══ 1  INCIDENT DESCRIPTION ═══ */}
-      <Section title="Incident Description" icon={<FileText size={20} />} badge="Required">
+      <Section title="Incident Description" icon={<FileText size={20} />} badge="Required" id="section-description" hasError={!!sectionErrors.description}>
         <div className="pt-3 space-y-4">
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1">What happened? <span className="text-red-500">*</span></label>
             <div className="relative">
-              <SmartTextArea value={description} onChange={e => setDescription(e.target.value)} onValueChange={setDescription}
+              <SmartTextArea value={description} onChange={e => { setDescription(e.target.value); setSectionErrors(p => ({ ...p, description: false })); }} onValueChange={(v) => { setDescription(v); setSectionErrors(p => ({ ...p, description: false })); }}
                 className="w-full p-3 border border-slate-300 rounded-xl h-36 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all pr-12 text-slate-800 shadow-inner"
                 placeholder="Describe in detail: what happened, who was involved, the sequence of events..." />
               <button type="button" onClick={toggleListening} title="Voice to Text"
@@ -352,7 +400,7 @@ export const IncidentReport: React.FC = () => {
       </Section>
 
       {/* ═══ 2  CLASSIFICATION ═══ */}
-      <Section title="Classification" icon={<Shield size={20} />} badge="Required">
+      <Section title="Classification" icon={<Shield size={20} />} badge="Required" id="section-classification" hasError={!!sectionErrors.classification}>
         <div className="pt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormSelect label="Incident Category" value={incidentCategory} onChange={setIncidentCategory} options={Object.values(IncidentCategory)} required />
           <FormSelect label="Incident Type" value={incidentType} onChange={setIncidentType} options={Object.values(IncidentType)} required />
@@ -554,9 +602,10 @@ export const IncidentReport: React.FC = () => {
 
       {/* ═══ SUBMIT ═══ */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-        <button type="submit"
-          className="w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold hover:bg-slate-800 transition-colors shadow-lg flex items-center justify-center gap-2">
-          <CheckSquare size={20} /> Submit Incident Report
+        <button type="submit" disabled={isSubmitting}
+          className="w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold hover:bg-slate-800 transition-colors shadow-lg flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+          {isSubmitting ? <Loader2 size={20} className="animate-spin" /> : <CheckSquare size={20} />}
+          {isSubmitting ? 'Submitting...' : 'Submit Incident Report'}
         </button>
         <p className="text-xs text-slate-400 text-center mt-2">Report will be saved and assigned for investigation. Optional sections can be completed later.</p>
       </div>

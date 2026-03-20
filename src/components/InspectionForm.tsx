@@ -85,9 +85,14 @@ export const InspectionForm: React.FC = () => {
           items: newTemplateItems
       };
 
-      await saveInspectionTemplate(template);
-      toast.success("Template Created Successfully!");
-      setView('select-template'); // Go back to selection
+      try {
+        await saveInspectionTemplate(template);
+        toast.success("Template Created Successfully!");
+        setView('select-template'); // Go back to selection
+      } catch (err: any) {
+        console.error("Save template failed", err);
+        toast.error(err?.message || "Failed to save template. Please try again.");
+      }
   };
 
   const handleSelectTemplate = (template: InspectionTemplate) => {
@@ -181,11 +186,15 @@ export const InspectionForm: React.FC = () => {
         score: score,
         completed: true
     };
-    await saveInspection(finalInspection);
-    
-    setCurrentInspection(finalInspection); // Set for report view
-    toast.success("Inspection completed and saved.");
-    setView('report');
+    try {
+      await saveInspection(finalInspection);
+      setCurrentInspection(finalInspection); // Set for report view
+      toast.success("Inspection completed and saved.");
+      setView('report');
+    } catch (err: any) {
+      console.error("Save inspection failed", err);
+      toast.error(err?.message || "Failed to save inspection. Please try again.");
+    }
   };
 
   const handleViewReport = (inspection: Inspection) => {

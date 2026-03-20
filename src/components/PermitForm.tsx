@@ -168,18 +168,28 @@ export const PermitForm: React.FC = () => {
           }
       }
 
-      const updated = { ...formData, status };
-      await savePermit(updated);
-      toast.success(`Permit ${status === PermitStatus.PENDING ? 'submitted for approval' : 'saved'}.`);
-      navigate('/permits');
+      try {
+        const updated = { ...formData, status };
+        await savePermit(updated);
+        toast.success(`Permit ${status === PermitStatus.PENDING ? 'submitted for approval' : 'saved'}.`);
+        navigate('/permits');
+      } catch (err: any) {
+        console.error("Save permit failed", err);
+        toast.error(err?.message || "Failed to save permit. Please try again.");
+      }
   };
 
   const handleApprove = async () => {
-      // Simulation
-      const updated = { ...formData, status: PermitStatus.APPROVED, approver: user?.name || 'Unknown' };
-      await savePermit(updated);
-      setFormData(updated);
-      toast.success("Permit Approved and Active.");
+      try {
+        // Simulation
+        const updated = { ...formData, status: PermitStatus.APPROVED, approver: user?.name || 'Unknown' };
+        await savePermit(updated);
+        setFormData(updated);
+        toast.success("Permit Approved and Active.");
+      } catch (err: any) {
+        console.error("Approve permit failed", err);
+        toast.error(err?.message || "Failed to approve permit. Please try again.");
+      }
   };
 
   // Generate QR Code URL if Approved

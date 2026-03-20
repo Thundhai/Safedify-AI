@@ -23,6 +23,7 @@ export const ObservationForm: React.FC = () => {
   const [image, setImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCompressing, setIsCompressing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const categories = [
     'PPE', 'Housekeeping', 'Tools & Equipment', 'Working at Height', 
@@ -68,24 +69,39 @@ export const ObservationForm: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newObs: Observation = {
-      id: `obs-${Date.now()}`,
-      type,
-      category,
-      description,
-      location: location || 'Unknown',
-      date: new Date().toISOString(),
-      isAnonymous,
-      observer: isAnonymous ? undefined : observerName,
-      status: 'Open',
-      immediateActionTaken: immediateAction,
-      images: image ? [image] : []
-    };
+    if (!description || description.trim().length < 5) {
+      toast.error("Please provide a description (at least 5 characters).");
+      return;
+    }
+    if (!location.trim()) {
+      toast.error("Please enter a location.");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const newObs: Observation = {
+        id: `obs-${Date.now()}`,
+        type,
+        category,
+        description,
+        location: location || 'Unknown',
+        date: new Date().toISOString(),
+        isAnonymous,
+        observer: isAnonymous ? undefined : observerName,
+        status: 'Open',
+        immediateActionTaken: immediateAction,
+        images: image ? [image] : []
+      };
 
-    await saveObservation(newObs);
-    
-    toast.success("Observation submitted successfully!");
-    navigate('/observations');
+      await saveObservation(newObs);
+      toast.success("Observation submitted successfully!");
+      navigate('/observations');
+    } catch (err: any) {
+      console.error("Save observation failed", err);
+      toast.error(err?.message || "Failed to submit observation. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -251,9 +267,10 @@ export const ObservationForm: React.FC = () => {
 
         <button 
           type="submit" 
-          className="w-full bg-slate-900 text-white py-3 rounded-lg font-semibold hover:bg-slate-800 transition-colors shadow-lg flex items-center justify-center gap-2"
+          disabled={isSubmitting}
+          className="w-full bg-slate-900 text-white py-3 rounded-lg font-semibold hover:bg-slate-800 transition-colors shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
         >
-          <Send size={18} /> Submit Card
+          {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Submitting...</> : <><Send size={18} /> Submit Card</>}
         </button>
       </form>
     </div>

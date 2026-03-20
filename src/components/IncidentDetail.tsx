@@ -184,11 +184,16 @@ export const IncidentDetail: React.FC = () => {
       }
     };
     
-    await updateIncident(updatedIncident);
-    
-    setIncident(updatedIncident);
-    setIsSaving(false);
-    toast.success(`Investigation saved.${markAsClosed ? ' Incident marked as Closed.' : ''}`);
+    try {
+      await updateIncident(updatedIncident);
+      setIncident(updatedIncident);
+      toast.success(`Investigation saved.${markAsClosed ? ' Incident marked as Closed.' : ''}`);
+    } catch (err: any) {
+      console.error("Save investigation failed", err);
+      toast.error(err?.message || "Failed to save investigation. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleAddAction = async (e: React.FormEvent) => {
@@ -208,23 +213,32 @@ export const IncidentDetail: React.FC = () => {
       relatedIncidentId: incident.id
     };
 
-    await saveAction(action);
-    
-    setActions([...actions, action]);
-    setShowActionForm(false);
-    setNewAction({ 
-        title: '', 
-        assignee: '', 
-        priority: 'Medium',
-        dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0]
-    });
+    try {
+      await saveAction(action);
+      setActions([...actions, action]);
+      setShowActionForm(false);
+      setNewAction({ 
+          title: '', 
+          assignee: '', 
+          priority: 'Medium',
+          dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0]
+      });
+      toast.success("Action added successfully.");
+    } catch (err: any) {
+      console.error("Save action failed", err);
+      toast.error(err?.message || "Failed to add action. Please try again.");
+    }
   };
 
   const handleActionStatusChange = async (action: ActionItem, newStatus: 'Open' | 'In Progress' | 'Done') => {
-    const updatedAction: ActionItem = { ...action, status: newStatus };
-    await updateAction(updatedAction);
-    
-    setActions(prev => prev.map(a => a.id === action.id ? updatedAction : a));
+    try {
+      const updatedAction: ActionItem = { ...action, status: newStatus };
+      await updateAction(updatedAction);
+      setActions(prev => prev.map(a => a.id === action.id ? updatedAction : a));
+    } catch (err: any) {
+      console.error("Update action failed", err);
+      toast.error(err?.message || "Failed to update action status. Please try again.");
+    }
   };
 
   const fetchAvailableActions = async () => {
@@ -238,11 +252,15 @@ export const IncidentDetail: React.FC = () => {
     if (!incident) return;
     const actionToLink = availableActions.find(a => a.id === actionId);
     if (actionToLink) {
-      const updated = { ...actionToLink, relatedIncidentId: incident.id };
-      await updateAction(updated);
-      
-      setActions(prev => [...prev, updated]);
-      setAvailableActions(prev => prev.filter(a => a.id !== actionId));
+      try {
+        const updated = { ...actionToLink, relatedIncidentId: incident.id };
+        await updateAction(updated);
+        setActions(prev => [...prev, updated]);
+        setAvailableActions(prev => prev.filter(a => a.id !== actionId));
+      } catch (err: any) {
+        console.error("Link action failed", err);
+        toast.error(err?.message || "Failed to link action. Please try again.");
+      }
     }
   };
 
