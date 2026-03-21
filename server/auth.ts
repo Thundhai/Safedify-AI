@@ -202,31 +202,44 @@ export const seedDefaultUsers = () => {
         // This prevents usage of the well-known demo password 'admin123'
         const mustChangePassword = isProduction;
 
-        // Step 1: Insert users with org_id = NULL to avoid circular FK
-        // (organizations.owner_id → users AND users.org_id → organizations)
-        for (const u of users) {
-          await pool.query(
-            `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, org_id, email_verified, must_change_password, password_changed_at) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, TRUE, $8, NOW())`,
-            [u.id, u.name, u.email, hash, u.role, u.tier, u.avatar, mustChangePassword]
+        // Use transaction for atomicity
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+
+          // Step 1: Insert users with org_id = NULL to avoid circular FK
+          // (organizations.owner_id → users AND users.org_id → organizations)
+          for (const u of users) {
+            await client.query(
+              `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, org_id, email_verified, must_change_password, password_changed_at) 
+               VALUES ($1, $2, $3, $4, $5, $6, $7, NULL, TRUE, $8, NOW())`,
+              [u.id, u.name, u.email, hash, u.role, u.tier, u.avatar, mustChangePassword]
+            );
+          }
+
+          // Step 2: Create org with admin as owner
+          const adminUser = users.find(u => u.role === 'Admin')!;
+          const demoOrgId = uuid();
+          const orgInsert = await client.query(
+            `INSERT INTO organizations (id, name, slug, plan, owner_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (slug) DO NOTHING RETURNING id`,
+            [demoOrgId, 'Demo Organization', 'demo', 'Enterprise', adminUser.id]
           );
+          const orgId = orgInsert.rows[0]?.id || (await client.query('SELECT id FROM organizations WHERE slug = $1', ['demo'])).rows[0]?.id;
+
+          // Step 3: Update all users with org_id
+          for (const u of users) {
+            await client.query('UPDATE users SET org_id = $1 WHERE id = $2', [orgId, u.id]);
+          }
+
+          await client.query('COMMIT');
+          console.log(`[Auth] Seeded demo users + org (must_change_password: ${mustChangePassword})`);
+        } catch (dbErr: any) {
+          await client.query('ROLLBACK');
+          console.error('[Auth] Seed transaction failed:', dbErr.message);
+          throw dbErr;
+        } finally {
+          client.release();
         }
-
-        // Step 2: Create org with admin as owner
-        const adminUser = users.find(u => u.role === 'Admin')!;
-        const demoOrgId = uuid();
-        const orgInsert = await pool.query(
-          `INSERT INTO organizations (id, name, slug, plan, owner_id) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (slug) DO NOTHING RETURNING id`,
-          [demoOrgId, 'Demo Organization', 'demo', 'Enterprise', adminUser.id]
-        );
-        const orgId = orgInsert.rows[0]?.id || (await pool.query('SELECT id FROM organizations WHERE slug = $1', ['demo'])).rows[0]?.id;
-
-        // Step 3: Update all users with org_id
-        for (const u of users) {
-          await pool.query('UPDATE users SET org_id = $1 WHERE id = $2', [orgId, u.id]);
-        }
-
-        console.log(`[Auth] Seeded demo users + org (must_change_password: ${mustChangePassword})`);
       }
     } catch (err: any) {
       console.error('[Auth] Failed to seed users (database may not be configured):', err.message);

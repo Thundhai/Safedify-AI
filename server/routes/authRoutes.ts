@@ -296,23 +296,37 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
     const verificationTokenHash = verificationToken ? hashToken(verificationToken) : null;
     const verificationExpires = requireVerification ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() : null;
 
-    // Insert user first (org_id set for invite path, NULL for new-org path until org is created)
-    const userOrgId = inviteToken ? orgId : null;
-    await pool.query(
-      `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, org_id, email_verified, email_verification_token, email_verification_expires, password_changed_at) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
-      [id, name, email, hash, assignedRole, 'Pro', avatar, userOrgId, !requireVerification, verificationTokenHash, verificationExpires]
-    );
+    // Use transaction to ensure atomicity of user + org creation
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
 
-    // Now create the organization (user exists, so FK on owner_id is satisfied)
-    if (!inviteToken) {
-      const slug = orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + orgId.slice(0, 8);
-      await pool.query(
-        `INSERT INTO organizations (id, name, slug, plan, owner_id) VALUES ($1, $2, $3, 'Pro', $4)`,
-        [orgId, orgName, slug, id]
+      // Insert user first (org_id set for invite path, NULL for new-org path until org is created)
+      const userOrgId = inviteToken ? orgId : null;
+      await client.query(
+        `INSERT INTO users (id, name, email, password_hash, role, tier, avatar, org_id, email_verified, email_verification_token, email_verification_expires, password_changed_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
+        [id, name, email, hash, assignedRole, 'Pro', avatar, userOrgId, !requireVerification, verificationTokenHash, verificationExpires]
       );
-      // Update user with org_id now that org exists
-      await pool.query('UPDATE users SET org_id = $1 WHERE id = $2', [orgId, id]);
+
+      // Now create the organization (user exists, so FK on owner_id is satisfied)
+      if (!inviteToken) {
+        const slug = orgName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + orgId.slice(0, 8);
+        await client.query(
+          `INSERT INTO organizations (id, name, slug, plan, owner_id) VALUES ($1, $2, $3, 'Pro', $4)`,
+          [orgId, orgName, slug, id]
+        );
+        // Update user with org_id now that org exists
+        await client.query('UPDATE users SET org_id = $1 WHERE id = $2', [orgId, id]);
+      }
+
+      await client.query('COMMIT');
+    } catch (dbErr: any) {
+      await client.query('ROLLBACK');
+      console.error('[Auth] Registration DB error:', dbErr.message, '| Code:', dbErr.code);
+      throw dbErr;
+    } finally {
+      client.release();
     }
 
     // Send verification email if required
