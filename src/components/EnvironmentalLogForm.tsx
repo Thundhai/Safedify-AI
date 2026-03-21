@@ -38,6 +38,7 @@ export const EnvironmentalLogForm: React.FC<{ onClose?: () => void; onLogged?: (
   const [readingType, setReadingType] = useState<ReadingTypeId>('noise');
   const [value, setValue] = useState('');
   const [location, setLocation] = useState('Site Zone A');
+  const [customLocation, setCustomLocation] = useState('');
   const [zone, setZone] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -65,9 +66,12 @@ export const EnvironmentalLogForm: React.FC<{ onClose?: () => void; onLogged?: (
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!value.trim()) { setError('Reading value is required'); return; }
+    if (location === 'Other' && !customLocation.trim()) { setError('Please enter a custom location'); return; }
 
     const numVal = parseFloat(value);
     if (isNaN(numVal)) { setError('Value must be a number'); return; }
+
+    const finalLocation = location === 'Other' ? customLocation.trim() : location;
 
     setSubmitting(true);
     setError('');
@@ -76,7 +80,7 @@ export const EnvironmentalLogForm: React.FC<{ onClose?: () => void; onLogged?: (
         reading_type: readingType,
         value: numVal,
         unit: config.unit,
-        location,
+        location: finalLocation,
         zone: zone || undefined,
         source: 'manual',
         notes: notes || undefined,
@@ -84,6 +88,7 @@ export const EnvironmentalLogForm: React.FC<{ onClose?: () => void; onLogged?: (
       setSuccess(true);
       setValue('');
       setNotes('');
+      setCustomLocation('');
       loadRecentReadings();
       onLogged?.();
       setTimeout(() => setSuccess(false), 3000);
@@ -203,9 +208,20 @@ export const EnvironmentalLogForm: React.FC<{ onClose?: () => void; onLogged?: (
                 <option value="Laydown Area">Laydown Area</option>
                 <option value="Excavation">Excavation</option>
                 <option value="Confined Space">Confined Space</option>
+                <option value="Other">Other (Custom Location)</option>
               </select>
               <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
+            {location === 'Other' && (
+              <input 
+                type="text" 
+                value={customLocation} 
+                onChange={e => setCustomLocation(e.target.value)}
+                placeholder="Enter custom location"
+                className="mt-2 w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-800 dark:text-white text-sm"
+                required
+              />
+            )}
           </div>
         </div>
 

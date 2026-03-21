@@ -30,7 +30,7 @@ export const getAuthToken = (): string | null => {
 
 import { queueOfflineRequest } from './offlineService';
 
-const apiFetch = async (path: string, options: RequestInit = {}): Promise<any> => {
+const apiFetch = async (path: string, options: RequestInit = {}, timeoutMs = 30000): Promise<any> => {
   const token = getAuthToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -41,20 +41,37 @@ const apiFetch = async (path: string, options: RequestInit = {}): Promise<any> =
   }
 
   const method = (options.method || 'GET').toUpperCase();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       ...options,
       headers,
+      signal: controller.signal,
     });
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({ error: res.statusText }));
+      // Provide user-friendly error messages
+      if (res.status === 504) {
+        throw new Error('Server is taking too long to respond. Please try again.');
+      }
+      if (res.status === 503) {
+        throw new Error('Service temporarily unavailable. Please try again in a moment.');
+      }
+      if (res.status === 401) {
+        throw new Error('Session expired. Please log in again.');
+      }
       throw new Error(body.error || `API Error: ${res.status}`);
     }
 
     return res.json();
   } catch (err: any) {
+    // Handle abort/timeout
+    if (err.name === 'AbortError') {
+      throw new Error('Request timed out. Please check your connection and try again.');
+    }
     // If offline and this is a mutating request, queue for later sync
     if (!navigator.onLine && ['POST', 'PUT', 'DELETE'].includes(method)) {
       const body = options.body ? JSON.parse(options.body as string) : null;
@@ -63,6 +80,8 @@ const apiFetch = async (path: string, options: RequestInit = {}): Promise<any> =
       return { id: `offline-${Date.now()}`, _offline: true };
     }
     throw err;
+  } finally {
+    clearTimeout(timeout);
   }
 };
 

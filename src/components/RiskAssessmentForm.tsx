@@ -31,6 +31,7 @@ export const RiskAssessmentForm: React.FC = () => {
 
   const [loadingHazards, setLoadingHazards] = useState(false);
   const [loadingControls, setLoadingControls] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   
   // State for AI Risk Explanations & Review
   const [riskExplanations, setRiskExplanations] = useState<Record<string, string>>({});
@@ -190,6 +191,8 @@ export const RiskAssessmentForm: React.FC = () => {
 
   const handleSave = async () => {
     if (!formData.title) { toast.error("Title is required"); return; }
+    if (isSaving) return; // Prevent double submission
+    setIsSaving(true);
     try {
       await saveRiskAssessment(formData);
       toast.success("Risk Assessment Saved!");
@@ -197,6 +200,8 @@ export const RiskAssessmentForm: React.FC = () => {
     } catch (err: any) {
       console.error("Save risk assessment failed", err);
       toast.error(err?.message || "Failed to save risk assessment. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -240,8 +245,8 @@ export const RiskAssessmentForm: React.FC = () => {
             <button type="button" onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 font-medium">
                 <Printer size={18} /> Print PDF
             </button>
-            <button type="button" onClick={handleSave} className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-sm">
-                <Save size={18} /> Save
+            <button type="button" onClick={handleSave} disabled={isSaving} className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                <Save size={18} /> {isSaving ? 'Saving...' : 'Save'}
             </button>
         </div>
       </div>
