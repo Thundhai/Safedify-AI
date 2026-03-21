@@ -54,14 +54,17 @@ export const ObservationForm: React.FC = () => {
     setIsAnalyzing(true);
     try {
         const result = await analyzeObservationAI(description);
-        if (result) {
+        if (result && Object.keys(result).length > 0) {
             if (result.type) setType(result.type as ObservationType);
             if (result.category) setCategory(result.category);
             if (result.immediateAction) setImmediateAction(result.immediateAction);
+            toast.success("AI analysis complete!");
+        } else {
+            toast.error("AI returned empty result. Please try again.");
         }
-    } catch (e) {
-        console.error(e);
-        toast.error("AI analysis failed.");
+    } catch (e: any) {
+        console.error("AI Analysis Error:", e);
+        toast.error(e?.message || "AI analysis failed. Please try again.");
     } finally {
         setIsAnalyzing(false);
     }

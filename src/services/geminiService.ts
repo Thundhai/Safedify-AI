@@ -65,7 +65,7 @@ const safeParseJSON = (text: string | undefined | null, fallback: any = {}): any
 const aiGenerate = async (params: { model?: string; contents: any; config?: any }): Promise<{ text: string }> => {
   const token = getAuthToken();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45000); // 45s timeout
+  const timeout = setTimeout(() => controller.abort(), 55000); // 55s timeout (less than Vercel's 60s)
   try {
     const res = await fetch(`${API_BASE}/ai/generate`, {
       method: 'POST',
@@ -99,7 +99,7 @@ const aiGenerate = async (params: { model?: string; contents: any; config?: any 
 const aiChat = async (params: { model?: string; history: any[]; config?: any; message: any }): Promise<{ text: string }> => {
   const token = getAuthToken();
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 45000); // 45s timeout
+  const timeout = setTimeout(() => controller.abort(), 55000); // 55s timeout (less than Vercel's 60s)
   try {
     const res = await fetch(`${API_BASE}/ai/chat`, {
       method: 'POST',
