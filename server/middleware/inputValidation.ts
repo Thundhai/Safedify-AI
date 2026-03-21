@@ -627,9 +627,17 @@ export function validateParams(schema: ValidationSchema) {
 
 /**
  * Generic injection detection middleware - scans all request data
+ * Skips certain paths that need to accept complex user input (like AI prompts)
  */
-export function detectInjections(options: { logOnly?: boolean } = {}) {
+export function detectInjections(options: { logOnly?: boolean; excludePaths?: string[] } = {}) {
+  const excludePaths = options.excludePaths || ['/api/ai/', '/api/agent/'];
+  
   return (req: Request, res: Response, next: NextFunction) => {
+    // Skip injection detection for AI-related routes that need to accept natural language
+    if (excludePaths.some(p => req.path.startsWith(p))) {
+      return next();
+    }
+    
     const checkValue = (value: any, path: string): DetectionResult | null => {
       if (typeof value === 'string') {
         return detectAllInjections(value);
