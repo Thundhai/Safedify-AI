@@ -18,17 +18,17 @@ if (!apiKey) {
 }
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-// Allowlist of valid model names for @google/genai SDK
+// Allowlist of valid model names for @google/genai SDK (March 2026)
 const ALLOWED_MODELS = [
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-lite',
-  'gemini-1.5-flash-latest',
-  'gemini-1.5-pro-latest',
-  'gemini-pro',
+  'gemini-2.5-flash-preview-05-20',
+  'gemini-2.5-pro-preview-05-06',
+  'gemini-2.0-flash-001',
+  'gemini-1.5-flash-001',
+  'gemini-1.5-pro-001',
 ];
 
 // Fallback model if preferred model fails (most stable/available)
-const FALLBACK_MODEL = 'gemini-2.0-flash';
+const FALLBACK_MODEL = 'gemini-2.0-flash-001';
 
 /**
  * POST /api/ai/generate
@@ -128,8 +128,8 @@ router.post('/chat', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Validate model name if provided - use gemini-2.0-flash as default
-    const requestedModel = model && ALLOWED_MODELS.includes(model) ? model : 'gemini-2.0-flash';
+    // Validate model name if provided - use gemini-2.0-flash-001 as default
+    const requestedModel = model && ALLOWED_MODELS.includes(model) ? model : 'gemini-2.0-flash-001';
 
     // Try with requested model, fallback to stable model if it fails
     let result;
