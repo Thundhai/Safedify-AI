@@ -15,7 +15,7 @@ if (!apiKey) {
 }
 
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
-const MODEL = 'gemini-2.5-flash';
+const MODEL = 'gemini-1.5-flash'; // Use stable model as default
 const MAX_TOOL_ROUNDS = 10;
 
 const SYSTEM_INSTRUCTION = `You are Safedify AI Agent — an intelligent HSE (Health, Safety & Environment) assistant for industrial workplaces.

@@ -13,9 +13,12 @@ router.use(authenticate);
 
 // Use consistent GEMINI_API_KEY env var
 const apiKey = process.env.GEMINI_API_KEY;
+if (!apiKey) {
+  console.warn('[AI Routes] GEMINI_API_KEY not set - AI features will be disabled');
+}
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-// Allowlist of valid model names
+// Allowlist of valid model names (fallback to stable models if experimental unavailable)
 const ALLOWED_MODELS = [
   'gemini-2.5-flash',
   'gemini-2.0-flash',
@@ -23,6 +26,9 @@ const ALLOWED_MODELS = [
   'gemini-1.5-pro',
   'gemini-pro',
 ];
+
+// Fallback model if preferred model fails
+const FALLBACK_MODEL = 'gemini-1.5-flash';
 
 /**
  * POST /api/ai/generate
@@ -50,14 +56,30 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Validate model name if provided
-    const safeModel = model && ALLOWED_MODELS.includes(model) ? model : 'gemini-2.5-flash';
+    // Validate model name if provided - use gemini-1.5-flash as default (more stable)
+    const requestedModel = model && ALLOWED_MODELS.includes(model) ? model : 'gemini-1.5-flash';
 
-    const response = await ai.models.generateContent({
-      model: safeModel,
-      contents,
-      config,
-    });
+    // Try with requested model, fallback to stable model if it fails with model-specific error
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model: requestedModel,
+        contents,
+        config,
+      });
+    } catch (modelErr: any) {
+      // If model not found or unavailable, try fallback
+      if (requestedModel !== FALLBACK_MODEL && (modelErr.message?.includes('not found') || modelErr.message?.includes('not supported') || modelErr.status === 404)) {
+        console.warn(`[AI Proxy] Model ${requestedModel} unavailable, falling back to ${FALLBACK_MODEL}`);
+        response = await ai.models.generateContent({
+          model: FALLBACK_MODEL,
+          contents,
+          config,
+        });
+      } else {
+        throw modelErr;
+      }
+    }
 
     res.json({ text: response.text || '' });
   } catch (err: any) {
@@ -106,16 +128,32 @@ router.post('/chat', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Validate model name if provided
-    const safeModel = model && ALLOWED_MODELS.includes(model) ? model : 'gemini-2.5-flash';
+    // Validate model name if provided - use gemini-1.5-flash as default (more stable)
+    const requestedModel = model && ALLOWED_MODELS.includes(model) ? model : 'gemini-1.5-flash';
 
-    const chat = ai.chats.create({
-      model: safeModel,
-      history: history || [],
-      config,
-    });
+    // Try with requested model, fallback to stable model if it fails
+    let result;
+    try {
+      const chat = ai.chats.create({
+        model: requestedModel,
+        history: history || [],
+        config,
+      });
+      result = await chat.sendMessage({ message });
+    } catch (modelErr: any) {
+      if (requestedModel !== FALLBACK_MODEL && (modelErr.message?.includes('not found') || modelErr.message?.includes('not supported') || modelErr.status === 404)) {
+        console.warn(`[AI Proxy] Model ${requestedModel} unavailable, falling back to ${FALLBACK_MODEL}`);
+        const chat = ai.chats.create({
+          model: FALLBACK_MODEL,
+          history: history || [],
+          config,
+        });
+        result = await chat.sendMessage({ message });
+      } else {
+        throw modelErr;
+      }
+    }
 
-    const result = await chat.sendMessage({ message });
     res.json({ text: result.text || '' });
   } catch (err: any) {
     // Forward 429 rate-limit status properly
@@ -134,6 +172,45 @@ router.post('/chat', async (req: AuthRequest, res: Response) => {
     }
     console.error('[AI Proxy] Chat error:', err.message);
     res.status(500).json({ error: err.message || 'AI chat failed' });
+  }
+});
+
+/**
+ * GET /api/ai/status
+ * Check if AI service is configured and working
+ */
+router.get('/status', async (_req: AuthRequest, res: Response) => {
+  if (!ai) {
+    res.json({ 
+      status: 'disabled', 
+      message: 'AI service not configured. GEMINI_API_KEY is not set.',
+      apiKeySet: false 
+    });
+    return;
+  }
+
+  try {
+    // Test with a simple request
+    const response = await ai.models.generateContent({
+      model: FALLBACK_MODEL,
+      contents: 'Say "OK" in one word.',
+    });
+    res.json({ 
+      status: 'ok', 
+      message: 'AI service is working.',
+      apiKeySet: true,
+      model: FALLBACK_MODEL,
+      testResponse: response.text?.substring(0, 50)
+    });
+  } catch (err: any) {
+    console.error('[AI Status Check] Error:', err.message);
+    res.json({ 
+      status: 'error', 
+      message: err.message || 'Unknown error',
+      apiKeySet: true,
+      errorType: err.status === 401 || err.status === 403 ? 'authentication' : 
+                 err.status === 429 ? 'rate_limit' : 'other'
+    });
   }
 });
 
