@@ -107,6 +107,12 @@ router.post('/chat', validate(chatSchema), async (req: AuthRequest, res: Respons
       res.status(429).json({ error: 'Rate limit exceeded. Please wait before sending another request.', retryAfter });
       return;
     }
+    // Handle API key errors
+    if (err.message?.includes('API key') || err.message?.includes('invalid') || err.message?.includes('expired') || err.status === 401 || err.status === 403) {
+      console.error('[Agent Route] API key error:', err.message);
+      res.status(503).json({ error: 'AI service authentication failed. Please check that the GEMINI_API_KEY is valid and not expired.' });
+      return;
+    }
     console.error('[Agent Route Error]', err);
     res.status(500).json({ error: err.message || 'Agent error' });
   }
