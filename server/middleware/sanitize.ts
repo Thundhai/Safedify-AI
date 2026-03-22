@@ -64,14 +64,23 @@ interface SanitizeOptions {
   stripTags?: boolean;
   escapeHtml?: boolean;
   maxLength?: number;
+  excludePaths?: string[];
 }
 
 /**
  * Express middleware that sanitizes req.body
  * Call AFTER body-parser middleware
+ * Optionally skip certain paths (like AI routes that need raw content)
  */
 export const sanitizeBody = (options: SanitizeOptions = { stripTags: true, maxLength: 10000 }) => {
+  const excludePaths = options.excludePaths || ['/api/ai/', '/api/agent/'];
+  
   return (req: Request, _res: Response, next: NextFunction) => {
+    // Skip sanitization for AI routes that need to accept complex content
+    if (excludePaths.some(p => req.path.startsWith(p))) {
+      return next();
+    }
+    
     if (req.body && typeof req.body === 'object') {
       req.body = sanitizeValue(req.body, options);
     }
