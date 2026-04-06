@@ -106,7 +106,10 @@ const saveOfflineQueue = (queue: QueuedRequest[]) => {
 /**
  * Queue a failed mutating API request for later replay.
  * Called automatically by apiFetch when navigator.onLine is false.
+ * Limited to 100 queued requests to prevent unbounded localStorage growth.
  */
+const MAX_OFFLINE_QUEUE_SIZE = 100;
+
 export const queueOfflineRequest = (
   method: string,
   path: string,
@@ -114,6 +117,13 @@ export const queueOfflineRequest = (
   description?: string
 ) => {
   const queue = getOfflineQueue();
+
+  // Enforce queue size limit — drop oldest entries
+  if (queue.length >= MAX_OFFLINE_QUEUE_SIZE) {
+    console.warn(`[Offline] Queue at capacity (${MAX_OFFLINE_QUEUE_SIZE}). Dropping oldest entry.`);
+    queue.shift();
+  }
+
   const entry: QueuedRequest = {
     id: `oq-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     method,

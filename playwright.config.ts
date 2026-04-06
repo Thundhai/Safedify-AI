@@ -6,16 +6,16 @@ export default defineConfig({
   timeout: 30000,
   retries: 1,
   use: {
-    baseURL: 'http://localhost:4500',
+    baseURL: 'http://localhost:3000', // Frontend
     headless: true,
     screenshot: 'only-on-failure',
     trace: 'on-first-retry',
   },
   webServer: {
-    command: 'npx tsx server/index.ts',
-    port: 4500,
+    command: 'npm run test:e2e:full',
+    port: 3000,
     reuseExistingServer: true,
-    timeout: 60000,
+    timeout: 90000,
     env: {
       PORT: '4500',
       SEED_DEMO_USERS: 'true',

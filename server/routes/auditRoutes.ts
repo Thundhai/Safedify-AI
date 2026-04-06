@@ -40,23 +40,33 @@ export const logAudit = async (
   try {
     const ip = req.ip || (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || '';
     const ua = (req.headers['user-agent'] || '').slice(0, 256);
-    await pool.query(
-      `INSERT INTO audit_logs (id, user_id, user_email, user_role, action, entity_type, entity_id, details, ip_address, user_agent, org_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-      [
-        uuid(),
-        req.user?.id || null,
-        req.user?.email || (req.body?.email as string) || null,
-        req.user?.role || null,
-        entry.action,
-        entry.entityType || null,
-        entry.entityId || null,
-        entry.details || null,
-        ip,
-        ua,
-        req.user?.org_id || null,
-      ]
-    );
+    const baseValues = [
+      uuid(),
+      req.user?.id || null,
+      req.user?.email || (req.body?.email as string) || null,
+      req.user?.role || null,
+      entry.action,
+      entry.entityType || null,
+      entry.entityId || null,
+      entry.details || null,
+      ip,
+      ua,
+    ];
+
+    // Backward compatibility for DBs where audit_logs.org_id has not been migrated yet.
+    if (await checkAuditOrgId()) {
+      await pool.query(
+        `INSERT INTO audit_logs (id, user_id, user_email, user_role, action, entity_type, entity_id, details, ip_address, user_agent, org_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+        [...baseValues, req.user?.org_id || null]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO audit_logs (id, user_id, user_email, user_role, action, entity_type, entity_id, details, ip_address, user_agent)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        baseValues
+      );
+    }
   } catch (err: any) {
     console.error('[Audit] Write error:', err.message);
   }

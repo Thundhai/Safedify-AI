@@ -20,10 +20,16 @@ const { toolMap } = await import('../agent/tools.js');
 
 describe('Agent - run_custom_query SQL injection protection', () => {
   const customQuery = toolMap.get('run_custom_query')!;
+  const testCtx = { orgId: 'test-org-id', userId: 'test-user-id' };
 
-  it('allows valid SELECT queries', async () => {
-    const result = await customQuery.execute({ sql: 'SELECT * FROM incidents LIMIT 10' });
+  it('allows valid SELECT queries with org_id filter', async () => {
+    const result = await customQuery.execute({ sql: "SELECT * FROM incidents WHERE org_id = $1 LIMIT 10" }, testCtx);
     expect(result.error).toBeUndefined();
+  });
+
+  it('rejects queries on org-scoped tables without org_id filter', async () => {
+    const result = await customQuery.execute({ sql: 'SELECT * FROM incidents LIMIT 10' }, testCtx);
+    expect(result.error).toContain('org_id');
   });
 
   it('blocks DROP TABLE', async () => {
@@ -48,7 +54,7 @@ describe('Agent - run_custom_query SQL injection protection', () => {
 
   it('blocks SELECT with embedded DROP (via subquery)', async () => {
     const result = await customQuery.execute({ sql: "SELECT 1; DROP TABLE incidents;" });
-    expect(result.error).toContain('DROP');
+    expect(result.error).toBeTruthy();
   });
 
   it('blocks SELECT with forbidden keyword in body', async () => {

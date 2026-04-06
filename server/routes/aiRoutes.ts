@@ -19,6 +19,8 @@ if (!apiKey) {
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 // Allowlist of valid model names for @google/genai SDK (March 2026)
+// To update: Review https://ai.google.dev/models/gemini regularly for new/retired models.
+// Update this list as Gemini/AI models evolve to ensure compatibility and access to latest features.
 const ALLOWED_MODELS = [
   'gemini-2.5-flash-preview-05-20',
   'gemini-2.5-pro-preview-05-06',
@@ -94,11 +96,18 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
     // Handle API key errors
     if (err.message?.includes('API key') || err.message?.includes('invalid') || err.message?.includes('expired') || err.status === 401 || err.status === 403) {
       console.error('[AI Proxy] API key error:', err.message);
+      console.error('[AI Proxy] Request body:', JSON.stringify(req.body));
+      console.error('[AI Proxy] GEMINI_API_KEY present:', !!process.env.GEMINI_API_KEY);
+      if (err.stack) console.error('[AI Proxy] Stack:', err.stack);
       res.status(503).json({ error: 'AI service authentication failed. Please check that the GEMINI_API_KEY is valid and not expired.' });
       return;
     }
+    // Log all other errors with stack and request context
     console.error('[AI Proxy] Generate error:', err.message);
-    res.status(500).json({ error: err.message || 'AI generation failed' });
+    if (err.stack) console.error('[AI Proxy] Stack:', err.stack);
+    console.error('[AI Proxy] Request body:', JSON.stringify(req.body));
+    console.error('[AI Proxy] GEMINI_API_KEY present:', !!process.env.GEMINI_API_KEY);
+    res.status(500).json({ error: err.message || 'AI generation failed', details: err.stack });
   }
 });
 
@@ -167,11 +176,18 @@ router.post('/chat', async (req: AuthRequest, res: Response) => {
     // Handle API key errors
     if (err.message?.includes('API key') || err.message?.includes('invalid') || err.message?.includes('expired') || err.status === 401 || err.status === 403) {
       console.error('[AI Proxy] API key error:', err.message);
+      console.error('[AI Proxy] Request body:', JSON.stringify(req.body));
+      console.error('[AI Proxy] GEMINI_API_KEY present:', !!process.env.GEMINI_API_KEY);
+      if (err.stack) console.error('[AI Proxy] Stack:', err.stack);
       res.status(503).json({ error: 'AI service authentication failed. Please check that the GEMINI_API_KEY is valid and not expired.' });
       return;
     }
+    // Log all other errors with stack and request context
     console.error('[AI Proxy] Chat error:', err.message);
-    res.status(500).json({ error: err.message || 'AI chat failed' });
+    if (err.stack) console.error('[AI Proxy] Stack:', err.stack);
+    console.error('[AI Proxy] Request body:', JSON.stringify(req.body));
+    console.error('[AI Proxy] GEMINI_API_KEY present:', !!process.env.GEMINI_API_KEY);
+    res.status(500).json({ error: err.message || 'AI chat failed', details: err.stack });
   }
 });
 
@@ -190,26 +206,37 @@ router.get('/status', async (_req: AuthRequest, res: Response) => {
   }
 
   try {
+    const timeoutMs = Math.max(500, parseInt(process.env.AI_STATUS_TIMEOUT_MS || '4000', 10));
+
     // Test with a simple request
-    const response = await ai.models.generateContent({
-      model: FALLBACK_MODEL,
-      contents: 'Say "OK" in one word.',
-    });
+    const response = await Promise.race([
+      ai.models.generateContent({
+        model: FALLBACK_MODEL,
+        contents: 'Say "OK" in one word.',
+      }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`AI status check timed out after ${timeoutMs}ms`)), timeoutMs)),
+    ]);
+
+    const typedResponse = response as { text?: string };
+
     res.json({ 
       status: 'ok', 
       message: 'AI service is working.',
       apiKeySet: true,
       model: FALLBACK_MODEL,
-      testResponse: response.text?.substring(0, 50)
+      testResponse: typedResponse.text?.substring(0, 50)
     });
   } catch (err: any) {
     console.error('[AI Status Check] Error:', err.message);
+    if (err.stack) console.error('[AI Status Check] Stack:', err.stack);
+    console.error('[AI Status Check] GEMINI_API_KEY present:', !!process.env.GEMINI_API_KEY);
     res.json({ 
       status: 'error', 
       message: err.message || 'Unknown error',
       apiKeySet: true,
       errorType: err.status === 401 || err.status === 403 ? 'authentication' : 
-                 err.status === 429 ? 'rate_limit' : 'other'
+                 err.status === 429 ? 'rate_limit' : 'other',
+      details: err.stack
     });
   }
 });

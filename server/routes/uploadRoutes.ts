@@ -113,10 +113,10 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
       const filename = `${fileId}${ext}`;
       writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
 
-      // Track file ownership in database
+      // Track file ownership in database (including org_id for tenant isolation)
       await pool.query(
-        'INSERT INTO uploads (id, filename, mime_type, size, uploaded_by) VALUES ($1, $2, $3, $4, $5)',
-        [fileId, filename, mimeType, buffer.length, req.user?.id]
+        'INSERT INTO uploads (id, filename, mime_type, size, uploaded_by, org_id) VALUES ($1, $2, $3, $4, $5, $6)',
+        [fileId, filename, mimeType, buffer.length, req.user?.id, req.user?.org_id]
       );
 
       const url = `/api/uploads/${filename}`;
@@ -141,10 +141,10 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
         const filename = `${fileId}${ext}`;
         writeFileSync(path.join(UPLOADS_DIR, filename), buffer);
         
-        // Track file ownership in database
+        // Track file ownership in database (including org_id for tenant isolation)
         await pool.query(
-          'INSERT INTO uploads (id, filename, mime_type, size, uploaded_by) VALUES ($1, $2, $3, $4, $5)',
-          [fileId, filename, mimeType, buffer.length, req.user?.id]
+          'INSERT INTO uploads (id, filename, mime_type, size, uploaded_by, org_id) VALUES ($1, $2, $3, $4, $5, $6)',
+          [fileId, filename, mimeType, buffer.length, req.user?.id, req.user?.org_id]
         );
         
         results.push({ id: fileId, url: `/api/uploads/${filename}`, filename, size: buffer.length, mimeType });
@@ -162,9 +162,9 @@ router.post('/', authenticate, async (req: AuthRequest, res: Response) => {
 
 /**
  * GET /api/uploads/:filename
- * Serve a stored file (requires authentication)
+ * Serve a stored file (requires authentication + org ownership)
  */
-router.get('/:filename', authenticate, (req: AuthRequest, res: Response) => {
+router.get('/:filename', authenticate, async (req: AuthRequest, res: Response) => {
   // Sanitize filename to prevent path traversal
   const filename = path.basename(req.params.filename as string);
   const filePath = path.join(UPLOADS_DIR, filename);
@@ -172,6 +172,30 @@ router.get('/:filename', authenticate, (req: AuthRequest, res: Response) => {
   if (!existsSync(filePath)) {
     res.status(404).json({ error: 'File not found' });
     return;
+  }
+
+  // Verify the file belongs to the user's organization
+  const orgId = req.user?.org_id;
+  if (orgId) {
+    const ownerCheck = await pool.query(
+      'SELECT id FROM uploads WHERE filename = $1 AND org_id = $2',
+      [filename, orgId]
+    );
+    if (ownerCheck.rows.length === 0) {
+      // Check if it's a legacy file (no org_id) — allow Admin/Manager only
+      const legacyCheck = await pool.query(
+        'SELECT id FROM uploads WHERE filename = $1 AND org_id IS NULL',
+        [filename]
+      );
+      if (legacyCheck.rows.length === 0) {
+        res.status(404).json({ error: 'File not found' });
+        return;
+      }
+      if (req.user?.role !== 'Admin' && req.user?.role !== 'Manager') {
+        res.status(404).json({ error: 'File not found' });
+        return;
+      }
+    }
   }
 
   try {
@@ -206,17 +230,23 @@ router.delete('/:filename', authenticate, async (req: AuthRequest, res: Response
     return;
   }
 
-  // Check ownership (unless admin/manager)
+  // Check ownership (unless admin/manager) + org isolation
   const userRole = req.user?.role;
+  const orgId = req.user?.org_id;
   if (userRole !== 'Admin' && userRole !== 'Manager') {
     const result = await pool.query(
-      'SELECT uploaded_by FROM uploads WHERE filename = $1',
+      'SELECT uploaded_by, org_id FROM uploads WHERE filename = $1',
       [filename]
     );
     
     if (result.rows.length > 0) {
-      const uploadedBy = result.rows[0].uploaded_by;
-      if (uploadedBy !== req.user?.id) {
+      const row = result.rows[0];
+      // Org isolation: resource must belong to user's org
+      if (orgId && row.org_id && row.org_id !== orgId) {
+        res.status(404).json({ error: 'File not found' });
+        return;
+      }
+      if (row.uploaded_by !== req.user?.id) {
         res.status(403).json({ error: 'Access denied: You can only delete your own uploads' });
         return;
       }
@@ -224,6 +254,18 @@ router.delete('/:filename', authenticate, async (req: AuthRequest, res: Response
       // No DB record (legacy file) — only Admin/Manager can delete these
       res.status(403).json({ error: 'Access denied: Cannot verify ownership of this file' });
       return;
+    }
+  } else {
+    // Admin/Manager: still enforce org isolation
+    if (orgId) {
+      const result = await pool.query(
+        'SELECT org_id FROM uploads WHERE filename = $1',
+        [filename]
+      );
+      if (result.rows.length > 0 && result.rows[0].org_id && result.rows[0].org_id !== orgId) {
+        res.status(404).json({ error: 'File not found' });
+        return;
+      }
     }
   }
 

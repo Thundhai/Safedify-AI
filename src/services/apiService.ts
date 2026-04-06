@@ -61,6 +61,8 @@ const apiFetch = async (path: string, options: RequestInit = {}, timeoutMs = 300
         throw new Error('Service temporarily unavailable. Please try again in a moment.');
       }
       if (res.status === 401) {
+        // Clear stale token on 401 to prevent repeated failed requests
+        setAuthToken(null);
         throw new Error('Session expired. Please log in again.');
       }
       throw new Error(body.error || `API Error: ${res.status}`);
@@ -386,8 +388,8 @@ export const api2FASetup = () => apiFetch('/auth/2fa/setup', { method: 'POST' })
 export const api2FAVerify = (token: string) => apiFetch('/auth/2fa/verify', { method: 'POST', body: JSON.stringify({ token }) });
 export const api2FAStatus = () => apiFetch('/auth/2fa/status');
 export const api2FADisable = () => apiFetch('/auth/2fa', { method: 'DELETE' });
-export const apiLoginWith2FA = async (userId: string, token: string) => {
-  const data = await apiFetch('/auth/login/2fa', { method: 'POST', body: JSON.stringify({ userId, token }) });
+export const apiLoginWith2FA = async (challengeToken: string, token: string) => {
+  const data = await apiFetch('/auth/login/2fa', { method: 'POST', body: JSON.stringify({ challengeToken, token }) });
   setAuthToken(data.token);
   return data;
 };

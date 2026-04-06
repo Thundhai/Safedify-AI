@@ -1,10 +1,12 @@
 import { Router, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import pool from '../postgres';
 import { 
   AuthRequest, hashPassword, comparePassword, generateToken, authenticate,
-  LOCKOUT_CONFIG, validatePasswordStrength, generateSecureToken, hashToken
+  LOCKOUT_CONFIG, validatePasswordStrength, generateSecureToken, hashToken,
+  decryptTotpSecret, encryptTotpSecret
 } from '../auth.js';
 import { logAudit } from './auditRoutes.js';
 import { sendEmail, isEmailConfigured } from '../services/emailService.js';
@@ -57,6 +59,10 @@ const forgotPasswordSchema: ValidationSchema = {
 const resetPasswordSchema: ValidationSchema = {
   token: { type: 'string', required: true, minLength: 10, maxLength: 500 },
   password: { type: 'string', required: true, minLength: 8, maxLength: 128, allowInjection: true },
+};
+
+const profileSchema: ValidationSchema = {
+  name: { type: 'string', required: true, minLength: 2, maxLength: 100, trim: true },
 };
 
 const router = Router();
@@ -187,8 +193,15 @@ router.post('/login', loginRateLimiter(), validate(loginSchema), async (req: Aut
 
     // Check if 2FA is enabled
     if (row.totp_enabled) {
+      // Issue a short-lived signed challenge token (not a full access token)
+      // This proves the user passed password verification before attempting 2FA
+      const challengeToken = jwt.sign(
+        { userId: row.id, purpose: '2fa_challenge' },
+        process.env.JWT_SECRET || 'safedify-dev-secret-not-for-production',
+        { expiresIn: '5m' }
+      );
       logAudit(req, { action: 'login_2fa_required', entityType: 'user', entityId: row.id, details: `2FA challenge for ${email}` });
-      res.json({ requires2FA: true, userId: row.id });
+      res.json({ requires2FA: true, challengeToken });
       return;
     }
 
@@ -262,10 +275,11 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
     const { organizationName, inviteToken } = req.body;
 
     if (inviteToken) {
-      // Joining existing org via invite
+      // Joining existing org via invite — hash the token to compare with DB
+      const inviteTokenHash = hashToken(inviteToken);
       const { rows: inviteRows } = await pool.query(
         `SELECT org_id, role, email, expires_at, accepted FROM org_invites WHERE token = $1`,
-        [inviteToken]
+        [inviteTokenHash]
       );
       const invite = inviteRows[0];
       if (!invite || invite.accepted || new Date(invite.expires_at) < new Date()) {
@@ -281,7 +295,7 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
       const { rows: orgRows } = await pool.query('SELECT name FROM organizations WHERE id = $1', [orgId]);
       orgName = orgRows[0]?.name || 'Organization';
       // Mark invite as accepted
-      await pool.query('UPDATE org_invites SET accepted = TRUE WHERE token = $1', [inviteToken]);
+      await pool.query('UPDATE org_invites SET accepted = TRUE WHERE token = $1', [inviteTokenHash]);
     } else {
       // Create new organization — must insert user first (without org_id) to satisfy FK constraint
       orgId = uuid();
@@ -347,6 +361,17 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
       });
 
       logAudit(req, { action: 'register', entityType: 'user', entityId: id, details: `New user registered (pending verification): ${email}` });
+      logSecurityEvent({
+        type: 'account_created',
+        severity: 'info',
+        userId: id,
+        email,
+        ip: getClientIp(req),
+        userAgent: (req.headers['user-agent'] || '').slice(0, 512),
+        endpoint: req.path,
+        method: req.method,
+        details: 'New account registered (pending email verification)',
+      });
       res.status(201).json({ 
         message: 'Registration successful. Please check your email to verify your account.',
         requiresVerification: true
@@ -357,6 +382,17 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
     const user = { id, name, email, role: assignedRole, tier: 'Pro', avatar, org_id: orgId };
     const token = generateToken(user);
     logAudit(req, { action: 'register', entityType: 'user', entityId: id, details: `New user registered: ${email} (org: ${orgName})` });
+    logSecurityEvent({
+      type: 'account_created',
+      severity: 'info',
+      userId: id,
+      email,
+      ip: getClientIp(req),
+      userAgent: (req.headers['user-agent'] || '').slice(0, 512),
+      endpoint: req.path,
+      method: req.method,
+      details: `New account registered: ${email} (org: ${orgName})`,
+    });
     res.status(201).json({ token, user: { ...user, org_name: orgName } });
   } catch (err: any) {
     console.error('[Auth] Registration error:', err.message);
@@ -458,9 +494,23 @@ router.post('/resend-verification', sensitiveAuthLimiter, async (req: AuthReques
 // POST /api/auth/login/2fa — Complete login after 2FA verification
 router.post('/login/2fa', sensitiveAuthLimiter, async (req: AuthRequest, res: Response) => {
   try {
-    const { userId, token: totpToken } = req.body;
-    if (!userId || !totpToken) {
-      res.status(400).json({ error: 'User ID and 2FA code required' });
+    const { challengeToken, token: totpToken } = req.body;
+    if (!challengeToken || !totpToken) {
+      res.status(400).json({ error: 'Challenge token and 2FA code required' });
+      return;
+    }
+
+    // Verify the signed challenge token (proves password was already validated)
+    let userId: string;
+    try {
+      const decoded = jwt.verify(challengeToken, process.env.JWT_SECRET || 'safedify-dev-secret-not-for-production') as any;
+      if (decoded.purpose !== '2fa_challenge') {
+        res.status(400).json({ error: 'Invalid challenge token' });
+        return;
+      }
+      userId = decoded.userId;
+    } catch {
+      res.status(401).json({ error: 'Challenge token expired or invalid. Please log in again.' });
       return;
     }
 
@@ -470,6 +520,9 @@ router.post('/login/2fa', sensitiveAuthLimiter, async (req: AuthRequest, res: Re
       res.status(400).json({ error: 'Invalid request' });
       return;
     }
+
+    // Decrypt TOTP secret from DB
+    const decryptedSecret = decryptTotpSecret(row.totp_secret);
 
     // Verify TOTP using the same logic as twoFactorRoutes
     const crypto = await import('crypto');
@@ -485,14 +538,16 @@ router.post('/login/2fa', sensitiveAuthLimiter, async (req: AuthRequest, res: Re
         const code = ((hmac[offset] & 0x7f) << 24 | hmac[offset+1] << 16 | hmac[offset+2] << 8 | hmac[offset+3]) % 1000000;
         if (code.toString().padStart(6, '0') === token) return true;
       }
-      // Check backup codes
+      // Check backup codes (decrypt from DB)
       if (row.totp_backup_codes) {
         try {
-          const codes: string[] = JSON.parse(row.totp_backup_codes);
+          const decryptedBackup = decryptTotpSecret(row.totp_backup_codes);
+          const codes: string[] = JSON.parse(decryptedBackup);
           const idx = codes.indexOf(token);
           if (idx !== -1) {
             codes.splice(idx, 1);
-            await pool.query('UPDATE users SET totp_backup_codes = $1 WHERE id = $2', [JSON.stringify(codes), userId]);
+            const reEncrypted = encryptTotpSecret(JSON.stringify(codes));
+            await pool.query('UPDATE users SET totp_backup_codes = $1 WHERE id = $2', [reEncrypted, userId]);
             return true;
           }
         } catch { /* ignore */ }
@@ -500,8 +555,20 @@ router.post('/login/2fa', sensitiveAuthLimiter, async (req: AuthRequest, res: Re
       return false;
     }
 
-    if (!(await verifyTOTP(row.totp_secret, totpToken))) {
+    if (!(await verifyTOTP(decryptedSecret, totpToken))) {
       logAudit(req, { action: '2fa_failed', entityType: 'user', entityId: userId, details: 'Invalid 2FA code' });
+      logAuthFailure(req, row.email, 'Invalid 2FA code');
+      logSecurityEvent({
+        type: 'auth_2fa_failure',
+        severity: 'warning',
+        userId,
+        email: row.email,
+        ip: getClientIp(req),
+        userAgent: (req.headers['user-agent'] || '').slice(0, 512),
+        endpoint: req.path,
+        method: req.method,
+        details: 'Failed 2FA verification attempt',
+      });
       res.status(401).json({ error: 'Invalid 2FA code' });
       return;
     }
@@ -517,6 +584,18 @@ router.post('/login/2fa', sensitiveAuthLimiter, async (req: AuthRequest, res: Re
     }
 
     logAudit(req, { action: 'login', entityType: 'user', entityId: row.id, details: `User ${row.email} logged in with 2FA` });
+    logAuthSuccess(req, row.id, row.email);
+    logSecurityEvent({
+      type: 'auth_2fa_success',
+      severity: 'info',
+      userId: row.id,
+      email: row.email,
+      ip: getClientIp(req),
+      userAgent: (req.headers['user-agent'] || '').slice(0, 512),
+      endpoint: req.path,
+      method: req.method,
+      details: 'Successful 2FA authentication',
+    });
     res.json({ token: jwtToken, user: { ...user, org_name } });
   } catch (err: any) {
     console.error('[Auth] 2FA login error:', err.message);
@@ -588,6 +667,17 @@ router.post('/forgot-password', sensitiveAuthLimiter, async (req: AuthRequest, r
     }
 
     logAudit(req, { action: 'password_reset_request', entityType: 'user', entityId: user.id, details: `Password reset requested for ${email}` });
+    logSecurityEvent({
+      type: 'password_reset_request',
+      severity: 'info',
+      userId: user.id,
+      email,
+      ip: getClientIp(req),
+      userAgent: (req.headers['user-agent'] || '').slice(0, 512),
+      endpoint: req.path,
+      method: req.method,
+      details: 'Password reset link requested',
+    });
     res.json({ message: 'If the email exists, a reset link has been sent.' });
   } catch (err: any) {
     console.error('[Auth] Forgot password error:', err.message);
@@ -647,6 +737,16 @@ router.post('/reset-password', sensitiveAuthLimiter, async (req: AuthRequest, re
     await pool.query('UPDATE password_reset_tokens SET used = TRUE WHERE user_id = $1', [resetRow.user_id]);
 
     logAudit(req, { action: 'password_reset', entityType: 'user', entityId: resetRow.user_id, details: 'Password reset completed' });
+    logSecurityEvent({
+      type: 'password_changed',
+      severity: 'info',
+      userId: resetRow.user_id,
+      ip: getClientIp(req),
+      userAgent: (req.headers['user-agent'] || '').slice(0, 512),
+      endpoint: req.path,
+      method: req.method,
+      details: 'Password reset completed via reset link',
+    });
     res.json({ message: 'Password has been reset successfully. You can now log in.' });
   } catch (err: any) {
     console.error('[Auth] Reset password error:', err.message);
@@ -655,14 +755,10 @@ router.post('/reset-password', sensitiveAuthLimiter, async (req: AuthRequest, re
 });
 
 // PUT /api/auth/profile — Update name/avatar
-router.put('/profile', authenticate, (req: AuthRequest, res: Response) => {
+router.put('/profile', authenticate, validate(profileSchema), (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user!.id;
     const { name } = req.body;
-    if (!name || typeof name !== 'string' || name.trim().length < 2) {
-      res.status(400).json({ error: 'Name must be at least 2 characters' });
-      return;
-    }
     const trimmed = name.trim();
     const avatar = trimmed.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2);
     (async () => {
@@ -718,6 +814,17 @@ router.put('/change-password', authenticate, async (req: AuthRequest, res: Respo
       [hash, userId]
     );
     logAudit(req, { action: 'password_change', entityType: 'user', entityId: userId, details: 'Password changed via profile' });
+    logSecurityEvent({
+      type: 'password_changed',
+      severity: 'info',
+      userId,
+      email: req.user!.email,
+      ip: getClientIp(req),
+      userAgent: (req.headers['user-agent'] || '').slice(0, 512),
+      endpoint: req.path,
+      method: req.method,
+      details: 'Password changed via user profile',
+    });
     res.json({ message: 'Password changed successfully.' });
   } catch (err: any) {
     console.error('[Auth] Change password error:', err.message);

@@ -6,7 +6,7 @@
  *   Supports multi-step reasoning with up to 10 tool calls per turn.
  */
 import { GoogleGenAI } from '@google/genai';
-import { toolMap, getToolDeclarations } from './tools.js';
+import { toolMap, getToolDeclarations, ToolContext } from './tools.js';
 
 const apiKey = process.env.GEMINI_API_KEY;
 
@@ -21,7 +21,7 @@ const MAX_TOOL_ROUNDS = 10;
 const SYSTEM_INSTRUCTION = `You are Safedify AI Agent — an intelligent HSE (Health, Safety & Environment) assistant for industrial workplaces.
 
 Your capabilities:
-1. **Query & Analyze**: Search incidents, observations, actions, permits, workers, inspections, and more from the SQLite database using your tools.
+1. **Query & Analyze**: Search incidents, observations, actions, permits, workers, inspections, and more from the PostgreSQL database using your tools.
 2. **Calculate Metrics**: Compute TRIR, LTIFR, safety scores, and other KPIs.
 3. **Create Records**: Log new incidents, create corrective actions.
 4. **Custom SQL**: Run read-only SQL queries for complex analysis.
@@ -51,7 +51,7 @@ export interface AgentMessage {
 export async function runAgent(
   userMessage: string,
   conversationHistory: AgentMessage[] = [],
-  userContext?: { userId?: string; userName?: string }
+  userContext?: { userId?: string; userName?: string; orgId?: string }
 ): Promise<{ response: string; toolCalls: { name: string; args: any; result: any }[] }> {
   if (!ai) {
     return {
@@ -128,11 +128,17 @@ export async function runAgent(
 
       if (tool) {
         try {
+          // Build tool context with org scoping for multi-tenancy
+          const toolCtx: ToolContext = {
+            orgId: userContext?.orgId,
+            userId: userContext?.userId,
+            userName: userContext?.userName,
+          };
           // Inject user context for tools that create records
           const argsWithContext = (toolName === 'create_incident' || toolName === 'create_action')
             ? { ...toolArgs, _userId: userContext?.userId, _userName: userContext?.userName }
             : toolArgs;
-          result = tool.execute(argsWithContext);
+          result = await tool.execute(argsWithContext, toolCtx);
         } catch (err: any) {
           result = { error: err.message };
         }

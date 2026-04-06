@@ -326,7 +326,8 @@ router.put('/incidents/:id', validateParams(uuidParamSchema), validate(incidentS
 
   fields.push(`updated_at = NOW()`);
   values.push(req.params.id);
-  await pool.query(`UPDATE incidents SET ${fields.join(', ')} WHERE id = $${values.length}`, values);
+  values.push(req.user?.org_id);
+  await pool.query(`UPDATE incidents SET ${fields.join(', ')} WHERE id = $${values.length - 1} AND org_id = $${values.length}`, values);
   res.json({ message: 'Updated' });
 
   // Notify on status change
@@ -347,7 +348,7 @@ router.put('/incidents/:id', validateParams(uuidParamSchema), validate(incidentS
 });
 
 router.delete('/incidents/:id', validateParams(uuidParamSchema), requireOwnership('incidents', 'reported_by'), requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
-  await pool.query('DELETE FROM incidents WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM incidents WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   res.json({ message: 'Deleted' });
 });
 
@@ -389,8 +390,8 @@ router.put('/actions/:id', validateParams(uuidParamSchema), validate(actionSchem
     `UPDATE actions SET title=COALESCE($1,title), description=COALESCE($2,description), assignee=COALESCE($3,assignee),
      due_date=COALESCE($4,due_date), completed_date=COALESCE($5,completed_date), priority=COALESCE($6,priority),
      status=COALESCE($7,status), action_type=COALESCE($8,action_type), category=COALESCE($9,category),
-     indicator=COALESCE($10,indicator), verified_by=COALESCE($11,verified_by), effectiveness=COALESCE($12,effectiveness) WHERE id=$13`,
-    [title, description, assignee, due_date, completed_date, priority, status, action_type, category, indicator, verified_by, effectiveness, req.params.id]
+     indicator=COALESCE($10,indicator), verified_by=COALESCE($11,verified_by), effectiveness=COALESCE($12,effectiveness) WHERE id=$13 AND org_id=$14`,
+    [title, description, assignee, due_date, completed_date, priority, status, action_type, category, indicator, verified_by, effectiveness, req.params.id, req.user?.org_id]
   );
   res.json({ message: 'Updated' });
 
@@ -416,7 +417,7 @@ router.put('/actions/:id', validateParams(uuidParamSchema), validate(actionSchem
 });
 
 router.delete('/actions/:id', validateParams(uuidParamSchema), requireOwnership('actions', 'created_by', false, 'assignee'), async (req: AuthRequest, res: Response) => {
-  await pool.query('DELETE FROM actions WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM actions WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   res.json({ message: 'Deleted' });
 });
 
@@ -441,14 +442,14 @@ router.put('/observations/:id', validateParams(uuidParamSchema), validate(observ
   await pool.query(
     `UPDATE observations SET type=COALESCE($1,type), category=COALESCE($2,category), description=COALESCE($3,description),
      location=COALESCE($4,location), date=COALESCE($5,date), observer=COALESCE($6,observer), status=COALESCE($7,status),
-     immediate_action=COALESCE($8,immediate_action), images=COALESCE($9,images) WHERE id=$10`,
-    [type, category, description, location, date, observer, status, immediate_action, images ? JSON.stringify(images) : null, req.params.id]
+     immediate_action=COALESCE($8,immediate_action), images=COALESCE($9,images) WHERE id=$10 AND org_id=$11`,
+    [type, category, description, location, date, observer, status, immediate_action, images ? JSON.stringify(images) : null, req.params.id, req.user?.org_id]
   );
   res.json({ message: 'Updated' });
 });
 
 router.delete('/observations/:id', validateParams(uuidParamSchema), requireOwnership('observations', 'created_by'), async (req: AuthRequest, res: Response) => {
-  await pool.query('DELETE FROM observations WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM observations WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   res.json({ message: 'Deleted' });
 });
 
@@ -487,8 +488,8 @@ router.post('/permits', validate(permitSchema), requirePermission('create_permit
 router.put('/permits/:id', validateParams(uuidParamSchema), validate(permitSchema), requirePermission('approve_permit'), async (req: AuthRequest, res: Response) => {
   const { status, approver, approver_comments } = req.body;
   await pool.query(
-    'UPDATE permits SET status=COALESCE($1,status), approver=COALESCE($2,approver), approver_comments=COALESCE($3,approver_comments) WHERE id=$4',
-    [status, approver, approver_comments, req.params.id]
+    'UPDATE permits SET status=COALESCE($1,status), approver=COALESCE($2,approver), approver_comments=COALESCE($3,approver_comments) WHERE id=$4 AND org_id=$5',
+    [status, approver, approver_comments, req.params.id, req.user?.org_id]
   );
   res.json({ message: 'Updated' });
 
@@ -523,7 +524,7 @@ router.put('/permits/:id', validateParams(uuidParamSchema), validate(permitSchem
 });
 
 router.delete('/permits/:id', validateParams(uuidParamSchema), requireOwnership('permits', 'created_by'), async (req: AuthRequest, res: Response) => {
-  await pool.query('DELETE FROM permits WHERE id = $1', [req.params.id]);
+  await pool.query('DELETE FROM permits WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   res.json({ message: 'Deleted' });
 });
 

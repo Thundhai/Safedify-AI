@@ -100,6 +100,52 @@ export const hashToken = (token: string): string => {
   return crypto.createHash('sha256').update(token).digest('hex');
 };
 
+// ---------- TOTP Secret Encryption (AES-256-GCM) ----------
+
+const TOTP_ENCRYPTION_KEY = process.env.TOTP_ENCRYPTION_KEY;
+const _totpDerivedKey: Buffer | null = TOTP_ENCRYPTION_KEY
+  ? crypto.scryptSync(TOTP_ENCRYPTION_KEY, 'safedify-totp-v1', 32)
+  : null;
+
+if (!TOTP_ENCRYPTION_KEY) {
+  console.warn('\x1b[33m[SECURITY] TOTP_ENCRYPTION_KEY not set — TOTP secrets will be stored unencrypted\x1b[0m');
+}
+
+/**
+ * Encrypt a TOTP secret for storage. Uses AES-256-GCM with a derived key.
+ * Format: iv_hex:tag_hex:ciphertext_hex
+ */
+export const encryptTotpSecret = (plaintext: string): string => {
+  if (!_totpDerivedKey) return plaintext;
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', _totpDerivedKey, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `enc:${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`;
+};
+
+/**
+ * Decrypt a TOTP secret from storage.
+ * Handles both encrypted (enc:iv:tag:ct) and legacy plaintext hex formats.
+ */
+export const decryptTotpSecret = (stored: string): string => {
+  if (!stored) return stored;
+  if (!stored.startsWith('enc:')) return stored; // Legacy plaintext hex
+  if (!_totpDerivedKey) return stored;
+  const parts = stored.split(':');
+  if (parts.length !== 4) return stored;
+  try {
+    const iv = Buffer.from(parts[1], 'hex');
+    const tag = Buffer.from(parts[2], 'hex');
+    const encrypted = Buffer.from(parts[3], 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', _totpDerivedKey, iv);
+    decipher.setAuthTag(tag);
+    return decipher.update(encrypted, undefined, 'utf8') + decipher.final('utf8');
+  } catch {
+    return stored; // Decryption failed — treat as legacy plaintext
+  }
+};
+
 // ---------- Middleware ----------
 
 export const authenticate = (req: AuthRequest, res: Response, next: NextFunction): void => {
@@ -120,6 +166,20 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
       if (!dbUser) {
         res.status(401).json({ error: 'User account no longer exists' });
         return;
+      }
+
+      // SECURITY: Block all API access when password change is required
+      // Only allow the change-password endpoint itself
+      if (dbUser.must_change_password) {
+        const allowedPaths = ['/api/auth/change-password', '/api/auth/me'];
+        const reqPath = req.originalUrl?.split('?')[0] || req.path;
+        if (!allowedPaths.includes(reqPath)) {
+          res.status(403).json({ 
+            error: 'Password change required before accessing the application.',
+            requiresPasswordChange: true
+          });
+          return;
+        }
       }
 
       // Use DB values (not stale JWT values) for role/tier

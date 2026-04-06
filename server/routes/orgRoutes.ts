@@ -13,7 +13,7 @@ import { Router, Response } from 'express';
 import { v4 as uuid } from 'uuid';
 import crypto from 'crypto';
 import pool from '../postgres';
-import { AuthRequest, authenticate, requireRole } from '../auth.js';
+import { AuthRequest, authenticate, requireRole, hashToken } from '../auth.js';
 import { validate, validateParams, ValidationSchema, sanitizeString } from '../middleware/inputValidation.js';
 import { sendEmail } from '../services/emailService.js';
 import { logAudit } from './auditRoutes.js';
@@ -183,12 +183,13 @@ router.post('/invite', validate(inviteSchema), async (req: AuthRequest, res: Res
 
   const id = uuid();
   const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashToken(token); // Store only the hash in DB
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
   await pool.query(
     `INSERT INTO org_invites (id, org_id, email, role, token, expires_at, invited_by)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [id, orgId, email, role, token, expiresAt.toISOString(), req.user?.id]
+    [id, orgId, email, role, tokenHash, expiresAt.toISOString(), req.user?.id]
   );
 
   // Send invite email

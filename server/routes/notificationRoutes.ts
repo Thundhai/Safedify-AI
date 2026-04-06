@@ -39,7 +39,7 @@ router.get('/', validateQuery(paginationQuerySchema), async (req: AuthRequest, r
 // ---------- Unread count ----------
 router.get('/unread', async (req: AuthRequest, res: Response) => {
   const result = await pool.query(
-    'SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND is_read = 0',
+    'SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND is_read = FALSE',
     [req.user!.id]
   );
   const row = result.rows[0];
@@ -49,7 +49,7 @@ router.get('/unread', async (req: AuthRequest, res: Response) => {
 // ---------- Mark one as read ----------
 router.put('/:id/read', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
   await pool.query(
-    'UPDATE notifications SET is_read = 1 WHERE id = $1 AND user_id = $2',
+    'UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2',
     [req.params.id as string, req.user!.id]
   );
   res.json({ message: 'Marked as read' });
@@ -58,7 +58,7 @@ router.put('/:id/read', validateParams(uuidParamSchema), async (req: AuthRequest
 // ---------- Mark all as read ----------
 router.put('/read-all', async (req: AuthRequest, res: Response) => {
   await pool.query(
-    'UPDATE notifications SET is_read = 1 WHERE user_id = $1 AND is_read = 0',
+    'UPDATE notifications SET is_read = TRUE WHERE user_id = $1 AND is_read = FALSE',
     [req.user!.id]
   );
   res.json({ message: 'All marked as read' });

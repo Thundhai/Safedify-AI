@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import crypto from 'crypto';
 import pool from '../postgres';
-import { AuthRequest, authenticate } from '../auth.js';
+import { AuthRequest, authenticate, encryptTotpSecret, decryptTotpSecret } from '../auth.js';
 import { logAudit } from './auditRoutes.js';
 import { validate, ValidationSchema } from '../middleware/inputValidation.js';
 import { logSecurityEvent, getClientIp } from '../middleware/securityLogger.js';
@@ -117,8 +117,9 @@ router.post('/setup', authenticate, async (req: AuthRequest, res: Response) => {
     const secretHex = generateSecret();
     const secretB32 = base32Encode(secretHex);
 
-    // Store secret (not yet enabled until verified)
-    await pool.query('UPDATE users SET totp_secret = $1 WHERE id = $2', [secretHex, user.id]);
+    // Store secret encrypted at rest (not yet enabled until verified)
+    const encryptedSecret = encryptTotpSecret(secretHex);
+    await pool.query('UPDATE users SET totp_secret = $1 WHERE id = $2', [encryptedSecret, user.id]);
 
     const issuer = 'Safedify';
     const otpauthUri = `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(user.email)}?secret=${secretB32}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
@@ -142,16 +143,17 @@ router.post('/verify', authenticate, validate(tokenSchema), async (req: AuthRequ
     if (!row?.totp_secret) { res.status(400).json({ error: 'No 2FA setup in progress' }); return; }
     if (row.totp_enabled) { res.status(400).json({ error: '2FA is already enabled' }); return; }
 
-    if (!verifyTOTP(row.totp_secret, token)) {
+    const decryptedSecret = decryptTotpSecret(row.totp_secret);
+    if (!verifyTOTP(decryptedSecret, token)) {
       res.status(400).json({ error: 'Invalid verification code. Please try again.' });
       return;
     }
 
-    // Generate backup codes
+    // Generate backup codes (stored encrypted)
     const backupCodes = Array.from({ length: 8 }, () => crypto.randomBytes(4).toString('hex'));
-    const backupHash = JSON.stringify(backupCodes);
+    const encryptedBackup = encryptTotpSecret(JSON.stringify(backupCodes));
 
-    await pool.query('UPDATE users SET totp_enabled = TRUE, totp_backup_codes = $1 WHERE id = $2', [backupHash, user.id]);
+    await pool.query('UPDATE users SET totp_enabled = TRUE, totp_backup_codes = $1 WHERE id = $2', [encryptedBackup, user.id]);
 
     logAudit(req, { action: '2fa_enabled', entityType: 'user', entityId: user.id, details: '2FA enabled via TOTP' });
 
@@ -162,45 +164,12 @@ router.post('/verify', authenticate, validate(tokenSchema), async (req: AuthRequ
   }
 });
 
-// POST /api/auth/2fa/validate — Validate TOTP code during login (rate-limited, requires userId + token)
-router.post('/validate', twoFAValidateLimit, validate(validateSchema), async (req: AuthRequest, res: Response) => {
-  try {
-    const { userId, token } = req.body;
-    if (!userId || !token) { res.status(400).json({ error: 'User ID and token are required' }); return; }
-
-    const result = await pool.query('SELECT totp_secret, totp_enabled, totp_backup_codes FROM users WHERE id = $1', [userId]);
-    const row = result.rows[0];
-    if (!row?.totp_enabled || !row?.totp_secret) {
-      // Generic error to prevent enumeration of which accounts have 2FA
-      res.status(401).json({ valid: false, error: 'Invalid 2FA code' });
-      return;
-    }
-
-    // Check TOTP
-    if (verifyTOTP(row.totp_secret, token)) {
-      res.json({ valid: true });
-      return;
-    }
-
-    // Check backup codes
-    if (row.totp_backup_codes) {
-      try {
-        const codes: string[] = JSON.parse(row.totp_backup_codes);
-        const idx = codes.indexOf(token);
-        if (idx !== -1) {
-          codes.splice(idx, 1);
-          await pool.query('UPDATE users SET totp_backup_codes = $1 WHERE id = $2', [JSON.stringify(codes), userId]);
-          res.json({ valid: true, backupCodeUsed: true, remainingBackupCodes: codes.length });
-          return;
-        }
-      } catch { /* ignore parse errors */ }
-    }
-
-    res.status(401).json({ valid: false, error: 'Invalid 2FA code' });
-  } catch (err: any) {
-    console.error('[2FA] Validate error:', err.message);
-    res.status(500).json({ error: 'Failed to validate 2FA' });
-  }
+// POST /api/auth/2fa/validate — DEPRECATED: Use /api/auth/login/2fa with challengeToken instead.
+// This endpoint is kept temporarily for backward compatibility but now returns 410 Gone.
+router.post('/validate', twoFAValidateLimit, (_req: AuthRequest, res: Response) => {
+  res.status(410).json({ 
+    error: 'This endpoint is deprecated. Use POST /api/auth/login/2fa with challengeToken instead.',
+  });
 });
 
 // DELETE /api/auth/2fa — Disable 2FA

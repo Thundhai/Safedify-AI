@@ -74,6 +74,31 @@ const ANOMALY_THRESHOLDS = {
 // Track failed auth attempts per IP
 const failedAuthByIp = new Map<string, { count: number; firstAttempt: number }>();
 
+// Max unique IPs to track before evicting stale entries
+const MAX_TRACKED_IPS = 10000;
+
+/**
+ * Evict stale entries from tracking maps to prevent memory leaks
+ */
+function evictStaleEntries() {
+  const now = Date.now();
+  for (const [ip, record] of ipRequestCounts) {
+    if (now - record.firstSeen > IP_WINDOW_MS * 2) {
+      ipRequestCounts.delete(ip);
+    }
+  }
+  for (const [ip, record] of failedAuthByIp) {
+    if (now - record.firstAttempt > IP_WINDOW_MS * 2) {
+      failedAuthByIp.delete(ip);
+    }
+  }
+}
+
+// Run eviction every 5 minutes
+const evictionInterval = setInterval(evictStaleEntries, 5 * 60 * 1000);
+// Allow process to exit despite the interval
+if (evictionInterval.unref) evictionInterval.unref();
+
 /**
  * Extract client IP from request, handling proxies
  */
@@ -94,6 +119,10 @@ export function analyzeIpBehavior(ip: string, endpoint: string): { suspicious: b
   let record = ipRequestCounts.get(ip);
   
   if (!record || (now - record.firstSeen) > IP_WINDOW_MS) {
+    // Evict stale entries if map is too large
+    if (ipRequestCounts.size >= MAX_TRACKED_IPS) {
+      evictStaleEntries();
+    }
     // Reset or create new record
     record = { count: 1, firstSeen: now, endpoints: new Set([endpoint]) };
     ipRequestCounts.set(ip, record);
@@ -408,6 +437,159 @@ export function logUnauthorizedAccess(req: AuthRequest, reason: string): void {
 }
 
 // ============================================================
+// Middleware: API Response Logger (captures 4xx/5xx responses)
+// ============================================================
+
+// Track error responses per IP for anomaly detection
+const ipErrorCounts = new Map<string, { total: number; errors: number; firstSeen: number }>();
+
+/**
+ * Intercept all API responses to log 4xx/5xx status codes.
+ * This catches errors from explicit res.status().json() calls
+ * that never reach the securityErrorHandler.
+ * Mount early in the middleware chain.
+ */
+export function apiResponseLogger() {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const ip = getClientIp(req);
+    const originalJson = res.json.bind(res);
+
+    res.json = function (body: any) {
+      const statusCode = res.statusCode;
+
+      // Track all responses for error-ratio anomaly detection
+      const now = Date.now();
+      let errorRecord = ipErrorCounts.get(ip);
+      if (!errorRecord || (now - errorRecord.firstSeen) > IP_WINDOW_MS) {
+        errorRecord = { total: 0, errors: 0, firstSeen: now };
+        ipErrorCounts.set(ip, errorRecord);
+      }
+      errorRecord.total++;
+
+      if (statusCode >= 400) {
+        errorRecord.errors++;
+        const authReq = req as AuthRequest;
+        const userAgent = (req.headers['user-agent'] || '').slice(0, 512);
+
+        const severity: SeverityLevel =
+          statusCode >= 500 ? 'critical' :
+          statusCode === 401 || statusCode === 403 ? 'warning' :
+          'info';
+
+        logSecurityEvent({
+          type: 'api_error',
+          severity,
+          userId: authReq.user?.id,
+          email: authReq.user?.email,
+          ip,
+          userAgent,
+          endpoint: req.path,
+          method: req.method,
+          statusCode,
+          details: typeof body?.error === 'string' ? body.error.slice(0, 500) : `HTTP ${statusCode} response`,
+        });
+
+        // Detect high error ratio from single IP (> 80% errors with at least 10 requests)
+        if (errorRecord.total >= 10 && (errorRecord.errors / errorRecord.total) > 0.8) {
+          logSecurityEvent({
+            type: 'suspicious_activity',
+            severity: 'warning',
+            ip,
+            userAgent,
+            endpoint: req.path,
+            method: req.method,
+            details: `High error ratio: ${errorRecord.errors}/${errorRecord.total} requests returned errors (${Math.round(errorRecord.errors / errorRecord.total * 100)}%)`,
+            metadata: { errorRatio: errorRecord.errors / errorRecord.total, totalRequests: errorRecord.total },
+          });
+        }
+      }
+
+      return originalJson(body);
+    };
+
+    next();
+  };
+}
+
+// ============================================================
+// Unusual Traffic Pattern Detection
+// ============================================================
+
+// Track per-IP access to sensitive endpoints (rapid hits)
+const sensitiveEndpointHits = new Map<string, { endpoint: string; count: number; firstHit: number }[]>();
+
+const SENSITIVE_ENDPOINTS = [
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
+  '/api/auth/login/2fa',
+  '/api/admin',
+  '/api/export',
+  '/api/audit-logs',
+];
+
+const TRAFFIC_THRESHOLDS = {
+  sensitiveEndpointPerMinute: 15,  // >15 hits on a single sensitive endpoint per minute
+};
+
+/**
+ * Detect unusual traffic patterns:
+ * - Rapid hits on sensitive endpoints (potential brute-force or enumeration)
+ * Mount after securityMonitor in the middleware chain.
+ */
+export function trafficAnomalyDetector() {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    const ip = getClientIp(req);
+    const endpoint = req.path;
+    const userAgent = (req.headers['user-agent'] || '').slice(0, 512);
+    const authReq = req as AuthRequest;
+    const now = Date.now();
+
+    // --- Sensitive endpoint velocity tracking ---
+    const isSensitive = SENSITIVE_ENDPOINTS.some(e => endpoint.startsWith(e));
+    if (isSensitive) {
+      let ipHits = sensitiveEndpointHits.get(ip);
+      if (!ipHits) {
+        ipHits = [];
+        sensitiveEndpointHits.set(ip, ipHits);
+      }
+
+      // Find or create tracking entry for this endpoint
+      let entry = ipHits.find(h => h.endpoint === endpoint);
+      if (!entry || (now - entry.firstHit) > IP_WINDOW_MS) {
+        // Reset or create
+        if (entry) {
+          entry.count = 1;
+          entry.firstHit = now;
+        } else {
+          entry = { endpoint, count: 1, firstHit: now };
+          ipHits.push(entry);
+        }
+      } else {
+        entry.count++;
+      }
+
+      if (entry.count > TRAFFIC_THRESHOLDS.sensitiveEndpointPerMinute) {
+        logSecurityEvent({
+          type: 'suspicious_activity',
+          severity: 'critical',
+          userId: authReq.user?.id,
+          ip,
+          userAgent,
+          endpoint,
+          method: req.method,
+          details: `Rapid sensitive endpoint access: ${entry.count} hits to ${endpoint} in 1 minute`,
+          metadata: { hitsPerMinute: entry.count, endpoint },
+        });
+      }
+    }
+
+    next();
+  };
+}
+
+// ============================================================
 // Cleanup: Periodically clean old IP tracking data
 // ============================================================
 
@@ -423,6 +605,21 @@ setInterval(() => {
   for (const [ip, record] of failedAuthByIp.entries()) {
     if (now - record.firstAttempt > IP_WINDOW_MS * 2) {
       failedAuthByIp.delete(ip);
+    }
+  }
+
+  for (const [ip, record] of ipErrorCounts.entries()) {
+    if (now - record.firstSeen > IP_WINDOW_MS * 2) {
+      ipErrorCounts.delete(ip);
+    }
+  }
+
+  for (const [ip, hits] of sensitiveEndpointHits.entries()) {
+    const active = hits.filter(h => now - h.firstHit <= IP_WINDOW_MS * 2);
+    if (active.length === 0) {
+      sensitiveEndpointHits.delete(ip);
+    } else {
+      sensitiveEndpointHits.set(ip, active);
     }
   }
 }, IP_WINDOW_MS);

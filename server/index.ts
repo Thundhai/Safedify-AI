@@ -9,7 +9,7 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { sessionRateLimit } from './middleware/sessionRateLimit.js';
 import { sanitizeBody } from './middleware/sanitize.js';
-import { securityMonitor, securityErrorHandler, rateLimitLogger } from './middleware/securityLogger.js';
+import { securityMonitor, securityErrorHandler, rateLimitLogger, trafficAnomalyDetector } from './middleware/securityLogger.js';
 import { detectInjections } from './middleware/inputValidation.js';
 import { 
   trackRequestTiming, 
@@ -26,7 +26,7 @@ import {
 import pool from './postgres.js';
 
 // Auth
-import { seedDefaultUsers } from './auth.js';
+import { seedDefaultUsers, authenticate } from './auth.js';
 
 // Routes
 import authRoutes from './routes/authRoutes.js';
@@ -101,6 +101,9 @@ if (isProduction) {
 
 // ---------- Security Monitoring (detect suspicious patterns) ----------
 app.use(securityMonitor());
+
+// ---------- Unusual Traffic Pattern Detection (sensitive endpoint velocity) ----------
+app.use(trafficAnomalyDetector());
 
 // ---------- Abuse Protection (request tracking, IP blocking, bot detection) ----------
 app.use(trackRequestTiming());
@@ -204,12 +207,9 @@ app.get('/api/health', async (_req, res) => {
     status: isHealthy ? 'ok' : 'degraded',
     server: 'Safedify AI Backend',
     version: '1.0.0',
-    environment: NODE_ENV,
     timestamp: new Date().toISOString(),
-    agent: !!process.env.GEMINI_API_KEY ? 'enabled' : 'disabled',
     database: {
       status: dbStatus,
-      latencyMs: dbLatencyMs,
     },
   });
 });
@@ -231,10 +231,10 @@ app.use('/api/search', apiLimiter, searchRoutes);
 app.use('/api/admin', apiLimiter, adminRoutes);
 app.use('/api/org', apiLimiter, orgRoutes);
 
-// ---------- OpenAPI spec ----------
+// ---------- OpenAPI spec (requires auth) ----------
 const openapiPath = path.join(__dirname, 'openapi.yaml');
 if (existsSync(openapiPath)) {
-  app.get('/api/docs/openapi.yaml', (_req, res) => {
+  app.get('/api/docs/openapi.yaml', authenticate, (_req, res) => {
     res.set('Content-Type', 'text/yaml');
     res.send(readFileSync(openapiPath, 'utf-8'));
   });
@@ -270,7 +270,7 @@ async function start() {
   // --- JWT Secret Validation ---
   const jwtSecret = process.env.JWT_SECRET || '';
   const DEFAULT_SECRETS = ['safedify-secret-key-change-in-production', 'change-me-to-a-long-random-string', ''];
-  if (isProduction && !process.env.VERCEL && DEFAULT_SECRETS.includes(jwtSecret)) {
+  if (isProduction && DEFAULT_SECRETS.includes(jwtSecret)) {
     console.error('\n\x1b[31m[FATAL] JWT_SECRET is not set or uses a default value.\x1b[0m');
     console.error('Set a strong, unique JWT_SECRET environment variable before running in production.');
     console.error('Example: JWT_SECRET=$(openssl rand -base64 48)\n');
@@ -305,7 +305,14 @@ async function start() {
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-// Only start the HTTP server when running standalone (not on Vercel)
-if (!process.env.VERCEL) {
+// Only start the HTTP server when running standalone (not when imported for tests)
+// ESM-compatible entry point check
+function normalizePath(p: string) {
+  return p.replace(/\\/g, '/').toLowerCase();
+}
+const metaUrl = import.meta.url.toLowerCase();
+const argvUrl = 'file:///' + normalizePath(process.argv[1]);
+const isEntryPoint = metaUrl === argvUrl;
+if (isEntryPoint) {
   start().catch(console.error);
 }

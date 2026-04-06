@@ -64,6 +64,7 @@ router.post('/chat', validate(chatSchema), async (req: AuthRequest, res: Respons
     const { response, toolCalls } = await runAgent(sanitizedMessage, history, {
       userId: req.user?.id,
       userName: req.user?.name,
+      orgId: req.user?.org_id,
     });
 
     // Update history
@@ -114,7 +115,7 @@ router.post('/chat', validate(chatSchema), async (req: AuthRequest, res: Respons
       return;
     }
     console.error('[Agent Route Error]', err);
-    res.status(500).json({ error: err.message || 'Agent error' });
+    res.status(500).json({ error: 'An error occurred processing your request. Please try again.' });
   }
 });
 
