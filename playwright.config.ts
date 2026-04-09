@@ -17,7 +17,7 @@ export default defineConfig({
     reuseExistingServer: true,
     timeout: 90000,
     env: {
-      PORT: '4500',
+      PORT: '4000',
       SEED_DEMO_USERS: 'true',
     },
     stdout: 'pipe',
