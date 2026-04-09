@@ -306,13 +306,11 @@ async function start() {
 }
 
 // Only start the HTTP server when running standalone (not when imported for tests / Vercel)
-// ESM-compatible entry point check
-function normalizePath(p: string) {
-  return p.replace(/\\/g, '/').toLowerCase();
-}
-const metaUrl = import.meta.url.toLowerCase();
+// ESM-compatible entry point check using Node's built-in fileURLToPath (works on Linux + Windows)
 const argvEntry = process.argv[1];
-const isEntryPoint = argvEntry ? metaUrl === 'file:///' + normalizePath(argvEntry) : false;
+const isEntryPoint = argvEntry
+  ? fileURLToPath(import.meta.url).toLowerCase() === path.resolve(argvEntry).toLowerCase()
+  : false;
 if (isEntryPoint) {
   start().catch(console.error);
 }
