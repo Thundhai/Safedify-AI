@@ -15,7 +15,7 @@ let pending2FAChallengeToken: string | null = null;
 export const getPending2FAUserId = () => pending2FAChallengeToken;
 export const clearPending2FA = () => { pending2FAChallengeToken = null; };
 
-export const login = async (email: string, password: string): Promise<AuthUser | null | '2fa_required'> => {
+export const login = async (email: string, password: string): Promise<AuthUser | null | '2fa_required' | 'password_change_required'> => {
     try {
         const data = await apiLogin(email, password);
 
@@ -36,7 +36,15 @@ export const login = async (email: string, password: string): Promise<AuthUser |
                 org_id: data.user.org_id,
                 org_name: data.user.org_name,
             };
+            // Store token so change-password API call works
+            setAuthToken(data.token);
             localStorage.setItem(AUTH_KEY, JSON.stringify(user));
+
+            // Handle forced password change for seeded/reset accounts
+            if (data.requiresPasswordChange) {
+                return 'password_change_required';
+            }
+
             return user;
         }
         return null;

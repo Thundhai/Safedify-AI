@@ -7,7 +7,7 @@ import { getRoles } from '../services/storageService';
 interface AuthContextType {
   user: AuthUser | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<boolean | '2fa_required'>;
+  login: (email: string, password: string) => Promise<boolean | '2fa_required' | 'password_change_required'>;
   loginWith2FA: (token: string) => Promise<boolean>;
   register: (name: string, email: string, password: string, role: UserRole, organizationName?: string, inviteToken?: string) => Promise<boolean | 'verification_required'>;
   logout: () => void;
@@ -58,10 +58,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     init();
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean | '2fa_required'> => {
+  const login = async (email: string, password: string): Promise<boolean | '2fa_required' | 'password_change_required'> => {
     try {
       const result = await authLogin(email, password);
       if (result === '2fa_required') return '2fa_required';
+      if (result === 'password_change_required') return 'password_change_required';
       if (result && typeof result === 'object') {
         setUser(result);
         await loadRoles();

@@ -2,13 +2,17 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Loader2, ShieldCheck, Lock, Mail, AlertCircle, ArrowRight, ArrowLeft, HardHat, KeyRound } from 'lucide-react';
+import { changePassword } from '../services/authService';
+import { Loader2, ShieldCheck, Lock, Mail, AlertCircle, ArrowRight, ArrowLeft, HardHat, KeyRound, CheckCircle } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [totpCode, setTotpCode] = useState('');
   const [needs2FA, setNeeds2FA] = useState(false);
+  const [needsPasswordChange, setNeedsPasswordChange] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login, loginWith2FA } = useAuth();
@@ -23,6 +27,8 @@ export const Login: React.FC = () => {
       const result = await login(email, password);
       if (result === '2fa_required') {
         setNeeds2FA(true);
+      } else if (result === 'password_change_required') {
+        setNeedsPasswordChange(true);
       } else if (result === true) {
         navigate('/');
       } else {
@@ -58,6 +64,40 @@ export const Login: React.FC = () => {
     }
   };
 
+  const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (newPassword.length < 8) {
+      setError('New password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmNewPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    if (newPassword === password) {
+      setError('New password must be different from the current password.');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await changePassword(password, newPassword);
+      // Password changed successfully — log in again with new password
+      const result = await login(email, newPassword);
+      if (result === true) {
+        navigate('/');
+      } else {
+        setError('Password changed. Please sign in with your new password.');
+        setNeedsPasswordChange(false);
+        setPassword('');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to change password.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background Decor */}
@@ -84,14 +124,55 @@ export const Login: React.FC = () => {
                 <p className="text-slate-500">Enter your credentials to access your workspace.</p>
             </div>
 
-            <form onSubmit={needs2FA ? handle2FASubmit : handleSubmit} className="space-y-5">
+            <form onSubmit={needsPasswordChange ? handlePasswordChangeSubmit : needs2FA ? handle2FASubmit : handleSubmit} className="space-y-5">
             {error && (
                 <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg flex items-center gap-2 border border-red-100 animate-in fade-in">
                 <AlertCircle size={16} /> {error}
                 </div>
             )}
 
-            {needs2FA ? (
+            {needsPasswordChange ? (
+              <>
+                <div className="text-center mb-2">
+                  <div className="inline-flex items-center justify-center w-14 h-14 bg-amber-100 rounded-full mb-3">
+                    <Lock size={28} className="text-amber-600" />
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-800">Password Change Required</h2>
+                  <p className="text-sm text-slate-500">Please set a new password to continue.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-slate-700">New Password</label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      required
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                      placeholder="Enter new password"
+                      minLength={8}
+                      autoFocus
+                    />
+                    <Lock className="absolute left-3 top-3.5 text-slate-400" size={18} />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold text-slate-700">Confirm New Password</label>
+                  <div className="relative">
+                    <input
+                      type="password"
+                      required
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                      placeholder="Confirm new password"
+                      minLength={8}
+                    />
+                    <CheckCircle className="absolute left-3 top-3.5 text-slate-400" size={18} />
+                  </div>
+                </div>
+              </>
+            ) : needs2FA ? (
               <>
                 <div className="text-center mb-2">
                   <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-100 rounded-full mb-3">
@@ -159,7 +240,7 @@ export const Login: React.FC = () => {
                 disabled={isSubmitting}
                 className="w-full bg-brand-navy hover:bg-slate-800 text-white py-3.5 rounded-xl font-bold transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-                {isSubmitting ? <Loader2 className="animate-spin" /> : needs2FA ? 'Verify Code' : 'Sign In'}
+                {isSubmitting ? <Loader2 className="animate-spin" /> : needsPasswordChange ? 'Set New Password' : needs2FA ? 'Verify Code' : 'Sign In'}
             </button>
 
 
