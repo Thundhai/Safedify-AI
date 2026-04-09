@@ -305,14 +305,14 @@ async function start() {
   process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
-// Only start the HTTP server when running standalone (not when imported for tests)
+// Only start the HTTP server when running standalone (not when imported for tests / Vercel)
 // ESM-compatible entry point check
 function normalizePath(p: string) {
   return p.replace(/\\/g, '/').toLowerCase();
 }
 const metaUrl = import.meta.url.toLowerCase();
-const argvUrl = 'file:///' + normalizePath(process.argv[1]);
-const isEntryPoint = metaUrl === argvUrl;
+const argvEntry = process.argv[1];
+const isEntryPoint = argvEntry ? metaUrl === 'file:///' + normalizePath(argvEntry) : false;
 if (isEntryPoint) {
   start().catch(console.error);
 }

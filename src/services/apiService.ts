@@ -63,7 +63,6 @@ const apiFetch = async (path: string, options: RequestInit = {}, timeoutMs = 300
       if (res.status === 401) {
         // Clear stale token on 401 to prevent repeated failed requests
         setAuthToken(null);
-        throw new Error('Session expired. Please log in again.');
       }
       throw new Error(body.error || `API Error: ${res.status}`);
     }
