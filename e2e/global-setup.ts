@@ -1,5 +1,8 @@
 import { execSync } from 'child_process';
 import { randomUUID } from 'crypto';
+import { writeFileSync, unlinkSync } from 'fs';
+import { tmpdir } from 'os';
+import path from 'path';
 import bcrypt from 'bcryptjs';
 
 export default async function globalSetup() {
@@ -64,10 +67,13 @@ export default async function globalSetup() {
       WHERE email IN ('admin@safedify.com', 'worker@safedify.com', 'supervisor@safedify.com') AND org_id IS NULL;
     `;
 
-    execSync(`${psql} -c "${seedSql.replace(/\n/g, ' ')}"`, {
+    const tmpFile = path.join(tmpdir(), `e2e-seed-${Date.now()}.sql`);
+    writeFileSync(tmpFile, seedSql);
+    execSync(`${psql} -f "${tmpFile}"`, {
       stdio: 'inherit',
       env: psqlEnv,
     });
+    unlinkSync(tmpFile);
     console.log('[GlobalSetup] Seeded demo users + org');
   } catch (err) {
     console.error('[GlobalSetup] Failed to seed demo users:', (err as any).message);

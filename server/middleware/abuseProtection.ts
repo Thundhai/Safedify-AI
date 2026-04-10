@@ -28,7 +28,7 @@ const ABUSE_CONFIG = {
   // Login protection
   login: {
     windowMs: 15 * 60 * 1000,     // 15 minutes
-    maxAttempts: 5,               // Per IP
+    maxAttempts: process.env.NODE_ENV === 'production' ? 5 : 50,  // Relaxed in dev/test
     blockDurationMs: 30 * 60 * 1000, // 30 min block after exceeded
   },
   // Registration protection
