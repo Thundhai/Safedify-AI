@@ -25,6 +25,7 @@ const PRIVATE_HOST_PATTERNS = [
 // Managed cloud DB hostnames are allowed (they restrict access via their own firewalls/VPCs)
 const CLOUD_DB_PATTERNS = [
   /\.supabase\.co$/i,
+  /\.supabase\.com$/i,
   /\.neon\.tech$/i,
   /\.rds\.amazonaws\.com$/i,
   /\.database\.azure\.com$/i,
