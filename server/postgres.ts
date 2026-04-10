@@ -90,8 +90,13 @@ const poolConfig: PoolConfig = connectionString
     max: parseInt(process.env.PG_POOL_MAX || '20'),
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
-    // SSL: required in production; default to verifying certs
-    ssl: isProduction ? { rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED !== 'false' } : undefined,
+    // SSL: required in production.
+    // Managed DB poolers (Supabase, Neon) use self-signed certs, so default
+    // rejectUnauthorized to false for connection-string setups (pooler URLs).
+    // Override with PG_SSL_REJECT_UNAUTHORIZED=true for providers with valid certs.
+    ssl: isProduction
+      ? { rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED === 'true' }
+      : undefined,
   }
   : {
     // Individual connection parameters for local/custom setups
