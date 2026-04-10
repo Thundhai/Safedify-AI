@@ -20,7 +20,7 @@ const Type = {
 };
 
 const API_BASE = (import.meta as any).env.VITE_API_URL || '/api';
-const MODEL_NAME = "gemini-2.0-flash"; // Use latest stable model
+const MODEL_NAME = "gemini-2.5-flash"; // Use latest stable model
 
 /**
  * Default config to disable thinking for faster responses

@@ -18,19 +18,18 @@ if (!apiKey) {
 }
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
-// Allowlist of valid model names for @google/genai SDK (March 2026)
-// To update: Review https://ai.google.dev/models/gemini regularly for new/retired models.
-// Update this list as Gemini/AI models evolve to ensure compatibility and access to latest features.
+// Allowlist of valid model names for @google/genai SDK (April 2026)
+// To update: Review https://ai.google.dev/gemini-api/docs/models regularly for new/retired models.
 const ALLOWED_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-pro',
   'gemini-2.5-flash-preview-05-20',
   'gemini-2.5-pro-preview-05-06',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash-001',
-  'gemini-1.5-pro-001',
 ];
 
 // Fallback model if preferred model fails (most stable/available)
-const FALLBACK_MODEL = 'gemini-2.0-flash';
+const FALLBACK_MODEL = 'gemini-2.5-flash';
 
 /**
  * POST /api/ai/generate
@@ -58,8 +57,8 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Validate model name if provided - use gemini-2.0-flash as default
-    const requestedModel = model && ALLOWED_MODELS.includes(model) ? model : 'gemini-2.0-flash';
+    // Validate model name if provided - use gemini-2.5-flash as default
+    const requestedModel = model && ALLOWED_MODELS.includes(model) ? model : 'gemini-2.5-flash';
 
     // Try with requested model, fallback to stable model if it fails with model-specific error
     let response;
@@ -137,8 +136,8 @@ router.post('/chat', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    // Validate model name if provided - use gemini-2.0-flash as default
-    const requestedModel = model && ALLOWED_MODELS.includes(model) ? model : 'gemini-2.0-flash';
+    // Validate model name if provided - use gemini-2.5-flash as default
+    const requestedModel = model && ALLOWED_MODELS.includes(model) ? model : 'gemini-2.5-flash';
 
     // Try with requested model, fallback to stable model if it fails
     let result;
