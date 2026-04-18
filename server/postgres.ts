@@ -87,9 +87,15 @@ const poolConfig: PoolConfig = connectionString
   ? {
     // When a connection string is provided (Vercel/Supabase/Neon), use it exclusively
     connectionString,
-    max: parseInt(process.env.PG_POOL_MAX || '20'),
-    idleTimeoutMillis: 30000,
+    // Serverless: keep pool small — each invocation needs 1-2 connections max.
+    // Supabase's PgBouncer handles the real pooling server-side.
+    max: parseInt(process.env.PG_POOL_MAX || (isProduction ? '3' : '20')),
+    idleTimeoutMillis: isProduction ? 10000 : 30000, // Release idle connections faster in serverless
     connectionTimeoutMillis: 5000,
+    // Prevent queries from hanging on stale/broken connections (e.g. PgBouncer recycled the server conn)
+    query_timeout: 15000,
+    // Allow the pool to exit cleanly in serverless environments
+    allowExitOnIdle: isProduction,
     // SSL: required in production.
     // Managed DB poolers (Supabase, Neon) use self-signed certs, so default
     // rejectUnauthorized to false for connection-string setups (pooler URLs).
