@@ -260,6 +260,7 @@ router.get('/incidents/:id', validateParams(uuidParamSchema), async (req: AuthRe
 });
 
 router.post('/incidents', validate(incidentSchema), async (req: AuthRequest, res: Response) => {
+  try {
   const b = req.body;
   const id = uuid();
   await pool.query(
@@ -272,7 +273,7 @@ router.post('/incidents', validate(incidentSchema), async (req: AuthRequest, res
   , [id, b.description ?? null, b.location ?? null, b.date || new Date().toISOString(), b.type ?? null, b.category || 'Near Miss',
     b.severity ?? null, b.status || 'Open', req.user?.id ?? null,
     b.image || (b.images?.[0] ?? null),
-    b.images ? JSON.stringify(b.images) : null,
+    Array.isArray(b.images) && b.images.length > 0 ? b.images : null,
     b.root_cause ?? null, b.corrective_actions ?? null, b.days_lost || 0,
     b.body_part ?? null, b.mechanism ?? null, b.immediate_action ?? null,
     b.date_reported || new Date().toISOString(), b.department ?? null, b.shift ?? null, b.weather_conditions ?? null, b.task_being_performed ?? null,
@@ -293,9 +294,14 @@ router.post('/incidents', validate(incidentSchema), async (req: AuthRequest, res
     entityType: 'incident',
     entityId: id,
   }).catch((err: any) => console.error('[Notify] incident create:', err.message));
+  } catch (err: any) {
+    console.error('[POST /incidents] Error:', err.message);
+    res.status(500).json({ error: 'Failed to create incident' });
+  }
 });
 
 router.put('/incidents/:id', validateParams(uuidParamSchema), validate(incidentSchema), requireOwnership('incidents', 'reported_by'), async (req: AuthRequest, res: Response) => {
+  try {
   const b = req.body;
   // Build dynamic SET clause for only provided fields
   const fields: string[] = [];
@@ -314,7 +320,7 @@ router.put('/incidents/:id', validateParams(uuidParamSchema), validate(incidentS
     if (val !== undefined) { fields.push(`${col} = $${fields.length + 1}`); values.push(val); }
   }
   // JSON fields
-  if (b.images !== undefined) { fields.push(`images = $${fields.length + 1}`); values.push(JSON.stringify(b.images)); fields.push(`image = $${fields.length + 1}`); values.push(b.images?.[0] ?? null); }
+  if (b.images !== undefined) { fields.push(`images = $${fields.length + 1}`); values.push(Array.isArray(b.images) ? b.images : null); fields.push(`image = $${fields.length + 1}`); values.push(b.images?.[0] ?? null); }
   if (b.injured_persons !== undefined) { fields.push(`injured_persons = $${fields.length + 1}`); values.push(JSON.stringify(b.injured_persons)); }
   if (b.witnesses !== undefined) { fields.push(`witnesses = $${fields.length + 1}`); values.push(JSON.stringify(b.witnesses)); }
   if (b.ppe_worn !== undefined) { fields.push(`ppe_worn = $${fields.length + 1}`); values.push(JSON.stringify(b.ppe_worn)); }
@@ -344,6 +350,10 @@ router.put('/incidents/:id', validateParams(uuidParamSchema), validate(incidentS
         entityId: req.params.id as string,
       }).catch((err: any) => console.error('[Notify] incident update:', err.message));
     }
+  }
+  } catch (err: any) {
+    console.error('[PUT /incidents] Error:', err.message);
+    res.status(500).json({ error: 'Failed to update incident' });
   }
 });
 
