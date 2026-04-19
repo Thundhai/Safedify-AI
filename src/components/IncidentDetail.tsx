@@ -585,6 +585,7 @@ export const IncidentDetail: React.FC = () => {
                  <select 
                     value={investigationMethod}
                     onChange={(e) => setInvestigationMethod(e.target.value as any)}
+                    aria-label="Investigation method"
                     className="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500"
                  >
                     <option value="5-Why">5-Why Method</option>
@@ -698,6 +699,7 @@ export const IncidentDetail: React.FC = () => {
                        <img src={img} alt={`Evidence ${idx}`} className="w-full h-full object-cover" />
                        <button 
                          onClick={() => removeEvidence(idx)}
+                         aria-label={`Remove evidence ${idx + 1}`}
                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                        >
                          <X size={12} />
@@ -765,7 +767,7 @@ export const IncidentDetail: React.FC = () => {
                  <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6 space-y-4">
                      <div className="flex justify-between items-center">
                         <h4 className="font-semibold text-slate-700">Link Unassigned Actions</h4>
-                        <button onClick={() => setShowLinkModal(false)} className="text-slate-400 hover:text-slate-600"><X size={16}/></button>
+                        <button onClick={() => setShowLinkModal(false)} aria-label="Close link actions modal" className="text-slate-400 hover:text-slate-600"><X size={16}/></button>
                      </div>
                      {availableActions.length === 0 ? (
                          <p className="text-sm text-slate-500 italic">No unassigned actions found.</p>
@@ -820,6 +822,7 @@ export const IncidentDetail: React.FC = () => {
                             <select 
                                 value={newAction.priority}
                                 onChange={e => setNewAction({...newAction, priority: e.target.value})}
+                                aria-label="Action priority"
                                 className="w-full border border-slate-300 rounded p-2 text-sm"
                             >
                                 <option>Low</option>
@@ -834,6 +837,7 @@ export const IncidentDetail: React.FC = () => {
                                 type="date" 
                                 value={newAction.dueDate}
                                 onChange={e => setNewAction({...newAction, dueDate: e.target.value})}
+                                aria-label="Action due date"
                                 className="w-full border border-slate-300 rounded p-2 text-sm"
                             />
                         </div>
@@ -869,6 +873,7 @@ export const IncidentDetail: React.FC = () => {
                             <select
                                 value={action.status}
                                 onChange={(e) => handleActionStatusChange(action, e.target.value as any)}
+                                aria-label={`Status for action: ${action.title || 'Untitled'}`}
                                 className={`px-3 py-1.5 text-xs rounded-full font-medium border-0 cursor-pointer outline-none ring-1 ring-inset ${
                                     action.status === 'Done' ? 'bg-green-50 text-green-700 ring-green-600/20' :
                                     action.status === 'In Progress' ? 'bg-blue-50 text-blue-700 ring-blue-700/10' : 

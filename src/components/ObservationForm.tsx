@@ -172,6 +172,7 @@ export const ObservationForm: React.FC = () => {
           <select 
             value={category}
             onChange={(e) => setCategory(e.target.value)}
+            aria-label="Observation category"
             className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
           >
             {categories.map(c => <option key={c} value={c}>{c}</option>)}
@@ -263,7 +264,7 @@ export const ObservationForm: React.FC = () => {
              <span className="text-sm font-medium text-slate-700">Submit Anonymously</span>
            </div>
            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" checked={isAnonymous} onChange={() => setIsAnonymous(!isAnonymous)} className="sr-only peer" />
+              <input type="checkbox" checked={isAnonymous} onChange={() => setIsAnonymous(!isAnonymous)} aria-label="Submit anonymously" className="sr-only peer" />
               <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
            </label>
         </div>

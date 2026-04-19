@@ -239,6 +239,7 @@ export const ObservationList: React.FC = () => {
                 <select
                     value={filterType}
                     onChange={(e) => setFilterType(e.target.value)}
+                    aria-label="Filter by type"
                     className="bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
                 >
                     <option value="All">All Types</option>
@@ -251,6 +252,7 @@ export const ObservationList: React.FC = () => {
                 <select
                     value={filterCategory}
                     onChange={(e) => setFilterCategory(e.target.value)}
+                    aria-label="Filter by category"
                     className="bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
                 >
                     <option value="All">All Categories</option>
@@ -260,6 +262,7 @@ export const ObservationList: React.FC = () => {
                 <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
+                    aria-label="Filter by status"
                     className="bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
                 >
                     <option value="All">All Statuses</option>
@@ -398,7 +401,7 @@ export const ObservationList: React.FC = () => {
                                 {isEditMode ? <Edit2 size={18} className="text-blue-600"/> : <Eye size={18} className="text-slate-600"/>}
                                 {isEditMode ? 'Edit Observation' : 'Observation Details'}
                             </h3>
-                            <button onClick={() => setSelectedObs(null)} className="text-slate-400 hover:text-slate-600">
+                            <button onClick={() => setSelectedObs(null)} aria-label="Close observation details" className="text-slate-400 hover:text-slate-600">
                                 <X size={20} />
                             </button>
                         </div>
@@ -412,6 +415,7 @@ export const ObservationList: React.FC = () => {
                                             className="w-full border border-slate-300 rounded-lg p-2 text-sm"
                                             value={editForm.type}
                                             onChange={(e) => setEditForm({...editForm, type: e.target.value as ObservationType})}
+                                            aria-label="Observation type"
                                         >
                                             <option value="Unsafe Act">Unsafe Act</option>
                                             <option value="Unsafe Condition">Unsafe Condition</option>
@@ -425,6 +429,7 @@ export const ObservationList: React.FC = () => {
                                             className="w-full border border-slate-300 rounded-lg p-2 text-sm"
                                             value={editForm.category}
                                             onChange={(e) => setEditForm({...editForm, category: e.target.value})}
+                                            aria-label="Observation category"
                                         >
                                             {categories.map(c => <option key={c} value={c}>{c}</option>)}
                                         </select>
@@ -438,6 +443,7 @@ export const ObservationList: React.FC = () => {
                                         className="w-full border border-slate-300 rounded-lg p-2 text-sm"
                                         value={editForm.location}
                                         onChange={(e) => setEditForm({...editForm, location: e.target.value})}
+                                        aria-label="Observation location"
                                     />
                                 </div>
 
@@ -448,6 +454,7 @@ export const ObservationList: React.FC = () => {
                                         className="w-full border border-slate-300 rounded-lg p-2 text-sm"
                                         value={editForm.description}
                                         onChange={(e) => setEditForm({...editForm, description: e.target.value})}
+                                        aria-label="Observation description"
                                     />
                                 </div>
 
@@ -458,6 +465,7 @@ export const ObservationList: React.FC = () => {
                                         className="w-full border border-slate-300 rounded-lg p-2 text-sm"
                                         value={editForm.immediateActionTaken}
                                         onChange={(e) => setEditForm({...editForm, immediateActionTaken: e.target.value})}
+                                        aria-label="Immediate action taken"
                                     />
                                 </div>
 
@@ -467,6 +475,7 @@ export const ObservationList: React.FC = () => {
                                         className="w-full border border-slate-300 rounded-lg p-2 text-sm"
                                         value={editForm.status}
                                         onChange={(e) => setEditForm({...editForm, status: e.target.value as any})}
+                                        aria-label="Observation status"
                                     >
                                         <option value="Open">Open</option>
                                         <option value="Closed">Closed</option>
