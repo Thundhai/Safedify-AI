@@ -1096,7 +1096,7 @@ function isPrivilegedRole(role?: string): boolean {
 const BULK_OWNER_COLUMNS: Record<string, { col: string; altCol?: string }> = {
   incidents: { col: 'reported_by' },
   actions: { col: 'created_by', altCol: 'assignee' },
-  observations: { col: 'created_by' },
+  observations: { col: 'observer' },
   risk_assessments: { col: 'author' },
   permits: { col: 'created_by' },
 };
@@ -1201,7 +1201,7 @@ router.post('/observations/bulk-delete', requirePermission('DeleteObservations')
     res.json({ deleted: result.rowCount, message: `${result.rowCount} observation(s) deleted` });
   } else {
     const params = ids.map((_: any, i: number) => `$${i + 3}`).join(',');
-    const result = await pool.query(`DELETE FROM observations WHERE id IN (${params}) AND created_by = $1 AND org_id = $2`, [req.user?.id, req.user?.org_id, ...ids]);
+    const result = await pool.query(`DELETE FROM observations WHERE id IN (${params}) AND observer = $1 AND org_id = $2`, [req.user?.id, req.user?.org_id, ...ids]);
     res.json({ deleted: result.rowCount, message: `${result.rowCount} observation(s) deleted` });
   }
 });
