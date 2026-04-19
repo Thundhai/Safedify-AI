@@ -2,14 +2,17 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Plus, Eye, CheckCircle, Sparkles, Loader2, Camera, Trash2, Edit2, X, Save, MapPin, Tag, FileText, Printer, Filter, Download } from 'lucide-react';
+import { Plus, Eye, CheckCircle, Sparkles, Loader2, Camera, Trash2, Edit2, X, Save, MapPin, Tag, FileText, Printer, Filter, Download, FileSpreadsheet } from 'lucide-react';
 import { getObservations, deleteObservation, updateObservation } from '../services/storageService';
 import { analyzeObservationTrendsAI } from '../services/geminiService';
 import { apiExportData } from '../services/apiService';
+import { downloadObservationPDF, downloadObservationCSV } from '../services/reportService';
+import { useAuth } from '../context/AuthContext';
 import { Observation, ObservationType } from '../types';
 import { Pagination } from './Pagination';
 
 export const ObservationList: React.FC = () => {
+    const { user } = useAuth();
     const [observations, setObservations] = useState<Observation[]>([]);
     const [trends, setTrends] = useState<any[]>([]);
     const [loadingTrends, setLoadingTrends] = useState(false);
@@ -533,7 +536,22 @@ export const ObservationList: React.FC = () => {
                                     </div>
                                 )}
 
-                                <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-sm">
+                                <div className="pt-4 border-t border-slate-100 space-y-3">
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => { const idx = observations.findIndex(o => o.id === selectedObs.id); downloadObservationPDF(selectedObs, user?.org_name, idx >= 0 ? idx + 1 : 1); toast.success('Observation PDF downloaded'); }}
+                                      className="flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-700 rounded-lg text-sm font-medium hover:bg-red-100 border border-red-200 transition-colors"
+                                    >
+                                      <FileText size={14} /> PDF
+                                    </button>
+                                    <button
+                                      onClick={() => { const idx = observations.findIndex(o => o.id === selectedObs.id); downloadObservationCSV(selectedObs, user?.org_name, idx >= 0 ? idx + 1 : 1); toast.success('Observation CSV downloaded'); }}
+                                      className="flex items-center gap-1.5 px-3 py-2 bg-green-50 text-green-700 rounded-lg text-sm font-medium hover:bg-green-100 border border-green-200 transition-colors"
+                                    >
+                                      <FileSpreadsheet size={14} /> CSV
+                                    </button>
+                                  </div>
+                                  <div className="flex justify-between items-center text-sm">
                                     <span className="text-slate-500">Status: <span className={`font-bold ${selectedObs.status === 'Open' ? 'text-blue-600' : 'text-slate-600'}`}>{selectedObs.status}</span></span>
                                     <div className="flex gap-2">
                                         <button 
@@ -549,6 +567,7 @@ export const ObservationList: React.FC = () => {
                                             Close
                                         </button>
                                     </div>
+                                  </div>
                                 </div>
                             </div>
                         )}

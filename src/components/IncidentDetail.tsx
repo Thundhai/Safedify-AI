@@ -3,10 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   ArrowLeft, Calendar, MapPin, User, AlertTriangle, 
-  ClipboardList, CheckSquare, BrainCircuit, Save, Plus, Trash2, Loader2, Target, GitBranch, Upload, X, Image as ImageIcon, Link as LinkIcon, CheckCircle2, Volume2
+  ClipboardList, CheckSquare, BrainCircuit, Save, Plus, Trash2, Loader2, Target, GitBranch, Upload, X, Image as ImageIcon, Link as LinkIcon, CheckCircle2, Volume2, Download, FileText, FileSpreadsheet
 } from 'lucide-react';
 import { getIncidentById, getActions, saveAction, updateIncident, updateAction } from '../services/storageService';
 import { analyzeRootCauseAI, generateSpeechAI, playGeneratedAudio } from '../services/geminiService';
+import { downloadIncidentPDF, downloadIncidentCSV, downloadInvestigationPDF } from '../services/reportService';
 import { Incident, ActionItem, IncidentSeverity, InjuredPerson, IncidentWitness } from '../types';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -47,6 +48,25 @@ export const IncidentDetail: React.FC = () => {
 
   // TTS State
   const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Download state — keep a stable serial so PDF & CSV use the same doc number
+  const [docSerial] = useState(() => Math.max(1, Math.floor(Math.random() * 999)));
+
+  const handleDownloadPDF = () => {
+    if (!incident) return;
+    downloadIncidentPDF(incident, user?.org_name, docSerial);
+    toast.success('Incident PDF downloaded');
+  };
+  const handleDownloadCSV = () => {
+    if (!incident) return;
+    downloadIncidentCSV(incident, user?.org_name, docSerial);
+    toast.success('Incident CSV downloaded');
+  };
+  const handleDownloadInvestigationPDF = () => {
+    if (!incident?.investigation) { toast.error('No investigation data yet'); return; }
+    downloadInvestigationPDF(incident, user?.org_name, docSerial);
+    toast.success('Investigation PDF downloaded');
+  };
 
   useEffect(() => {
     const load = async () => {
@@ -289,18 +309,37 @@ export const IncidentDetail: React.FC = () => {
             <p className="text-slate-500 text-sm mt-1">Reported on {new Date(incident.date).toLocaleDateString()}</p>
             </div>
         </div>
-        <button 
-            onClick={handleReadAloud}
-            disabled={isSpeaking}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm ${
-                isSpeaking 
-                ? 'bg-purple-100 text-purple-700 animate-pulse' 
-                : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
-            }`}
-        >
-            {isSpeaking ? <Loader2 size={16} className="animate-spin" /> : <Volume2 size={16} />}
-            {isSpeaking ? 'Playing Brief...' : 'Play Audio Brief'}
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={handleDownloadPDF}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-all shadow-sm"
+          >
+            <FileText size={15} /> PDF
+          </button>
+          <button onClick={handleDownloadCSV}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition-all shadow-sm"
+          >
+            <FileSpreadsheet size={15} /> CSV
+          </button>
+          {incident.investigation && (
+            <button onClick={handleDownloadInvestigationPDF}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-all shadow-sm"
+            >
+              <Download size={15} /> Investigation
+            </button>
+          )}
+          <button 
+              onClick={handleReadAloud}
+              disabled={isSpeaking}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all shadow-sm ${
+                  isSpeaking 
+                  ? 'bg-purple-100 text-purple-700 animate-pulse' 
+                  : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+              }`}
+          >
+              {isSpeaking ? <Loader2 size={16} className="animate-spin" /> : <Volume2 size={16} />}
+              {isSpeaking ? 'Playing...' : 'Audio'}
+          </button>
+        </div>
       </div>
 
       {/* Navigation Tabs */}
