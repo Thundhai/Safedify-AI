@@ -386,7 +386,7 @@ const observationToApi = (o: Observation) => ({
   location: o.location,
   date: o.date,
   observer: o.observer,
-  is_anonymous: o.isAnonymous ? 1 : 0,
+  is_anonymous: !!o.isAnonymous,
   immediate_action: o.immediateActionTaken,
   images: o.images,
 });
