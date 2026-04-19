@@ -443,7 +443,7 @@ router.post('/observations', validate(observationSchema), requirePermission('cre
     const id = uuid();
     await pool.query(
       'INSERT INTO observations (id, type, category, description, location, date, observer, is_anonymous, immediate_action, images, created_by, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-      [id, type, category, description, location, date || new Date().toISOString(), observer, !!is_anonymous, immediate_action, Array.isArray(images) && images.length > 0 ? images : null, req.user?.id, req.user?.org_id]
+      [id, type, category, description, location, date || new Date().toISOString(), observer, !!is_anonymous, immediate_action, Array.isArray(images) && images.length > 0 ? JSON.stringify(images) : null, req.user?.id, req.user?.org_id]
     );
     res.status(201).json({ id });
   } catch (err: any) {
@@ -459,7 +459,7 @@ router.put('/observations/:id', validateParams(uuidParamSchema), validate(observ
       `UPDATE observations SET type=COALESCE($1,type), category=COALESCE($2,category), description=COALESCE($3,description),
        location=COALESCE($4,location), date=COALESCE($5,date), observer=COALESCE($6,observer), status=COALESCE($7,status),
        immediate_action=COALESCE($8,immediate_action), images=COALESCE($9,images) WHERE id=$10 AND org_id=$11`,
-      [type, category, description, location, date, observer, status, immediate_action, Array.isArray(images) && images.length > 0 ? images : null, req.params.id, req.user?.org_id]
+      [type, category, description, location, date, observer, status, immediate_action, Array.isArray(images) && images.length > 0 ? JSON.stringify(images) : null, req.params.id, req.user?.org_id]
     );
     res.json({ message: 'Updated' });
   } catch (err: any) {
