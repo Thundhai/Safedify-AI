@@ -444,8 +444,8 @@ router.post('/observations', validate(observationSchema), requirePermission('cre
     // observer column is UUID — store the authenticated user's ID (not a name string), or null if anonymous
     const observerUuid = is_anonymous ? null : (req.user?.id || null);
     await pool.query(
-      'INSERT INTO observations (id, type, category, description, location, date, observer, is_anonymous, immediate_action, images, created_by, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',
-      [id, type, category, description, location, date || new Date().toISOString(), observerUuid, !!is_anonymous, immediate_action, Array.isArray(images) && images.length > 0 ? JSON.stringify(images) : null, req.user?.id, req.user?.org_id]
+      'INSERT INTO observations (id, type, category, description, location, date, observer, is_anonymous, immediate_action, images, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
+      [id, type, category, description, location, date || new Date().toISOString(), observerUuid, !!is_anonymous, immediate_action, Array.isArray(images) && images.length > 0 ? JSON.stringify(images) : null, req.user?.org_id]
     );
     res.status(201).json({ id });
   } catch (err: any) {
@@ -454,7 +454,7 @@ router.post('/observations', validate(observationSchema), requirePermission('cre
   }
 });
 
-router.put('/observations/:id', validateParams(uuidParamSchema), validate(observationSchema), requireOwnership('observations', 'created_by'), async (req: AuthRequest, res: Response) => {
+router.put('/observations/:id', validateParams(uuidParamSchema), validate(observationSchema), requireOwnership('observations', 'observer'), async (req: AuthRequest, res: Response) => {
   try {
     const { type, category, description, location, date, status, immediate_action, images } = req.body;
     await pool.query(
@@ -470,7 +470,7 @@ router.put('/observations/:id', validateParams(uuidParamSchema), validate(observ
   }
 });
 
-router.delete('/observations/:id', validateParams(uuidParamSchema), requireOwnership('observations', 'created_by'), async (req: AuthRequest, res: Response) => {
+router.delete('/observations/:id', validateParams(uuidParamSchema), requireOwnership('observations', 'observer'), async (req: AuthRequest, res: Response) => {
   await pool.query('DELETE FROM observations WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
   res.json({ message: 'Deleted' });
 });
