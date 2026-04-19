@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import {
   Wind, Thermometer, Droplets, Activity, Ear,
@@ -168,27 +168,28 @@ export const EnvironmentalCard: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [dataSource, setDataSource] = useState<'live' | 'simulated'>('simulated');
   const [geoCoords, setGeoCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const geoCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
   const [geoStatus, setGeoStatus] = useState<'pending' | 'granted' | 'denied' | 'unavailable'>('pending');
 
   // ── Auto-detect location via browser Geolocation API ──
   useEffect(() => {
     if (!navigator.geolocation) {
       setGeoStatus('unavailable');
-      refreshWeather(); // proceed without coords → uses server .env defaults
+      refreshWeatherWithCoords(); // no coords → server .env defaults
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        geoCoordsRef.current = coords;
         setGeoCoords(coords);
         setGeoStatus('granted');
-        // Fetch weather with detected coordinates
         refreshWeatherWithCoords(coords.lat, coords.lng);
       },
       (_err) => {
         setGeoStatus('denied');
-        refreshWeather(); // fallback to server-side defaults
+        refreshWeatherWithCoords(); // no coords → server .env defaults
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 60_000 }
     );
@@ -231,7 +232,7 @@ export const EnvironmentalCard: React.FC = () => {
     setTimeout(() => setRefreshing(false), 600);
   };
 
-  const refreshWeather = () => refreshWeatherWithCoords(geoCoords?.lat, geoCoords?.lng);
+  const refreshWeather = () => refreshWeatherWithCoords(geoCoordsRef.current?.lat, geoCoordsRef.current?.lng);
 
   const handleRunAnalysis = async (data: EnvironmentalData) => {
     setLoadingAnalysis(true);
