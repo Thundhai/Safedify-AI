@@ -59,7 +59,7 @@ export const Layout: React.FC = () => {
   const [syncing, setSyncing] = useState(false);
   const [pendingSyncs, setPendingSyncs] = useState(0);
   const { user, logout, checkPermission } = useAuth();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [showLangMenu, setShowLangMenu] = useState(false);
   
@@ -70,12 +70,12 @@ export const Layout: React.FC = () => {
   
   // Navigation State
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
-    'Overview': true,
-    'Field Reporting': true,
-    'Risk & Compliance': false,
-    'Resources': false,
-    'General': false,
-    'Admin': true
+    'overview': true,
+    'field-reporting': true,
+    'risk-compliance': false,
+    'resources': false,
+    'general': false,
+    'admin': true
   });
 
   // Dark Mode State
@@ -155,6 +155,12 @@ export const Layout: React.FC = () => {
     }
   }, [isDarkMode]);
 
+  // RTL support for Arabic
+  useEffect(() => {
+    document.documentElement.dir = i18n.language === 'ar' ? 'rtl' : 'ltr';
+    document.documentElement.lang = i18n.language;
+  }, [i18n.language]);
+
   const attemptSync = async () => {
       const count = getSyncQueue().length;
       if (count > 0 && !syncing) {
@@ -206,50 +212,55 @@ export const Layout: React.FC = () => {
 
   const navGroups = [
     {
-      title: 'Overview',
+      key: 'overview',
+      title: t('nav.overview'),
       items: [
-        { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-        { to: '/analytics', icon: BarChart2, label: 'Analytics & KPIs' },
-        { to: '/intelligence', icon: Brain, label: 'AI Intelligence' },
+        { to: '/', icon: LayoutDashboard, label: t('nav.dashboard') },
+        { to: '/analytics', icon: BarChart2, label: t('nav.analyticsKpis') },
+        { to: '/intelligence', icon: Brain, label: t('nav.aiIntelligence') },
       ]
     },
     {
-      title: 'Field Reporting',
+      key: 'field-reporting',
+      title: t('nav.fieldReporting'),
       items: [
-        { to: '/incidents', icon: AlertTriangle, label: 'Incidents' },
-        { to: '/observations', icon: Eye, label: 'Observations / STOP' },
-        { to: '/environmental-log', icon: Leaf, label: 'Environmental Log' },
-        { to: '/smart-camera', icon: Camera, label: 'AI Safety Monitor' },
-        { to: '/emergency', icon: Siren, label: 'Emergency' },
+        { to: '/incidents', icon: AlertTriangle, label: t('nav.incidents') },
+        { to: '/observations', icon: Eye, label: t('nav.observationsStop') },
+        { to: '/environmental-log', icon: Leaf, label: t('nav.environmentalLog') },
+        { to: '/smart-camera', icon: Camera, label: t('nav.aiSafetyMonitor') },
+        { to: '/emergency', icon: Siren, label: t('nav.emergency') },
       ]
     },
     {
-      title: 'Risk & Compliance',
+      key: 'risk-compliance',
+      title: t('nav.riskCompliance'),
       items: [
-        { to: '/risk-assessments', icon: ShieldAlert, label: 'Risk Assessment' },
-        { to: '/permits', icon: FileSignature, label: 'Permit to Work' },
-        { to: '/inspections', icon: ClipboardCheck, label: 'Inspections' },
-        { to: '/geo-fencing', icon: Map, label: 'Geo-Fencing' },
+        { to: '/risk-assessments', icon: ShieldAlert, label: t('nav.riskAssessment') },
+        { to: '/permits', icon: FileSignature, label: t('nav.permitToWork') },
+        { to: '/inspections', icon: ClipboardCheck, label: t('nav.inspections') },
+        { to: '/geo-fencing', icon: Map, label: t('nav.geoFencing') },
       ]
     },
     {
-      title: 'Resources',
+      key: 'resources',
+      title: t('nav.resources'),
       items: [
-        { to: '/workers', icon: Users, label: 'Workers' },
-        { to: '/training', icon: GraduationCap, label: 'Training' },
-        { to: '/ppe', icon: HardHat, label: 'PPE' },
-        { to: '/assets', icon: Wrench, label: 'Assets' },
-        { to: '/contractors', icon: Briefcase, label: 'Contractors' },
-        { to: '/regulatory-news', icon: Globe, label: 'Regulatory News' },
+        { to: '/workers', icon: Users, label: t('nav.workers') },
+        { to: '/training', icon: GraduationCap, label: t('nav.training') },
+        { to: '/ppe', icon: HardHat, label: t('nav.ppe') },
+        { to: '/assets', icon: Wrench, label: t('nav.assets') },
+        { to: '/contractors', icon: Briefcase, label: t('nav.contractors') },
+        { to: '/regulatory-news', icon: Globe, label: t('nav.regulatoryNews') },
       ]
     },
     {
-      title: 'General',
+      key: 'general',
+      title: t('nav.general'),
       items: [
-        { to: '/actions', icon: CheckSquare, label: 'Action Items' },
-        { to: '/documents', icon: FileText, label: 'Documents' },
-        { to: '/gamification', icon: Trophy, label: 'Safety Champions' },
-        { to: '/sites', icon: Building2, label: 'Sites & Teams' },
+        { to: '/actions', icon: CheckSquare, label: t('nav.actionItems') },
+        { to: '/documents', icon: FileText, label: t('nav.documents') },
+        { to: '/gamification', icon: Trophy, label: t('nav.safetyChampions') },
+        { to: '/sites', icon: Building2, label: t('nav.sitesTeams') },
       ]
     }
   ];
@@ -257,9 +268,10 @@ export const Layout: React.FC = () => {
   // Conditionally add Admin group if user has permission
   if (checkPermission('manage_roles')) {
       navGroups.push({
-          title: 'Admin',
+          key: 'admin',
+          title: t('nav.admin'),
           items: [
-              { to: '/roles', icon: Shield, label: 'Role Management' }
+              { to: '/roles', icon: Shield, label: t('nav.roleManagement') }
           ]
       });
   }
@@ -267,27 +279,27 @@ export const Layout: React.FC = () => {
   const getPageTitle = () => {
     const allItems = navGroups.flatMap(g => g.items);
     const current = allItems.find(item => location.pathname.startsWith(item.to) && item.to !== '/');
-    if (location.pathname === '/') return 'Dashboard';
-    if (location.pathname === '/pricing') return 'Subscription Plans';
-    if (location.pathname === '/roles') return 'Role Management';
-    if (location.pathname === '/profile') return 'Account Settings';
-    if (location.pathname === '/sites') return 'Site & Team Management';
+    if (location.pathname === '/') return t('nav.dashboard');
+    if (location.pathname === '/pricing') return t('common.appName');
+    if (location.pathname === '/roles') return t('nav.roleManagement');
+    if (location.pathname === '/profile') return t('profile.title');
+    if (location.pathname === '/sites') return t('nav.sitesTeams');
     return current ? current.label : 'Safedify';
   };
 
   const renderNavLinks = () => (
     <div className="space-y-4 px-2">
       {navGroups.map((group, groupIdx) => (
-        <div key={groupIdx} className="space-y-1">
+        <div key={group.key} className="space-y-1">
           <button 
-            onClick={() => toggleGroup(group.title)}
+            onClick={() => toggleGroup(group.key)}
             className="w-full flex items-center justify-between px-3 py-2 text-xs font-bold text-slate-300 uppercase tracking-wider hover:text-white transition-colors"
           >
             <span>{group.title}</span>
-            {expandedGroups[group.title] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            {expandedGroups[group.key] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
           
-          {expandedGroups[group.title] && (
+          {expandedGroups[group.key] && (
             <div className="space-y-1 ml-1 animate-in slide-in-from-top-1 duration-200">
               {group.items.map((item) => (
                 <NavLink
@@ -324,7 +336,7 @@ export const Layout: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 overflow-hidden print:h-auto print:overflow-visible">
+    <div dir={i18n.language === 'ar' ? 'rtl' : 'ltr'} className="flex h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 overflow-hidden print:h-auto print:overflow-visible">
       <SkipLink />
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex md:flex-col md:w-64 bg-brand-navy text-white shadow-2xl z-20 border-r border-slate-800 print:hidden">
@@ -436,7 +448,7 @@ export const Layout: React.FC = () => {
                 onClick={logout} 
                 className="flex items-center gap-2 w-full px-4 py-3 text-red-300 hover:bg-red-900/30 rounded-lg transition-colors text-sm font-bold"
             >
-                <LogOut size={18} /> Logout
+                <LogOut size={18} /> {t('nav.logout')}
             </button>
         </div>
       </aside>
