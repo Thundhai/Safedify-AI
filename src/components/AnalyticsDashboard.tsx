@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import toast from 'react-hot-toast';
 import { 
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -17,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 export const AnalyticsDashboard: React.FC = () => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const navigate = useNavigate();
     const [metrics, setMetrics] = useState<HSEMetrics | null>(null);
@@ -198,8 +200,8 @@ export const AnalyticsDashboard: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-800">Analytics & KPIs</h2>
-                    <p className="text-slate-500">Executive dashboard and safety performance monitoring.</p>
+                    <h2 className="text-2xl font-bold text-slate-800">{t('analytics.title')}</h2>
+                    <p className="text-slate-500">{t('analytics.subtitle', { defaultValue: 'Executive dashboard and safety performance monitoring.' })}</p>
                 </div>
                 
                 {/* Stats Action */}
@@ -211,7 +213,7 @@ export const AnalyticsDashboard: React.FC = () => {
                         onClick={() => setShowInputModal(true)}
                         className="flex items-center gap-1 text-xs bg-slate-900 text-white px-3 py-1.5 rounded hover:bg-slate-800 transition-colors"
                     >
-                        <Plus size={14} /> Log Data
+                        <Plus size={14} /> {t('analytics.logData', { defaultValue: 'Log Data' })}
                     </button>
                 </div>
             </div>
@@ -222,7 +224,7 @@ export const AnalyticsDashboard: React.FC = () => {
                     <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 animate-in fade-in zoom-in-95">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                                <Calculator size={20} className="text-blue-600"/> Log Safe Man-Hours
+                                <Calculator size={20} className="text-blue-600"/> {t('analytics.logManHours', { defaultValue: 'Log Safe Man-Hours' })}
                             </h3>
                             <button onClick={() => setShowInputModal(false)} className="text-slate-400 hover:text-slate-600">
                                 <X size={20} />
@@ -326,13 +328,13 @@ export const AnalyticsDashboard: React.FC = () => {
                                     onClick={() => setShowInputModal(false)}
                                     className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
                                 >
-                                    Cancel
+                                    {t('common.cancel')}
                                 </button>
                                 <button 
                                     type="submit"
                                     className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm"
                                 >
-                                    Save Entry
+                                    {t('analytics.saveEntry', { defaultValue: 'Save Entry' })}
                                 </button>
                             </div>
                         </form>
@@ -346,25 +348,25 @@ export const AnalyticsDashboard: React.FC = () => {
                     onClick={() => setActiveTab('kpi')}
                     className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'kpi' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                 >
-                    <Activity size={16} /> Key Performance Indicators
+                    <Activity size={16} /> {t('analytics.kpi', { defaultValue: 'Key Performance Indicators' })}
                 </button>
                 <button 
                     onClick={() => setActiveTab('trends')}
                     className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'trends' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                 >
-                    <TrendingUp size={16} /> Trends & Heatmaps
+                    <TrendingUp size={16} /> {t('analytics.trends')}
                 </button>
                 <button 
                     onClick={() => setActiveTab('risk')}
                     className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'risk' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                 >
-                    <Shield size={16} /> Risk Matrix
+                    <Shield size={16} /> {t('analytics.riskMatrix', { defaultValue: 'Risk Matrix' })}
                 </button>
                 <button 
                     onClick={() => setActiveTab('ai')}
                     className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ai' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                 >
-                    <Sparkles size={16} /> AI Executive Report
+                    <Sparkles size={16} /> {t('analytics.aiReport', { defaultValue: 'AI Executive Report' })}
                 </button>
             </div>
 
@@ -426,7 +428,7 @@ export const AnalyticsDashboard: React.FC = () => {
                     {/* Detailed Breakdown */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                            <h3 className="font-bold text-slate-800 mb-6">Lagging Indicators (Incident Types)</h3>
+                            <h3 className="font-bold text-slate-800 mb-6">{t('analytics.laggingIndicators', { defaultValue: 'Lagging Indicators (Incident Types)' })}</h3>
                                 <div className="h-64 w-full" style={{ minHeight: '200px', minWidth: '300px' }}>
                                 <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
                                     <BarChart data={[
@@ -457,7 +459,7 @@ export const AnalyticsDashboard: React.FC = () => {
                         </div>
 
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                            <h3 className="font-bold text-slate-800 mb-6">Incident Ratios</h3>
+                            <h3 className="font-bold text-slate-800 mb-6">{t('analytics.incidentRatios', { defaultValue: 'Incident Ratios' })}</h3>
                             <div className="h-64 w-full" style={{ minHeight: '200px', minWidth: '300px' }}>
                                 <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
                                     <PieChart>
@@ -487,8 +489,8 @@ export const AnalyticsDashboard: React.FC = () => {
                 <div className="space-y-6 animate-in fade-in">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                            <h3 className="font-bold text-slate-800 mb-2">Monthly Incident Trend</h3>
-                            <p className="text-xs text-slate-400 mb-6">Incident breakdown by type over recent months</p>
+                            <h3 className="font-bold text-slate-800 mb-2">{t('analytics.monthlyTrend', { defaultValue: 'Monthly Incident Trend' })}</h3>
+                            <p className="text-xs text-slate-400 mb-6">{t('analytics.monthlyTrendDesc', { defaultValue: 'Incident breakdown by type over recent months' })}</p>
                             <div className="h-72">
                                 <ResponsiveContainer width="100%" height="100%">
                                     {monthlyTrendData.length > 0 ? (
@@ -524,8 +526,8 @@ export const AnalyticsDashboard: React.FC = () => {
                         </div>
 
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                            <h3 className="font-bold text-slate-800 mb-2">Location Risk Heatmap</h3>
-                            <p className="text-xs text-slate-400 mb-6">Frequency of incidents by site zone</p>
+                            <h3 className="font-bold text-slate-800 mb-2">{t('analytics.locationHeatmap', { defaultValue: 'Location Risk Heatmap' })}</h3>
+                            <p className="text-xs text-slate-400 mb-6">{t('analytics.locationHeatmapDesc', { defaultValue: 'Frequency of incidents by site zone' })}</p>
                             <div className="h-72">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <BarChart layout="vertical" data={locationChartData}>
@@ -542,8 +544,8 @@ export const AnalyticsDashboard: React.FC = () => {
 
                     {/* Leading vs Lagging Indicators */}
                     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                        <h3 className="font-bold text-slate-800 mb-2">Leading vs Lagging Indicators</h3>
-                        <p className="text-xs text-slate-400 mb-6">Proactive (leading) vs reactive (lagging) safety metrics</p>
+                        <h3 className="font-bold text-slate-800 mb-2">{t('analytics.leadingVsLagging', { defaultValue: 'Leading vs Lagging Indicators' })}</h3>
+                        <p className="text-xs text-slate-400 mb-6">{t('analytics.leadingVsLaggingDesc', { defaultValue: 'Proactive (leading) vs reactive (lagging) safety metrics' })}</p>
                         <div className="h-72">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={leadingVsLagging}>
@@ -571,8 +573,8 @@ export const AnalyticsDashboard: React.FC = () => {
             {activeTab === 'risk' && (
                 <div className="space-y-6 animate-in fade-in">
                     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                        <h3 className="font-bold text-slate-800 mb-2">5×5 Risk Assessment Matrix</h3>
-                        <p className="text-xs text-slate-400 mb-6">Likelihood vs Severity — click cells to see incident count</p>
+                        <h3 className="font-bold text-slate-800 mb-2">{t('analytics.riskMatrix5x5', { defaultValue: '5×5 Risk Assessment Matrix' })}</h3>
+                        <p className="text-xs text-slate-400 mb-6">{t('analytics.riskMatrixDesc', { defaultValue: 'Likelihood vs Severity — click cells to see incident count' })}</p>
                         
                         <div className="overflow-x-auto">
                             <table className="w-full max-w-2xl mx-auto border-collapse">
@@ -621,7 +623,7 @@ export const AnalyticsDashboard: React.FC = () => {
                     {/* Risk Distribution */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                            <h3 className="font-bold text-slate-800 mb-4">Risk Distribution by Severity</h3>
+                            <h3 className="font-bold text-slate-800 mb-4">{t('analytics.riskDistribution', { defaultValue: 'Risk Distribution by Severity' })}</h3>
                             <div className="h-64">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
@@ -649,7 +651,7 @@ export const AnalyticsDashboard: React.FC = () => {
                             </div>
                         </div>
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                            <h3 className="font-bold text-slate-800 mb-4">Incident Severity Summary</h3>
+                            <h3 className="font-bold text-slate-800 mb-4">{t('analytics.severitySummary', { defaultValue: 'Incident Severity Summary' })}</h3>
                             <div className="space-y-4 mt-6">
                                 {[
                                     { label: 'Critical', count: incidents.filter(i => i.severity === 'Critical').length, color: 'bg-red-500', textColor: 'text-red-700' },
@@ -690,7 +692,7 @@ export const AnalyticsDashboard: React.FC = () => {
                                 </div>
                                 <div>
                                     <h2 className="text-2xl font-bold">AI Executive Safety Report</h2>
-                                    <p className="text-indigo-200">Powered by Gemini models</p>
+                                    <p className="text-indigo-200">{t('analytics.poweredBy', { defaultValue: 'Powered by Gemini models' })}</p>
                                 </div>
                             </div>
 

@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { 
   Check, X, Minus, Sparkles, Loader2, Plus, 
   ClipboardCheck, Calendar, MapPin, Printer, Camera, 
@@ -14,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
 export const InspectionForm: React.FC = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   // Mode: list (dashboard) | create-template | select-template | form (executing) | report (view/print)
   const [view, setView] = useState<'list' | 'create-template' | 'select-template' | 'form' | 'report'>('list');
@@ -209,15 +211,15 @@ export const InspectionForm: React.FC = () => {
     <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-                <h2 className="text-2xl font-bold text-slate-800">Inspections & Audits</h2>
-                <p className="text-slate-500">Scheduled inspections, daily checks, and compliance audits.</p>
+                <h2 className="text-2xl font-bold text-slate-800">{t('inspections.title')}</h2>
+                <p className="text-slate-500">{t('inspections.subtitle', { defaultValue: 'Scheduled inspections, daily checks, and compliance audits.' })}</p>
             </div>
             <div className="flex gap-2">
                 <button onClick={handleCreateTemplate} className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm flex items-center justify-center gap-2">
-                    <LayoutTemplate size={18} /> Templates
+                    <LayoutTemplate size={18} /> {t('inspections.templates', { defaultValue: 'Templates' })}
                 </button>
                 <button onClick={handleStartNew} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm flex items-center justify-center gap-2">
-                    <Plus size={18} /> New Inspection
+                    <Plus size={18} /> {t('inspections.newInspection')}
                 </button>
             </div>
         </div>
@@ -226,8 +228,8 @@ export const InspectionForm: React.FC = () => {
             {inspections.length === 0 ? (
                 <div className="col-span-full py-12 text-center bg-white rounded-xl border border-dashed border-slate-300 text-slate-400">
                     <ClipboardCheck size={48} className="mx-auto mb-3 opacity-20" />
-                    <p>No inspections completed yet.</p>
-                    <button onClick={handleStartNew} className="text-blue-600 font-medium mt-2 hover:underline">Start your first audit</button>
+                    <p>{t('inspections.noInspections')}</p>
+                    <button onClick={handleStartNew} className="text-blue-600 font-medium mt-2 hover:underline">{t('inspections.startFirst', { defaultValue: 'Start your first audit' })}</button>
                 </div>
             ) : (
                 inspections.map(insp => (
@@ -265,13 +267,13 @@ export const InspectionForm: React.FC = () => {
             <button onClick={() => setView('list')} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
                 <ArrowLeft size={20} className="text-slate-600" />
             </button>
-            <h2 className="text-2xl font-bold text-slate-800">Create New Template</h2>
+            <h2 className="text-2xl font-bold text-slate-800">{t('inspections.createTemplate', { defaultValue: 'Create New Template' })}</h2>
           </div>
 
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1">Template Name</label>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">{t('inspections.templateName', { defaultValue: 'Template Name' })}</label>
                       <input 
                           type="text" 
                           value={newTemplateName}
@@ -281,7 +283,7 @@ export const InspectionForm: React.FC = () => {
                       />
                   </div>
                   <div>
-                      <label className="block text-sm font-semibold text-slate-700 mb-1">Category</label>
+                      <label className="block text-sm font-semibold text-slate-700 mb-1">{t('documents.category')}</label>
                       <select 
                           value={newTemplateCategory}
                           onChange={(e) => setNewTemplateCategory(e.target.value)}
@@ -297,7 +299,7 @@ export const InspectionForm: React.FC = () => {
                   </div>
               </div>
               <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">Description</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">{t('inspections.description', { defaultValue: 'Description' })}</label>
                   <SmartTextInput 
                       value={newTemplateDesc}
                       onChange={(e) => setNewTemplateDesc(e.target.value)}
@@ -308,7 +310,7 @@ export const InspectionForm: React.FC = () => {
               </div>
 
               <div className="pt-4 border-t border-slate-100">
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Checklist Items</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">{t('inspections.checklistItems', { defaultValue: 'Checklist Items' })}</label>
                   <div className="flex gap-2 mb-3">
                       <SmartTextInput 
                           value={newItemInput}
@@ -322,13 +324,13 @@ export const InspectionForm: React.FC = () => {
                           onClick={handleAddItemToTemplate}
                           className="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-200"
                       >
-                          Add
+                          {t('inspections.add', { defaultValue: 'Add' })}
                       </button>
                   </div>
 
                   <div className="space-y-2">
                       {newTemplateItems.length === 0 ? (
-                          <p className="text-center text-slate-400 py-4 text-sm bg-slate-50 rounded-lg border border-dashed border-slate-200">No items added yet.</p>
+                          <p className="text-center text-slate-400 py-4 text-sm bg-slate-50 rounded-lg border border-dashed border-slate-200">{t('inspections.noItems', { defaultValue: 'No items added yet.' })}</p>
                       ) : (
                           newTemplateItems.map((item, index) => (
                               <div key={index} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg border border-slate-100">
@@ -347,7 +349,7 @@ export const InspectionForm: React.FC = () => {
                       onClick={handleSaveTemplate}
                       className="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 shadow-sm"
                   >
-                      Save Template
+                      {t('inspections.saveTemplate', { defaultValue: 'Save Template' })}
                   </button>
               </div>
           </div>
@@ -360,7 +362,7 @@ export const InspectionForm: React.FC = () => {
             <button onClick={() => setView('list')} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
                 <ArrowLeft size={20} className="text-slate-600" />
             </button>
-            <h2 className="text-2xl font-bold text-slate-800">Select Inspection Type</h2>
+            <h2 className="text-2xl font-bold text-slate-800">{t('inspections.selectType', { defaultValue: 'Select Inspection Type' })}</h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -381,7 +383,7 @@ export const InspectionForm: React.FC = () => {
               {/* Shortcut to create new */}
               <div onClick={handleCreateTemplate} className="border-2 border-dashed border-slate-300 p-6 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:bg-slate-50 hover:border-slate-400 cursor-pointer transition-colors">
                   <Plus size={32} className="mb-2 opacity-50" />
-                  <span className="font-medium">Create Custom Template</span>
+                  <span className="font-medium">{t('inspections.createCustomTemplate', { defaultValue: 'Create Custom Template' })}</span>
               </div>
           </div>
       </div>
@@ -404,7 +406,7 @@ export const InspectionForm: React.FC = () => {
                     </div>
                 </div>
                 <div className="text-right">
-                    <span className="block text-xs text-slate-400 uppercase font-bold">Current Score</span>
+                    <span className="block text-xs text-slate-400 uppercase font-bold">{t('inspections.currentScore', { defaultValue: 'Current Score' })}</span>
                     <span className={`text-2xl font-bold ${score >= 80 ? 'text-green-600' : score >= 50 ? 'text-orange-500' : 'text-red-600'}`}>
                         {score}%
                     </span>
@@ -413,7 +415,7 @@ export const InspectionForm: React.FC = () => {
 
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
                  <div>
-                     <label className="block text-sm font-semibold text-slate-700 mb-1">Inspection Location / Asset ID</label>
+                     <label className="block text-sm font-semibold text-slate-700 mb-1">{t('inspections.locationLabel', { defaultValue: 'Inspection Location / Asset ID' })}</label>
                      <div className="relative">
                         <SmartTextInput 
                             value={location}

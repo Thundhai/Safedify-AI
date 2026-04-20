@@ -8,11 +8,13 @@ import { analyzeObservationTrendsAI } from '../services/geminiService';
 import { apiExportData } from '../services/apiService';
 import { downloadObservationPDF, downloadObservationCSV } from '../services/reportService';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from 'react-i18next';
 import { Observation, ObservationType } from '../types';
 import { Pagination } from './Pagination';
 
 export const ObservationList: React.FC = () => {
     const { user } = useAuth();
+    const { t } = useTranslation();
     const [observations, setObservations] = useState<Observation[]>([]);
     const [trends, setTrends] = useState<any[]>([]);
     const [loadingTrends, setLoadingTrends] = useState(false);
@@ -53,7 +55,7 @@ export const ObservationList: React.FC = () => {
 
     const handleDelete = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (confirm('Are you sure you want to permanently delete this observation?')) {
+        if (confirm(t('observations.confirmDelete', { defaultValue: 'Are you sure you want to permanently delete this observation?' }))) {
             await deleteObservation(id);
             setObservations(prev => prev.filter(o => o.id !== id));
         }
@@ -133,27 +135,27 @@ export const ObservationList: React.FC = () => {
             {/* Screen Header - Hidden on Print */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-800">Observation Cards (STOP/BBS)</h2>
-                    <p className="text-slate-500">Track unsafe acts, conditions, and safe behaviors.</p>
+                    <h2 className="text-2xl font-bold text-slate-800">{t('observations.title')}</h2>
+                    <p className="text-slate-500">{t('observations.subtitle', { defaultValue: 'Track unsafe acts, conditions, and safe behaviors.' })}</p>
                 </div>
                 <div className="flex gap-2">
                     <button 
                         onClick={() => apiExportData('observations').then(() => toast.success('Export downloaded')).catch(() => toast.error('Export failed'))}
                         className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm flex items-center justify-center gap-2"
                     >
-                        <Download size={18} /> Export CSV
+                        <Download size={18} /> {t('common.export')} CSV
                     </button>
                     <button 
                         onClick={() => window.print()}
                         className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm flex items-center justify-center gap-2"
                     >
-                        <Printer size={18} /> Print / PDF
+                        <Printer size={18} /> {t('observations.printPDF', { defaultValue: 'Print / PDF' })}
                     </button>
                     <Link to="/smart-camera" className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 shadow-sm flex items-center justify-center gap-2">
-                        <Camera size={18} /> AI Photo Scan
+                        <Camera size={18} /> {t('observations.aiPhotoScan', { defaultValue: 'AI Photo Scan' })}
                     </Link>
                     <Link to="/observations/new" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm flex items-center justify-center gap-2">
-                        <Plus size={18} /> Add Manual
+                        <Plus size={18} /> {t('observations.addManual', { defaultValue: 'Add Manual' })}
                     </Link>
                 </div>
             </div>
@@ -162,12 +164,12 @@ export const ObservationList: React.FC = () => {
             <div className="hidden print:block mb-8 border-b-2 border-slate-800 pb-4">
                 <div className="flex justify-between items-end">
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-900">Safety Observation Log</h1>
-                        <p className="text-slate-500">Comprehensive Report</p>
+                        <h1 className="text-3xl font-bold text-slate-900">{t('observations.title')}</h1>
+                        <p className="text-slate-500">{t('observations.comprehensiveReport', { defaultValue: 'Comprehensive Report' })}</p>
                     </div>
                     <div className="text-right">
-                        <p className="text-sm font-bold">Generated: {new Date().toLocaleDateString()}</p>
-                        <p className="text-sm text-slate-500">Filtered Records: {filteredObservations.length}</p>
+                        <p className="text-sm font-bold">{t('observations.generated', { defaultValue: 'Generated' })}: {new Date().toLocaleDateString()}</p>
+                        <p className="text-sm text-slate-500">{t('observations.filteredRecords', { defaultValue: 'Filtered Records' })}: {filteredObservations.length}</p>
                     </div>
                 </div>
             </div>
@@ -175,19 +177,19 @@ export const ObservationList: React.FC = () => {
             {/* Stats Row - Hidden on Print */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 print:hidden">
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                    <p className="text-slate-500 text-xs uppercase font-bold">Total Cards</p>
+                    <p className="text-slate-500 text-xs uppercase font-bold">{t('observations.totalCards', { defaultValue: 'Total Cards' })}</p>
                     <h3 className="text-2xl font-bold text-slate-800">{stats.total}</h3>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-red-100 shadow-sm">
-                    <p className="text-red-500 text-xs uppercase font-bold">Unsafe Acts</p>
+                    <p className="text-red-500 text-xs uppercase font-bold">{t('observations.unsafeAct')}</p>
                     <h3 className="text-2xl font-bold text-red-700">{stats.unsafeActs}</h3>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-orange-100 shadow-sm">
-                    <p className="text-orange-500 text-xs uppercase font-bold">Conditions</p>
+                    <p className="text-orange-500 text-xs uppercase font-bold">{t('observations.unsafeCondition')}</p>
                     <h3 className="text-2xl font-bold text-orange-700">{stats.conditions}</h3>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-green-100 shadow-sm">
-                    <p className="text-green-500 text-xs uppercase font-bold">Safe Behaviors</p>
+                    <p className="text-green-500 text-xs uppercase font-bold">{t('observations.safeAct')}</p>
                     <h3 className="text-2xl font-bold text-green-700">{stats.safe}</h3>
                 </div>
             </div>
@@ -198,9 +200,9 @@ export const ObservationList: React.FC = () => {
                     <div className="flex justify-between items-start mb-4">
                         <div>
                             <h3 className="text-lg font-bold flex items-center gap-2 text-yellow-400">
-                                <Sparkles size={18} /> AI Trend Detection
+                                <Sparkles size={18} /> {t('observations.aiTrendDetection', { defaultValue: 'AI Trend Detection' })}
                             </h3>
-                            <p className="text-slate-300 text-sm">Group observations to find recurring hazards.</p>
+                            <p className="text-slate-300 text-sm">{t('observations.trendDescription', { defaultValue: 'Group observations to find recurring hazards.' })}</p>
                         </div>
                         {trends.length === 0 && (
                             <button 
@@ -208,7 +210,7 @@ export const ObservationList: React.FC = () => {
                                 disabled={loadingTrends || observations.length === 0}
                                 className="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded text-sm font-medium transition-colors border border-white/20 disabled:opacity-50"
                             >
-                                {loadingTrends ? <Loader2 className="animate-spin" size={16} /> : 'Run Analysis'}
+                                {loadingTrends ? <Loader2 className="animate-spin" size={16} /> : t('observations.runAnalysis', { defaultValue: 'Run Analysis' })}
                             </button>
                         )}
                     </div>
@@ -226,7 +228,7 @@ export const ObservationList: React.FC = () => {
                             ))}
                         </div>
                     ) : (
-                        !loadingTrends && <p className="text-sm text-slate-400 italic">No trends analyzed yet. Click the button to start.</p>
+                        !loadingTrends && <p className="text-sm text-slate-400 italic">{t('observations.noTrends', { defaultValue: 'No trends analyzed yet. Click the button to start.' })}</p>
                     )}
                 </div>
             </div>
@@ -234,7 +236,7 @@ export const ObservationList: React.FC = () => {
             {/* Filter Bar */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center print:hidden">
                 <div className="flex items-center gap-2 text-sm text-slate-500 font-medium">
-                    <Filter size={16} /> Filters:
+                    <Filter size={16} /> {t('common.filter')}:
                 </div>
                 <select
                     value={filterType}
@@ -242,11 +244,11 @@ export const ObservationList: React.FC = () => {
                     aria-label="Filter by type"
                     className="bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
                 >
-                    <option value="All">All Types</option>
-                    <option value="Unsafe Act">Unsafe Act</option>
-                    <option value="Unsafe Condition">Unsafe Condition</option>
-                    <option value="Safe Behavior">Safe Behavior</option>
-                    <option value="Near Miss">Near Miss</option>
+                    <option value="All">{t('observations.allTypes', { defaultValue: 'All Types' })}</option>
+                    <option value="Unsafe Act">{t('observations.unsafeAct')}</option>
+                    <option value="Unsafe Condition">{t('observations.unsafeCondition')}</option>
+                    <option value="Safe Behavior">{t('observations.safeBehavior', { defaultValue: 'Safe Behavior' })}</option>
+                    <option value="Near Miss">{t('observations.nearMiss')}</option>
                 </select>
 
                 <select
@@ -255,7 +257,7 @@ export const ObservationList: React.FC = () => {
                     aria-label="Filter by category"
                     className="bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
                 >
-                    <option value="All">All Categories</option>
+                    <option value="All">{t('observations.allCategories', { defaultValue: 'All Categories' })}</option>
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
 
@@ -265,9 +267,9 @@ export const ObservationList: React.FC = () => {
                     aria-label="Filter by status"
                     className="bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
                 >
-                    <option value="All">All Statuses</option>
-                    <option value="Open">Open</option>
-                    <option value="Closed">Closed</option>
+                    <option value="All">{t('observations.allStatuses', { defaultValue: 'All Statuses' })}</option>
+                    <option value="Open">{t('observations.statusOpen')}</option>
+                    <option value="Closed">{t('observations.statusClosed')}</option>
                 </select>
 
                 {(filterType !== 'All' || filterCategory !== 'All' || filterStatus !== 'All') && (
@@ -275,7 +277,7 @@ export const ObservationList: React.FC = () => {
                         onClick={() => { setFilterType('All'); setFilterCategory('All'); setFilterStatus('All'); }}
                         className="text-sm text-blue-600 hover:underline ml-auto font-medium"
                     >
-                        Clear Filters
+                        {t('observations.clearFilters', { defaultValue: 'Clear Filters' })}
                     </button>
                 )}
             </div>
@@ -283,12 +285,12 @@ export const ObservationList: React.FC = () => {
             {/* Screen List - Hidden on Print */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden print:hidden">
                 <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-                    <h3 className="font-semibold text-slate-700">Recent Observations</h3>
-                    <span className="text-xs text-slate-500">Showing {filteredObservations.length} of {observations.length}</span>
+                    <h3 className="font-semibold text-slate-700">{t('observations.recentObservations', { defaultValue: 'Recent Observations' })}</h3>
+                    <span className="text-xs text-slate-500">{t('observations.showing', { defaultValue: 'Showing {{filtered}} of {{total}}', filtered: filteredObservations.length, total: observations.length })}</span>
                 </div>
                 <div className="divide-y divide-slate-100">
                     {filteredObservations.length === 0 ? (
-                        <div className="p-8 text-center text-slate-400">No observations found matching filters.</div>
+                        <div className="p-8 text-center text-slate-400">{t('observations.noObservations')}</div>
                     ) : (
                         paginatedObservations.map(obs => (
                             <div key={obs.id} className="p-4 hover:bg-slate-50 transition-colors group">
@@ -306,13 +308,13 @@ export const ObservationList: React.FC = () => {
                                 <p className="text-slate-800 font-medium mb-1">{obs.description}</p>
                                 {obs.immediateActionTaken && (
                                     <p className="text-sm text-slate-500 flex items-center gap-1">
-                                        <CheckCircle size={12} className="text-green-600" /> Action: {obs.immediateActionTaken}
+                                        <CheckCircle size={12} className="text-green-600" /> {t('observations.action', { defaultValue: 'Action' })}: {obs.immediateActionTaken}
                                     </p>
                                 )}
                                 <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-50">
                                      <div className="flex items-center gap-3">
                                          <span className="text-xs text-slate-400">
-                                             Reported by: {obs.isAnonymous ? 'Anonymous' : obs.observer}
+                                             {t('observations.reportedBy', { defaultValue: 'Reported by' })}: {obs.isAnonymous ? t('observations.anonymous', { defaultValue: 'Anonymous' }) : obs.observer}
                                          </span>
                                          <span className={`text-xs font-medium px-2 py-0.5 rounded ${obs.status === 'Open' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
                                              {obs.status}
@@ -363,13 +365,13 @@ export const ObservationList: React.FC = () => {
                 <table className="w-full text-sm text-left border border-slate-300">
                     <thead className="bg-slate-100 text-slate-700 uppercase text-xs">
                         <tr>
-                            <th className="px-4 py-3 border border-slate-300">Date</th>
-                            <th className="px-4 py-3 border border-slate-300">Type</th>
-                            <th className="px-4 py-3 border border-slate-300">Category</th>
-                            <th className="px-4 py-3 border border-slate-300">Location</th>
-                            <th className="px-4 py-3 border border-slate-300 w-1/3">Description</th>
-                            <th className="px-4 py-3 border border-slate-300 w-1/4">Action Taken</th>
-                            <th className="px-4 py-3 border border-slate-300">Status</th>
+                            <th className="px-4 py-3 border border-slate-300">{t('observations.date', { defaultValue: 'Date' })}</th>
+                            <th className="px-4 py-3 border border-slate-300">{t('observations.type')}</th>
+                            <th className="px-4 py-3 border border-slate-300">{t('observations.category', { defaultValue: 'Category' })}</th>
+                            <th className="px-4 py-3 border border-slate-300">{t('observations.location')}</th>
+                            <th className="px-4 py-3 border border-slate-300 w-1/3">{t('observations.description', { defaultValue: 'Description' })}</th>
+                            <th className="px-4 py-3 border border-slate-300 w-1/4">{t('observations.actionTaken', { defaultValue: 'Action Taken' })}</th>
+                            <th className="px-4 py-3 border border-slate-300">{t('common.status')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -387,8 +389,8 @@ export const ObservationList: React.FC = () => {
                     </tbody>
                 </table>
                 <div className="mt-8 pt-4 border-t border-slate-800 flex justify-between text-xs">
-                    <p>Report generated by Safedify HSE Platform</p>
-                    <p>Sign Off: __________________________</p>
+                    <p>{t('observations.reportGenerated', { defaultValue: 'Report generated by Safedify HSE Platform' })}</p>
+                    <p>{t('observations.signOff', { defaultValue: 'Sign Off' })}: __________________________</p>
                 </div>
             </div>
 
@@ -399,7 +401,7 @@ export const ObservationList: React.FC = () => {
                         <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-slate-50">
                             <h3 className="font-bold text-slate-800 flex items-center gap-2">
                                 {isEditMode ? <Edit2 size={18} className="text-blue-600"/> : <Eye size={18} className="text-slate-600"/>}
-                                {isEditMode ? 'Edit Observation' : 'Observation Details'}
+                                {isEditMode ? t('observations.editObservation', { defaultValue: 'Edit Observation' }) : t('observations.observationDetails', { defaultValue: 'Observation Details' })}
                             </h3>
                             <button onClick={() => setSelectedObs(null)} aria-label="Close observation details" className="text-slate-400 hover:text-slate-600">
                                 <X size={20} />
@@ -410,21 +412,21 @@ export const ObservationList: React.FC = () => {
                             <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">Type</label>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">{t('observations.type')}</label>
                                         <select 
                                             className="w-full border border-slate-300 rounded-lg p-2 text-sm"
                                             value={editForm.type}
                                             onChange={(e) => setEditForm({...editForm, type: e.target.value as ObservationType})}
                                             aria-label="Observation type"
                                         >
-                                            <option value="Unsafe Act">Unsafe Act</option>
-                                            <option value="Unsafe Condition">Unsafe Condition</option>
-                                            <option value="Safe Behavior">Safe Behavior</option>
-                                            <option value="Near Miss">Near Miss</option>
+                                            <option value="Unsafe Act">{t('observations.unsafeAct')}</option>
+                                            <option value="Unsafe Condition">{t('observations.unsafeCondition')}</option>
+                                            <option value="Safe Behavior">{t('observations.safeBehavior', { defaultValue: 'Safe Behavior' })}</option>
+                                            <option value="Near Miss">{t('observations.nearMiss')}</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 mb-1">Category</label>
+                                        <label className="block text-xs font-bold text-slate-500 mb-1">{t('observations.category', { defaultValue: 'Category' })}</label>
                                         <select 
                                             className="w-full border border-slate-300 rounded-lg p-2 text-sm"
                                             value={editForm.category}
@@ -437,7 +439,7 @@ export const ObservationList: React.FC = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1">Location</label>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">{t('observations.location')}</label>
                                     <input 
                                         type="text"
                                         className="w-full border border-slate-300 rounded-lg p-2 text-sm"
@@ -448,7 +450,7 @@ export const ObservationList: React.FC = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1">Description</label>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">{t('observations.description', { defaultValue: 'Description' })}</label>
                                     <textarea 
                                         rows={3}
                                         className="w-full border border-slate-300 rounded-lg p-2 text-sm"
@@ -459,7 +461,7 @@ export const ObservationList: React.FC = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1">Immediate Action</label>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">{t('observations.immediateAction', { defaultValue: 'Immediate Action' })}</label>
                                     <textarea 
                                         rows={2}
                                         className="w-full border border-slate-300 rounded-lg p-2 text-sm"
@@ -470,15 +472,15 @@ export const ObservationList: React.FC = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 mb-1">Status</label>
+                                    <label className="block text-xs font-bold text-slate-500 mb-1">{t('common.status')}</label>
                                     <select 
                                         className="w-full border border-slate-300 rounded-lg p-2 text-sm"
                                         value={editForm.status}
                                         onChange={(e) => setEditForm({...editForm, status: e.target.value as any})}
                                         aria-label="Observation status"
                                     >
-                                        <option value="Open">Open</option>
-                                        <option value="Closed">Closed</option>
+                                        <option value="Open">{t('observations.statusOpen')}</option>
+                                        <option value="Closed">{t('observations.statusClosed')}</option>
                                     </select>
                                 </div>
 
@@ -488,13 +490,13 @@ export const ObservationList: React.FC = () => {
                                         onClick={() => setSelectedObs(null)}
                                         className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
                                     >
-                                        Cancel
+                                        {t('common.cancel')}
                                     </button>
                                     <button 
                                         type="submit"
                                         className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
                                     >
-                                        <Save size={16} /> Save Changes
+                                        <Save size={16} /> {t('common.save')}
                                     </button>
                                 </div>
                             </form>
@@ -509,17 +511,17 @@ export const ObservationList: React.FC = () => {
 
                                 <div className="grid grid-cols-2 gap-4 text-sm">
                                     <div className="flex flex-col">
-                                        <span className="text-xs text-slate-400 uppercase font-bold flex items-center gap-1"><Tag size={12}/> Category</span>
+                                        <span className="text-xs text-slate-400 uppercase font-bold flex items-center gap-1"><Tag size={12}/> {t('observations.category', { defaultValue: 'Category' })}</span>
                                         <span className="font-medium text-slate-800">{selectedObs.category}</span>
                                     </div>
                                     <div className="flex flex-col">
-                                        <span className="text-xs text-slate-400 uppercase font-bold flex items-center gap-1"><MapPin size={12}/> Location</span>
+                                        <span className="text-xs text-slate-400 uppercase font-bold flex items-center gap-1"><MapPin size={12}/> {t('observations.location')}</span>
                                         <span className="font-medium text-slate-800">{selectedObs.location}</span>
                                     </div>
                                 </div>
 
                                 <div>
-                                    <h4 className="text-xs text-slate-400 uppercase font-bold flex items-center gap-1 mb-1"><FileText size={12}/> Description</h4>
+                                    <h4 className="text-xs text-slate-400 uppercase font-bold flex items-center gap-1 mb-1"><FileText size={12}/> {t('observations.description', { defaultValue: 'Description' })}</h4>
                                     <p className="text-slate-800 bg-slate-50 p-3 rounded-lg border border-slate-100 text-sm">
                                         {selectedObs.description}
                                     </p>
@@ -527,7 +529,7 @@ export const ObservationList: React.FC = () => {
 
                                 {selectedObs.immediateActionTaken && (
                                     <div>
-                                        <h4 className="text-xs text-slate-400 uppercase font-bold flex items-center gap-1 mb-1"><CheckCircle size={12}/> Immediate Action</h4>
+                                        <h4 className="text-xs text-slate-400 uppercase font-bold flex items-center gap-1 mb-1"><CheckCircle size={12}/> {t('observations.immediateAction', { defaultValue: 'Immediate Action' })}</h4>
                                         <p className="text-slate-700 text-sm italic">
                                             {selectedObs.immediateActionTaken}
                                         </p>
@@ -536,7 +538,7 @@ export const ObservationList: React.FC = () => {
 
                                 {selectedObs.images.length > 0 && (
                                     <div>
-                                        <h4 className="text-xs text-slate-400 uppercase font-bold mb-2">Evidence</h4>
+                                        <h4 className="text-xs text-slate-400 uppercase font-bold mb-2">{t('observations.evidence', { defaultValue: 'Evidence' })}</h4>
                                         <div className="flex gap-2 overflow-x-auto">
                                             {selectedObs.images.map((img, i) => (
                                                 <img key={i} src={img} alt="Evidence" className="h-24 w-auto rounded border border-slate-200" />
@@ -561,19 +563,19 @@ export const ObservationList: React.FC = () => {
                                     </button>
                                   </div>
                                   <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-500">Status: <span className={`font-bold ${selectedObs.status === 'Open' ? 'text-blue-600' : 'text-slate-600'}`}>{selectedObs.status}</span></span>
+                                    <span className="text-slate-500">{t('common.status')}: <span className={`font-bold ${selectedObs.status === 'Open' ? 'text-blue-600' : 'text-slate-600'}`}>{selectedObs.status === 'Open' ? t('observations.statusOpen') : t('observations.statusClosed')}</span></span>
                                     <div className="flex gap-2">
                                         <button 
                                             onClick={(e) => openEditModal(selectedObs, e)}
                                             className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"
                                         >
-                                            Edit
+                                            {t('common.edit')}
                                         </button>
                                         <button 
                                             onClick={() => setSelectedObs(null)}
                                             className="px-4 py-2 bg-slate-100 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-200 transition-colors"
                                         >
-                                            Close
+                                            {t('common.close')}
                                         </button>
                                     </div>
                                   </div>

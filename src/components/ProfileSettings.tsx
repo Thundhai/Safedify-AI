@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../context/AuthContext';
 import { changePassword } from '../services/authService';
 import { getStorageUsage, clearUserData } from '../services/storageService';
@@ -11,6 +12,7 @@ import toast from 'react-hot-toast';
 const TwoFactorSetup = lazy(() => import('./TwoFactorSetup'));
 
 export const ProfileSettings: React.FC = () => {
+    const { t } = useTranslation();
     const { user, logout, updateProfile } = useAuth();
     const navigate = useNavigate();
     const [usage, setUsage] = useState(0);
@@ -129,7 +131,7 @@ export const ProfileSettings: React.FC = () => {
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">
-            <h1 className="text-2xl font-bold text-slate-800">Account Settings</h1>
+            <h1 className="text-2xl font-bold text-slate-800">{t('profile.title')}</h1>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Profile Card */}
@@ -173,7 +175,7 @@ export const ProfileSettings: React.FC = () => {
                     
                     <div className="border-t border-slate-100 pt-4">
                         <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                            <Shield size={16} /> Plan Details
+                            <Shield size={16} /> {t('profile.planDetails', { defaultValue: 'Plan Details' })}
                         </h3>
                         <div className="bg-slate-50 p-4 rounded-lg flex justify-between items-center">
                             <div>
@@ -187,7 +189,7 @@ export const ProfileSettings: React.FC = () => {
                                     onClick={() => navigate('/pricing')}
                                     className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded font-bold hover:bg-blue-700"
                                 >
-                                    Upgrade
+                                    {t('profile.upgrade', { defaultValue: 'Upgrade' })}
                                 </button>
                             )}
                         </div>
@@ -196,34 +198,34 @@ export const ProfileSettings: React.FC = () => {
                     {/* Change Password */}
                     <div className="border-t border-slate-100 pt-4 mt-4">
                         <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
-                            <Lock size={16} /> Password
+                            <Lock size={16} /> {t('profile.security')}
                         </h3>
                         {!showPasswordForm ? (
                             <button
                                 onClick={() => setShowPasswordForm(true)}
                                 className="text-sm text-blue-600 hover:text-blue-700 font-medium hover:underline"
                             >
-                                Change Password
+                                {t('profile.changePassword')}
                             </button>
                         ) : (
                             <div className="space-y-3">
                                 <input
                                     type="password"
-                                    placeholder="Current password"
+                                    placeholder={t('profile.currentPassword')}
                                     value={currentPassword}
                                     onChange={e => setCurrentPassword(e.target.value)}
                                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                 />
                                 <input
                                     type="password"
-                                    placeholder="New password (min 8 chars)"
+                                    placeholder={t('profile.newPasswordPlaceholder', { defaultValue: 'New password (min 8 chars)' })}
                                     value={newPassword}
                                     onChange={e => setNewPassword(e.target.value)}
                                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
                                 />
                                 <input
                                     type="password"
-                                    placeholder="Confirm new password"
+                                    placeholder={t('profile.confirmPassword')}
                                     value={confirmPassword}
                                     onChange={e => setConfirmPassword(e.target.value)}
                                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
@@ -235,13 +237,13 @@ export const ProfileSettings: React.FC = () => {
                                         disabled={changingPassword}
                                         className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
                                     >
-                                        {changingPassword ? 'Saving...' : 'Update Password'}
+                                        {changingPassword ? t('common.loading') : t('profile.updatePassword', { defaultValue: 'Update Password' })}
                                     </button>
                                     <button
                                         onClick={() => { setShowPasswordForm(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }}
                                         className="px-4 py-2 text-slate-600 text-sm rounded-lg font-medium hover:bg-slate-100"
                                     >
-                                        Cancel
+                                        {t('common.cancel')}
                                     </button>
                                 </div>
                             </div>
@@ -253,7 +255,7 @@ export const ProfileSettings: React.FC = () => {
                 <div className="space-y-6">
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                         <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <HardDrive size={16} /> Storage Usage (Local)
+                            <HardDrive size={16} /> {t('profile.storageUsage', { defaultValue: 'Storage Usage (Local)' })}
                         </h3>
                         
                         <div className="mb-2 flex justify-between text-xs text-slate-600 font-medium">
@@ -277,16 +279,16 @@ export const ProfileSettings: React.FC = () => {
 
                     <div className="bg-white rounded-xl shadow-sm border border-red-100 p-6">
                         <h3 className="text-sm font-bold text-red-800 mb-2 flex items-center gap-2">
-                            <Trash2 size={16} /> Danger Zone
+                            <Trash2 size={16} /> {t('profile.dangerZone', { defaultValue: 'Danger Zone' })}
                         </h3>
                         <p className="text-xs text-slate-500 mb-4">
-                            Clear all local data stored on this device. This cannot be undone.
+                            {t('profile.clearDataWarning', { defaultValue: 'Clear all local data stored on this device. This cannot be undone.' })}
                         </p>
                         <button 
                             onClick={handleClearData}
                             className="w-full border border-red-200 text-red-600 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
                         >
-                            Reset All Data
+                            {t('profile.resetAllData', { defaultValue: 'Reset All Data' })}
                         </button>
                     </div>
                 </div>
@@ -300,7 +302,7 @@ export const ProfileSettings: React.FC = () => {
             {/* Notification Preferences */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <h3 className="text-sm font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <Bell size={16} /> Notification Preferences
+                    <Bell size={16} /> {t('profile.notifications')}
                 </h3>
                 {loadingPrefs ? (
                     <div className="animate-pulse space-y-3">
@@ -359,7 +361,7 @@ export const ProfileSettings: React.FC = () => {
                                 disabled={savingPrefs}
                                 className="px-5 py-2 bg-blue-600 text-white text-sm rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
                             >
-                                {savingPrefs ? 'Saving...' : 'Save Preferences'}
+                                {savingPrefs ? t('common.loading') : t('profile.savePreferences', { defaultValue: 'Save Preferences' })}
                             </button>
                         </div>
                     </div>

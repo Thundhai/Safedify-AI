@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { getDocuments, deleteDocument } from '../services/storageService';
 import { HSEDocument, DocumentCategory } from '../types';
 import { Plus, FileText, Search, Filter, Shield, Book, FileBarChart, AlertCircle, Trash2, Clock } from 'lucide-react';
@@ -8,6 +9,7 @@ import { Pagination } from './Pagination';
 import toast from 'react-hot-toast';
 
 export const DocumentList: React.FC = () => {
+    const { t } = useTranslation();
     const [documents, setDocuments] = useState<HSEDocument[]>([]);
     const [filterCategory, setFilterCategory] = useState<string>('All');
     const [search, setSearch] = useState('');
@@ -51,10 +53,10 @@ export const DocumentList: React.FC = () => {
     const handleDelete = async (e: React.MouseEvent, id: string, title: string) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!confirm(`Delete document "${title}"? This cannot be undone.`)) return;
+        if (!confirm(t('documents.deleteConfirm', { defaultValue: `Delete document "${title}"? This cannot be undone.` }))) return;
         await deleteDocument(id);
         setDocuments(prev => prev.filter(d => d.id !== id));
-        toast.success('Document deleted');
+        toast.success(t('documents.deleted', { defaultValue: 'Document deleted' }));
     };
 
     if (loading) return (
@@ -67,11 +69,11 @@ export const DocumentList: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-800">Document Management</h2>
-                    <p className="text-slate-500">Central library for Policies, SOPs, and MSDS.</p>
+                    <h2 className="text-2xl font-bold text-slate-800">{t('documents.title')}</h2>
+                    <p className="text-slate-500">{t('documents.subtitle', { defaultValue: 'Central library for Policies, SOPs, and MSDS.' })}</p>
                 </div>
                 <Link to="/documents/new" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm flex items-center justify-center gap-2">
-                    <Plus size={18} /> Upload Document
+                    <Plus size={18} /> {t('documents.upload')}
                 </Link>
             </div>
 
@@ -80,7 +82,7 @@ export const DocumentList: React.FC = () => {
                 <div className="relative flex-1">
                     <input 
                         type="text" 
-                        placeholder="Search documents..." 
+                        placeholder={t('documents.searchPlaceholder', { defaultValue: 'Search documents...' })} 
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none text-sm"
@@ -95,7 +97,7 @@ export const DocumentList: React.FC = () => {
                              filterCategory === 'All' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                          }`}
                     >
-                        All Docs
+                        {t('documents.allDocs', { defaultValue: 'All Docs' })}
                     </button>
                     {categories.map(cat => (
                         <button 
@@ -156,7 +158,7 @@ export const DocumentList: React.FC = () => {
                         <p className="text-sm text-slate-600 line-clamp-2 mb-4 flex-1">{doc.description}</p>
 
                         <div className="border-t border-slate-100 pt-4 flex justify-between items-center text-xs text-slate-400">
-                             <span>Author: {doc.author}</span>
+                             <span>{t('documents.author', { defaultValue: 'Author' })}: {doc.author}</span>
                              <span>{doc.category}</span>
                         </div>
                     </Link>
@@ -165,7 +167,7 @@ export const DocumentList: React.FC = () => {
                 {filteredDocs.length === 0 && (
                     <div className="col-span-full py-12 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-300">
                         <FileText size={48} className="mx-auto mb-3 opacity-20" />
-                        <p>No documents found.</p>
+                        <p>{t('documents.noDocuments')}</p>
                     </div>
                 )}
             </div>

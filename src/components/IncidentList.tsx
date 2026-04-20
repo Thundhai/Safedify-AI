@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, AlertTriangle, Printer, Plus, Trash2, Download, CheckSquare, Square, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { getIncidents, deleteIncident } from '../services/storageService';
 import { apiExportData, apiBulkDeleteIncidents, apiBulkUpdateIncidentStatus } from '../services/apiService';
 import { exportIncidentsPDF } from '../services/pdfExportService';
@@ -9,6 +10,7 @@ import { Pagination } from './Pagination';
 import toast from 'react-hot-toast';
 
 export const IncidentList: React.FC = () => {
+    const { t } = useTranslation();
     const [incidents, setIncidents] = useState<Incident[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
@@ -110,24 +112,24 @@ export const IncidentList: React.FC = () => {
     return (
         <div className="space-y-4">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
-                <h2 className="text-xl font-bold text-slate-800 dark:text-white">Incident Registry</h2>
+                <h2 className="text-xl font-bold text-slate-800 dark:text-white">{t('incidents.title')}</h2>
                 <div className="flex gap-2">
                     <button 
                         onClick={() => apiExportData('incidents').then(() => toast.success('Export downloaded')).catch(() => toast.error('Export failed'))}
                         className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 flex items-center gap-2"
                     >
-                        <Download size={18} /> Export CSV
+                        <Download size={18} /> {t('common.downloadCsv')}
                     </button>
                     <button 
                         onClick={() => { exportIncidentsPDF(incidents, 'Main Site'); toast.success('PDF downloaded'); }}
                         className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 flex items-center gap-2"
                     >
-                        <Download size={18} /> Export PDF
+                        <Download size={18} /> {t('common.downloadPdf')}
                     </button>
                     <button onClick={() => window.print()} className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 flex items-center gap-2">
-                        <Printer size={18} /> Print
+                        <Printer size={18} /> {t('incidents.print')}
                     </button>
-                    <Link to="/incidents/new" className="bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm">+ Report New</Link>
+                    <Link to="/incidents/new" className="bg-brand-orange text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm">+ {t('incidents.reportNew')}</Link>
                 </div>
             </div>
 
@@ -135,42 +137,42 @@ export const IncidentList: React.FC = () => {
                 <div className="p-4 border-b dark:border-slate-800 flex flex-col gap-3">
                     <div className="flex items-center gap-3">
                         <Search size={18} className="text-slate-400" />
-                        <input type="text" placeholder="Search incidents..." className="bg-transparent border-none outline-none text-sm w-full dark:text-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                        <input type="text" placeholder={t('incidents.searchPlaceholder', { defaultValue: 'Search incidents...' })} className="bg-transparent border-none outline-none text-sm w-full dark:text-white" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                     </div>
                     <div className="flex flex-wrap gap-2">
                         <select title="Filter by category" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-800 dark:text-white dark:border-slate-700">
-                            <option value="All">All Categories</option>
+                            <option value="All">{t('incidents.allCategories', { defaultValue: 'All Categories' })}</option>
                             {Object.values(IncidentCategory).map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                         <select title="Filter by severity" value={severityFilter} onChange={e => setSeverityFilter(e.target.value)} className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-800 dark:text-white dark:border-slate-700">
-                            <option value="All">All Severities</option>
+                            <option value="All">{t('incidents.allSeverities', { defaultValue: 'All Severities' })}</option>
                             {Object.values(IncidentSeverity).map(s => <option key={s} value={s}>{s}</option>)}
                         </select>
                         <select title="Filter by status" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white dark:bg-slate-800 dark:text-white dark:border-slate-700">
-                            <option value="All">All Statuses</option>
-                            <option value="Open">Open</option><option value="Investigating">Investigating</option><option value="Closed">Closed</option>
+                            <option value="All">{t('incidents.allStatuses', { defaultValue: 'All Statuses' })}</option>
+                            <option value="Open">{t('incidents.statusOpen')}</option><option value="Investigating">{t('incidents.statusInvestigating')}</option><option value="Closed">{t('incidents.statusClosed')}</option>
                         </select>
                     </div>
                 </div>
                 {selectedIds.size > 0 && (
                     <div className="p-3 bg-blue-50 dark:bg-blue-900/30 border-b dark:border-slate-700 flex items-center gap-3">
-                        <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{selectedIds.size} selected</span>
+                        <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{t('incidents.nSelected', { count: selectedIds.size, defaultValue: '{{count}} selected' })}</span>
                         <select 
                             value={bulkAction} 
                             onChange={e => { if (e.target.value) handleBulkStatus(e.target.value); setBulkAction(''); }}
                             className="text-xs border border-blue-200 rounded px-2 py-1 bg-white dark:bg-slate-800 dark:text-white dark:border-slate-600"
                         >
-                            <option value="">Change Status...</option>
-                            <option value="Open">Open</option>
-                            <option value="In Progress">In Progress</option>
-                            <option value="Resolved">Resolved</option>
-                            <option value="Closed">Closed</option>
+                            <option value="">{t('incidents.changeStatus', { defaultValue: 'Change Status...' })}</option>
+                            <option value="Open">{t('incidents.statusOpen')}</option>
+                            <option value="In Progress">{t('incidents.statusInProgress', { defaultValue: 'In Progress' })}</option>
+                            <option value="Resolved">{t('incidents.statusResolved', { defaultValue: 'Resolved' })}</option>
+                            <option value="Closed">{t('incidents.statusClosed')}</option>
                         </select>
                         <button onClick={handleBulkDelete} className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1">
-                            <Trash2 size={14} /> Delete
+                            <Trash2 size={14} /> {t('common.delete')}
                         </button>
                         <button onClick={() => setSelectedIds(new Set())} className="text-xs text-slate-500 hover:text-slate-700 ml-auto flex items-center gap-1">
-                            <X size={14} /> Clear selection
+                            <X size={14} /> {t('incidents.clearSelection', { defaultValue: 'Clear selection' })}
                         </button>
                     </div>
                 )}
@@ -182,22 +184,22 @@ export const IncidentList: React.FC = () => {
                                     <div className="mb-6 opacity-80">
                                         <AlertTriangle className="w-16 h-16 text-yellow-500" />
                                     </div>
-                                    <h3 className="text-2xl font-bold text-gray-900 mb-4">No Incidents Reported Yet</h3>
+                                    <h3 className="text-2xl font-bold text-gray-900 mb-4">{t('incidents.noIncidentsYet', { defaultValue: 'No Incidents Reported Yet' })}</h3>
                                     <p className="text-gray-600 mb-8 max-w-md">
-                                        Start building your safety record by reporting incidents, near misses, and observations. Our AI will help you identify patterns and suggest improvements.
+                                        {t('incidents.noIncidentsDescription', { defaultValue: 'Start building your safety record by reporting incidents, near misses, and observations. Our AI will help you identify patterns and suggest improvements.' })}
                                     </p>
                                     <Link
                                         to="/incidents/new"
                                         className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-6 py-3 rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all duration-200 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105"
                                     >
                                         <Plus className="w-5 h-5" />
-                                        Report First Incident
+                                        {t('incidents.reportFirst', { defaultValue: 'Report First Incident' })}
                                     </Link>
                                 </div>
                             </div>
                         ) : (
                             <div className="p-8 text-center">
-                                <p className="text-slate-500">No incidents match your current filters.</p>
+                                <p className="text-slate-500">{t('incidents.noMatchFilters', { defaultValue: 'No incidents match your current filters.' })}</p>
                                 <button 
                                     onClick={() => {
                                         setSearchTerm('');
@@ -207,7 +209,7 @@ export const IncidentList: React.FC = () => {
                                     }}
                                     className="mt-2 text-blue-500 hover:text-blue-600 text-sm"
                                 >
-                                    Clear all filters
+                                    {t('incidents.clearAllFilters', { defaultValue: 'Clear all filters' })}
                                 </button>
                             </div>
                         )
