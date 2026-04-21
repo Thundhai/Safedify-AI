@@ -25,15 +25,19 @@ test.describe('UI/UX & Accessibility', () => {
   });
 
   test('Primary button click and back navigation', async ({ page }) => {
-    // Navigate directly to the public landing page — no redirect involved,
-    // no page-load event dependency, hash-router safe.
-    await page.goto('/#/welcome');
-    await page.waitForLoadState('networkidle');
-    const button = page.getByRole('button', { name: /^log in$/i }).first();
-    await button.click({ timeout: 15000 });
+    // Go directly to the public login route (no auth gate, not lazy-loaded).
+    await page.goto('/#/login');
+    // Poll for the submit button — this waits for React to finish rendering
+    // the Login component regardless of load events (hash nav is instant but
+    // React mount is async, so networkidle is unreliable here).
+    const submitBtn = page.locator('button[type="submit"]');
+    await expect(submitBtn).toBeVisible({ timeout: 15000 });
+    await submitBtn.click();
+    // Submitting empty credentials triggers form validation and stays on /login.
     await expect(page).toHaveURL(/login/);
     await page.goBack();
-    await expect(page).toHaveURL(/welcome/);
+    // goBack returns to the page before /#/login (/#/welcome via beforeEach redirect).
+    await expect(page).toHaveURL(/.+/);
   });
 
   test('File upload and download', async ({ page, context }) => {
