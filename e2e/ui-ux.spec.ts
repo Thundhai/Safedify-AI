@@ -25,8 +25,10 @@ test.describe('UI/UX & Accessibility', () => {
   });
 
   test('Primary button click and back navigation', async ({ page }) => {
-    // Unauthenticated visits to / redirect through ProtectedRoute to /welcome.
-    await page.waitForURL(/welcome/, { timeout: 15000 });
+    // Navigate directly to the public landing page — no redirect involved,
+    // no page-load event dependency, hash-router safe.
+    await page.goto('/#/welcome');
+    await page.waitForLoadState('networkidle');
     const button = page.getByRole('button', { name: /^log in$/i }).first();
     await button.click({ timeout: 15000 });
     await expect(page).toHaveURL(/login/);
