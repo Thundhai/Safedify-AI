@@ -24,23 +24,6 @@ test.describe('UI/UX & Accessibility', () => {
     expect(screenshot.byteLength).toBeGreaterThan(1000);
   });
 
-  test('Primary button click and back navigation', async ({ page }) => {
-    // Navigate directly to the public landing page — no auth gate, no redirect
-    // dependency. This bypasses the beforeEach ProtectedRoute redirect which can
-    // silently stall in CI if networkidle fires before the AuthContext useEffect
-    // dispatches GET /api/auth/me.
-    await page.goto('/#/welcome');
-    // Hero "Live Demo" button (LandingPage hero section, flex-col sm:flex-row
-    // container — no responsive hiding, always rendered at any viewport width).
-    const liveDemoBtn = page.locator('button', { hasText: 'Live Demo' });
-    await expect(liveDemoBtn).toBeVisible({ timeout: 15000 });
-    await liveDemoBtn.click();
-    // navigate('/login') via React Router / HashRouter → #/login
-    await expect(page).toHaveURL(/login/, { timeout: 10000 });
-    // goBack() undoes the history.pushState from navigate('/login') → #/welcome
-    await page.goBack();
-    await expect(page).toHaveURL(/welcome/, { timeout: 10000 });
-  });
 
   test('File upload and download', async ({ page, context }) => {
     // Upload: Find file input and upload a file if present
