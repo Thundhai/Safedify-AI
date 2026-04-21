@@ -6,7 +6,7 @@ import {
   ClipboardList, CheckSquare, BrainCircuit, Save, Plus, Trash2, Loader2, Target, GitBranch, Upload, X, Image as ImageIcon, Link as LinkIcon, CheckCircle2, Volume2, Download, FileText, FileSpreadsheet
 } from 'lucide-react';
 import { getIncidentById, getActions, saveAction, updateIncident, updateAction } from '../services/storageService';
-import { analyzeRootCauseAI, generateSpeechAI, playGeneratedAudio } from '../services/geminiService';
+import { analyzeRootCauseAI, generateSpeechAI, playGeneratedAudio, getCorrectiveActionsAI } from '../services/geminiService';
 import { downloadIncidentPDF, downloadIncidentCSV, downloadInvestigationPDF } from '../services/reportService';
 import { Incident, ActionItem, IncidentSeverity, InjuredPerson, IncidentWitness } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -39,6 +39,11 @@ export const IncidentDetail: React.FC = () => {
   const [showActionForm, setShowActionForm] = useState(false);
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [availableActions, setAvailableActions] = useState<ActionItem[]>([]);
+  const [autoCapaLoading, setAutoCapaLoading] = useState(false);
+  const [generatedCapa, setGeneratedCapa] = useState<string[]>([]);
+  const [selectedCapa, setSelectedCapa] = useState<string[]>([]);
+  const [verificationEvidence, setVerificationEvidence] = useState<Record<string, string>>({});
+  const [verifiedActionIds, setVerifiedActionIds] = useState<Set<string>>(new Set());
   const [newAction, setNewAction] = useState({ 
     title: '', 
     assignee: '', 
@@ -51,6 +56,26 @@ export const IncidentDetail: React.FC = () => {
 
   // Download state — keep a stable serial so PDF & CSV use the same doc number
   const [docSerial] = useState(() => Math.max(1, Math.floor(Math.random() * 999)));
+
+  type CapaTracking = {
+    generatedActions: string[];
+    selectedActions: string[];
+    verifications: Record<string, { evidence: string; verifiedBy: string; verifiedAt: string }>;
+  };
+
+  const parseCapaTracking = (payload?: string): CapaTracking => {
+    if (!payload) return { generatedActions: [], selectedActions: [], verifications: {} };
+    try {
+      const parsed = JSON.parse(payload);
+      return {
+        generatedActions: Array.isArray(parsed.generatedActions) ? parsed.generatedActions : [],
+        selectedActions: Array.isArray(parsed.selectedActions) ? parsed.selectedActions : [],
+        verifications: parsed.verifications && typeof parsed.verifications === 'object' ? parsed.verifications : {},
+      };
+    } catch {
+      return { generatedActions: [], selectedActions: [], verifications: {} };
+    }
+  };
 
   const handleDownloadPDF = () => {
     if (!incident) return;
@@ -105,10 +130,111 @@ export const IncidentDetail: React.FC = () => {
           // If investigation exists, default markAsClosed based on current status
           setMarkAsClosed(inc.status === 'Closed');
         }
+
+        if (inc?.correctiveActions) {
+          const capa = parseCapaTracking(inc.correctiveActions);
+          setGeneratedCapa(capa.generatedActions);
+          setSelectedCapa(capa.selectedActions);
+          const evidMap: Record<string, string> = {};
+          const verified = new Set<string>();
+          Object.entries(capa.verifications).forEach(([k, v]) => {
+            evidMap[k] = v.evidence;
+            verified.add(k);
+          });
+          setVerificationEvidence(evidMap);
+          setVerifiedActionIds(verified);
+        }
       }
     };
     load();
   }, [id]);
+
+  const toggleSelectCapa = (actionText: string) => {
+    setSelectedCapa(prev => prev.includes(actionText) ? prev.filter(a => a !== actionText) : [...prev, actionText]);
+  };
+
+  const handleAutoGenerateCapa = async () => {
+    if (!incident) return;
+    setAutoCapaLoading(true);
+    try {
+      const response = await getCorrectiveActionsAI(
+        `${incident.description} Root Cause: ${rootCause || incident.rootCause || ''}`,
+        incident.type,
+        incident.severity
+      );
+      const generated = (response?.actions || []).filter(Boolean);
+      setGeneratedCapa(generated);
+      toast.success('CAPA suggestions generated');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to generate CAPA suggestions');
+    } finally {
+      setAutoCapaLoading(false);
+    }
+  };
+
+  const handleAddSelectedCapaAsActions = async () => {
+    if (!incident || selectedCapa.length === 0) {
+      toast.error('Select CAPA actions first');
+      return;
+    }
+
+    const existingTitles = new Set(actions.map(a => a.title.trim().toLowerCase()));
+    const toCreate = selectedCapa.filter(a => !existingTitles.has(a.trim().toLowerCase()));
+    if (toCreate.length === 0) {
+      toast.success('Selected CAPA actions are already added');
+      return;
+    }
+
+    try {
+      const created: ActionItem[] = [];
+      for (const text of toCreate) {
+        const isPreventive = /prevent|recurr|future|avoid/i.test(text);
+        const action: ActionItem = {
+          id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          title: text,
+          assignee: user?.name || 'Unassigned',
+          dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]!,
+          priority: incident.severity === 'Critical' || incident.severity === 'High' ? 'High' : 'Medium',
+          status: 'Open',
+          actionType: isPreventive ? 'Preventive' : 'Corrective',
+          category: isPreventive ? 'Incident Preventive' : 'Incident Corrective',
+          indicator: 'Lagging',
+          relatedIncidentId: incident.id,
+        };
+        await saveAction(action);
+        created.push(action);
+      }
+      setActions(prev => [...prev, ...created]);
+      toast.success('Selected CAPA actions added');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || 'Failed to add CAPA actions');
+    }
+  };
+
+  const handleVerifyAction = async (action: ActionItem) => {
+    const evidenceText = (verificationEvidence[action.id] || '').trim();
+    if (!evidenceText) {
+      toast.error('Please provide evidence before verification');
+      return;
+    }
+    try {
+      const updatedAction: ActionItem = {
+        ...action,
+        status: 'Done',
+        verifiedBy: user?.id || user?.name || 'Verifier',
+        effectiveness: 'Effective',
+      };
+      await updateAction(updatedAction);
+      setActions(prev => prev.map(a => a.id === action.id ? updatedAction : a));
+      setVerifiedActionIds(prev => new Set([...Array.from(prev), action.id]));
+      toast.success('Action verified');
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.message || 'Failed to verify action');
+    }
+  };
 
   const handleReadAloud = async () => {
       if (!incident || isSpeaking) return;
@@ -190,8 +316,53 @@ export const IncidentDetail: React.FC = () => {
 
     setIsSaving(true);
 
+    const linkedSelectedActions = actions.filter(a => selectedCapa.includes(a.title));
+    if (markAsClosed) {
+      if (selectedCapa.length === 0) {
+        toast.error('Select CAPA actions before closing the incident.');
+        setActiveTab('capa');
+        setIsSaving(false);
+        return;
+      }
+
+      const unverified = linkedSelectedActions.filter(a => {
+        const ev = (verificationEvidence[a.id] || '').trim();
+        const isDone = a.status === 'Done';
+        return !isDone || !ev;
+      });
+
+      if (unverified.length > 0 || linkedSelectedActions.length < selectedCapa.length) {
+        toast.error('Cannot close report: all selected CAPA actions must be completed and verified with evidence.');
+        setActiveTab('capa');
+        setIsSaving(false);
+        return;
+      }
+    }
+
+    const verifications: Record<string, { evidence: string; verifiedBy: string; verifiedAt: string }> = {};
+    actions.forEach(action => {
+      const ev = (verificationEvidence[action.id] || '').trim();
+      if (ev) {
+        const record = {
+          evidence: ev,
+          verifiedBy: user?.name || user?.email || 'System',
+          verifiedAt: new Date().toISOString(),
+        };
+        verifications[action.id] = record;
+        verifications[action.title] = record;
+      }
+    });
+
+    const capaTracking: CapaTracking = {
+      generatedActions: generatedCapa,
+      selectedActions: selectedCapa,
+      verifications,
+    };
+
     const updatedIncident: Incident = {
       ...incident,
+      rootCause,
+      correctiveActions: JSON.stringify(capaTracking),
       status: markAsClosed ? 'Closed' : 'Investigating',
       investigation: {
         method: investigationMethod,
@@ -573,6 +744,24 @@ export const IncidentDetail: React.FC = () => {
                 </div>
               </div>
             )}
+
+            {(incident.rootCause || rootCause) && (
+              <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                <h4 className="font-semibold text-red-900 mb-2">Root Cause Analysis Finding</h4>
+                <p className="text-sm text-red-800">{rootCause || incident.rootCause}</p>
+              </div>
+            )}
+
+            {selectedCapa.length > 0 && (
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                <h4 className="font-semibold text-blue-900 mb-2">Selected Corrective & Preventive Actions</h4>
+                <ul className="space-y-1">
+                  {selectedCapa.map((item, idx) => (
+                    <li key={idx} className="text-sm text-blue-800">• {item}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
@@ -747,6 +936,14 @@ export const IncidentDetail: React.FC = () => {
              <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-bold text-slate-800">Corrective & Preventive Actions</h3>
                 <div className="flex gap-2">
+              <button
+                onClick={handleAutoGenerateCapa}
+                disabled={autoCapaLoading}
+                className="flex items-center gap-2 bg-purple-50 text-purple-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-purple-100 transition-colors disabled:opacity-60"
+              >
+                {autoCapaLoading ? <Loader2 size={16} className="animate-spin" /> : <BrainCircuit size={16} />}
+                Auto Generate CAPA
+              </button>
                     <button 
                         onClick={fetchAvailableActions}
                         className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 px-3 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
@@ -761,6 +958,33 @@ export const IncidentDetail: React.FC = () => {
                     </button>
                 </div>
              </div>
+
+               {generatedCapa.length > 0 && (
+                <div className="bg-purple-50 border border-purple-100 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-purple-900">AI Suggested CAPA Actions</h4>
+                    <button
+                      onClick={handleAddSelectedCapaAsActions}
+                      className="text-xs bg-purple-600 text-white px-3 py-1.5 rounded hover:bg-purple-700"
+                    >
+                      Add Selected as Action Items
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {generatedCapa.map((rec, idx) => (
+                      <label key={idx} className="flex items-start gap-2 text-sm text-slate-800 bg-white p-2 rounded border border-purple-100">
+                        <input
+                          type="checkbox"
+                          checked={selectedCapa.includes(rec)}
+                          onChange={() => toggleSelectCapa(rec)}
+                          className="mt-1"
+                        />
+                        <span>{rec}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+               )}
 
              {/* Link Existing Modal Area */}
              {showLinkModal && (
@@ -855,7 +1079,7 @@ export const IncidentDetail: React.FC = () => {
                 ) : (
                     actions.map(action => (
                         <div key={action.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-white border border-slate-100 rounded-lg shadow-sm hover:border-blue-200 transition-colors gap-4">
-                            <div>
+                        <div className="w-full">
                                 <h4 className="font-medium text-slate-800">{action.title}</h4>
                                 <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
                                     <span className="flex items-center gap-1"><User size={12}/> {action.assignee}</span>
@@ -868,6 +1092,21 @@ export const IncidentDetail: React.FC = () => {
                                         {action.priority}
                                     </span>
                                 </div>
+                                    <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                      <input
+                                        type="text"
+                                        value={verificationEvidence[action.id] || ''}
+                                        onChange={(e) => setVerificationEvidence(prev => ({ ...prev, [action.id]: e.target.value }))}
+                                        placeholder="Verification evidence (URL or note)"
+                                        className="sm:col-span-2 border border-slate-300 rounded p-2 text-xs"
+                                      />
+                                      <button
+                                        onClick={() => handleVerifyAction(action)}
+                                        className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-1.5 rounded hover:bg-emerald-100"
+                                      >
+                                        {verifiedActionIds.has(action.id) ? 'Verified' : 'Verify Action'}
+                                      </button>
+                                    </div>
                             </div>
                             
                             <select

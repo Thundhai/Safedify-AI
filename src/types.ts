@@ -318,6 +318,8 @@ export interface Incident {
     causes?: string[];
     contributingFactors?: string[];
   };
+  rootCause?: string;
+  correctiveActions?: string;
   investigation?: Investigation;
 }
 

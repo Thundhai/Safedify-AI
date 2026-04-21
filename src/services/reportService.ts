@@ -60,6 +60,19 @@ function fmtDateTime(d?: string): string {
 function yn(v: boolean | null | undefined): string { return v === true ? 'Yes' : v === false ? 'No' : 'N/A'; }
 function s(v: any): string { return v != null && v !== '' ? String(v) : 'N/A'; }
 
+function parseCapaPayload(payload?: string): { selectedActions: string[]; verifications: Record<string, { evidence: string; verifiedBy: string; verifiedAt: string }> } {
+  if (!payload) return { selectedActions: [], verifications: {} };
+  try {
+    const parsed = JSON.parse(payload);
+    return {
+      selectedActions: Array.isArray(parsed.selectedActions) ? parsed.selectedActions : [],
+      verifications: parsed.verifications && typeof parsed.verifications === 'object' ? parsed.verifications : {},
+    };
+  } catch {
+    return { selectedActions: [], verifications: {} };
+  }
+}
+
 function addFooter(doc: jsPDF, docNumber: string) {
   const totalPages = doc.getNumberOfPages();
   const pageW = doc.internal.pageSize.getWidth();
@@ -260,6 +273,43 @@ export function downloadIncidentPDF(
   // ── Section 7: Investigation (if exists) ──
   if (incident.investigation) {
     y = renderInvestigationSection(doc, incident.investigation, y, M, W);
+  } else if ((incident as any).rootCause) {
+    y = ensureSpace(doc, y, 30);
+    doc.setTextColor(...C.primary);
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('7. Root Cause Analysis Finding', M, y);
+    y += 5;
+    doc.setTextColor(...C.dark);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    const rcLines = doc.splitTextToSize((incident as any).rootCause || 'N/A', W - 2 * M);
+    doc.text(rcLines, M, y);
+    y += rcLines.length * 4.5 + 6;
+  }
+
+  const capa = parseCapaPayload((incident as any).correctiveActions);
+  if (capa.selectedActions.length > 0) {
+    y = ensureSpace(doc, y, 35);
+    doc.setTextColor(...C.primary);
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('8. Corrective & Preventive Actions (CAPA)', M, y);
+    y += 3;
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: M, right: M },
+      head: [['Selected Action', 'Evidence', 'Verified By', 'Verified At']],
+      body: capa.selectedActions.map((action) => {
+        const v = capa.verifications[action] || { evidence: 'Pending', verifiedBy: 'Pending', verifiedAt: 'Pending' };
+        return [action, v.evidence || 'Pending', v.verifiedBy || 'Pending', v.verifiedAt ? fmtDateTime(v.verifiedAt) : 'Pending'];
+      }),
+      headStyles: { fillColor: C.primary, textColor: C.white, fontStyle: 'bold', fontSize: 8 },
+      bodyStyles: { fontSize: 8, textColor: C.dark },
+      alternateRowStyles: { fillColor: C.light },
+      theme: 'grid',
+    });
   }
 
   addFooter(doc, docNum);
@@ -636,7 +686,12 @@ export function downloadIncidentCSV(
     'Immediate Actions Taken',
     'Injured Persons', 'Witnesses',
     'Root Cause', 'Investigation Method', 'Investigation By', 'Investigation Date',
+    'CAPA Selected Actions', 'CAPA Verification Evidence',
   ];
+  const capa = parseCapaPayload((incident as any).correctiveActions);
+  const verificationSummary = Object.entries(capa.verifications)
+    .map(([k, v]) => `${k}: ${v.evidence}`)
+    .join(' | ');
   const row = [
     docNum, orgName || 'N/A', incident.id, fmtDateTime(incident.date), fmtDate(incident.dateReported),
     s(incident.location), s(incident.department), s(incident.shift),
@@ -647,8 +702,9 @@ export function downloadIncidentCSV(
     s(incident.immediateActionsTaken || incident.immediateAction),
     incident.injuredPersons?.map(p => `${p.name} (${p.natureOfInjury})`).join('; ') || 'None',
     incident.witnesses?.map(w => w.name).join('; ') || 'None',
-    s(incident.investigation?.rootCause), s(incident.investigation?.method),
+    s((incident as any).rootCause || incident.investigation?.rootCause), s(incident.investigation?.method),
     s(incident.investigation?.completedBy), fmtDateTime(incident.investigation?.completedAt),
+    capa.selectedActions.join(' | ') || 'None', verificationSummary || 'Pending',
   ];
   downloadCSVBlob([header, row], `${docNum}-Incident-Report.csv`);
   return docNum;

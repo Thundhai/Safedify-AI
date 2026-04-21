@@ -249,11 +249,39 @@ async function paginate(req: AuthRequest, res: Response, table: string, orderBy 
 // ---------- INCIDENTS ----------
 
 router.get('/incidents', validateQuery(paginationQuerySchema), async (req: AuthRequest, res: Response) => {
-  await paginate(req, res, 'incidents');
+  const page = Math.max(1, parseInt(req.query.page as string) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+  const offset = (page - 1) * limit;
+  const orgId = req.user?.org_id;
+
+  const countResult = await pool.query('SELECT COUNT(*) as total FROM incidents WHERE org_id = $1', [orgId]);
+  const total = countResult.rows[0]?.total || 0;
+
+  const rowsResult = await pool.query(
+    `SELECT i.*, u.name as reported_by_name
+     FROM incidents i
+     LEFT JOIN users u ON i.reported_by = u.id
+     WHERE i.org_id = $1
+     ORDER BY i.created_at DESC
+     LIMIT $2 OFFSET $3`,
+    [orgId, limit, offset]
+  );
+
+  res.set('X-Total-Count', String(total));
+  res.set('X-Page', String(page));
+  res.set('X-Per-Page', String(limit));
+  res.set('X-Total-Pages', String(Math.ceil(Number(total) / limit)));
+  res.json(rowsResult.rows);
 });
 
 router.get('/incidents/:id', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM incidents WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
+  const result = await pool.query(
+    `SELECT i.*, u.name as reported_by_name
+     FROM incidents i
+     LEFT JOIN users u ON i.reported_by = u.id
+     WHERE i.id = $1 AND i.org_id = $2`,
+    [req.params.id, req.user?.org_id]
+  );
   const row = result.rows[0];
   if (!row) { res.status(404).json({ error: 'Not found' }); return; }
   res.json(row);
@@ -303,6 +331,46 @@ router.post('/incidents', validate(incidentSchema), async (req: AuthRequest, res
 router.put('/incidents/:id', validateParams(uuidParamSchema), validate(incidentSchema), requireOwnership('incidents', 'reported_by'), async (req: AuthRequest, res: Response) => {
   try {
   const b = req.body;
+
+  if (b.status === 'Closed') {
+    const rootCause = (b.root_cause || '').trim();
+    const correctiveActionsPayload = b.corrective_actions;
+
+    if (!rootCause) {
+      res.status(400).json({ error: 'Cannot close incident without root cause analysis.' });
+      return;
+    }
+
+    if (!correctiveActionsPayload) {
+      res.status(400).json({ error: 'Cannot close incident without CAPA selection and verification evidence.' });
+      return;
+    }
+
+    try {
+      const parsed = typeof correctiveActionsPayload === 'string' ? JSON.parse(correctiveActionsPayload) : correctiveActionsPayload;
+      const selected = Array.isArray(parsed?.selectedActions) ? parsed.selectedActions : [];
+      const verifications = parsed?.verifications && typeof parsed.verifications === 'object' ? parsed.verifications : {};
+
+      if (selected.length === 0) {
+        res.status(400).json({ error: 'Cannot close incident: no CAPA actions selected.' });
+        return;
+      }
+
+      const missing = selected.filter((action: string) => {
+        const v = verifications[action];
+        return !v || !String(v.evidence || '').trim();
+      });
+
+      if (missing.length > 0) {
+        res.status(400).json({ error: 'Cannot close incident: all selected CAPA actions must include verification evidence.' });
+        return;
+      }
+    } catch {
+      res.status(400).json({ error: 'Invalid CAPA payload. Cannot close incident.' });
+      return;
+    }
+  }
+
   // Build dynamic SET clause for only provided fields
   const fields: string[] = [];
   const values: any[] = [];
@@ -434,7 +502,29 @@ router.delete('/actions/:id', validateParams(uuidParamSchema), requireOwnership(
 // ---------- OBSERVATIONS ----------
 
 router.get('/observations', validateQuery(paginationQuerySchema), async (req: AuthRequest, res: Response) => {
-  await paginate(req, res, 'observations');
+  const page = Math.max(1, parseInt(req.query.page as string) || 1);
+  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+  const offset = (page - 1) * limit;
+  const orgId = req.user?.org_id;
+
+  const countResult = await pool.query('SELECT COUNT(*) as total FROM observations WHERE org_id = $1', [orgId]);
+  const total = countResult.rows[0]?.total || 0;
+
+  const rowsResult = await pool.query(
+    `SELECT o.*, u.name as observer_name
+     FROM observations o
+     LEFT JOIN users u ON o.observer = u.id
+     WHERE o.org_id = $1
+     ORDER BY o.created_at DESC
+     LIMIT $2 OFFSET $3`,
+    [orgId, limit, offset]
+  );
+
+  res.set('X-Total-Count', String(total));
+  res.set('X-Page', String(page));
+  res.set('X-Per-Page', String(limit));
+  res.set('X-Total-Pages', String(Math.ceil(Number(total) / limit)));
+  res.json(rowsResult.rows);
 });
 
 router.post('/observations', validate(observationSchema), requirePermission('create_incident'), async (req: AuthRequest, res: Response) => {

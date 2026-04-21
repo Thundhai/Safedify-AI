@@ -1,8 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, AlertTriangle, Printer, Plus, Trash2, Download, CheckSquare, Square, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Search, AlertTriangle, Printer, Plus, Trash2, Download, CheckSquare, Square, X, Eye, Edit2, Save } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { getIncidents, deleteIncident } from '../services/storageService';
+import { getIncidents, deleteIncident, updateIncident } from '../services/storageService';
 import { apiExportData, apiBulkDeleteIncidents, apiBulkUpdateIncidentStatus } from '../services/apiService';
 import { exportIncidentsPDF } from '../services/pdfExportService';
 import { Incident, IncidentSeverity, IncidentCategory } from '../types';
@@ -11,6 +12,7 @@ import toast from 'react-hot-toast';
 
 export const IncidentList: React.FC = () => {
     const { t } = useTranslation();
+    const navigate = useNavigate();
     const [incidents, setIncidents] = useState<Incident[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
@@ -19,6 +21,8 @@ export const IncidentList: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [bulkAction, setBulkAction] = useState<string>('');
+    const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
+    const [editForm, setEditForm] = useState<Partial<Incident>>({});
 
     useEffect(() => {
         const load = async () => {
@@ -101,6 +105,23 @@ export const IncidentList: React.FC = () => {
         } catch (err) {
             toast.error('Bulk update failed');
         }
+    };
+
+    const openEditModal = (e: React.MouseEvent, incident: Incident) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setSelectedIncident(incident);
+        setEditForm({ ...incident });
+    };
+
+    const handleSaveEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedIncident) return;
+        const updated = { ...selectedIncident, ...editForm } as Incident;
+        await updateIncident(updated);
+        setIncidents(prev => prev.map(i => i.id === updated.id ? updated : i));
+        setSelectedIncident(null);
+        toast.success('Incident updated');
     };
 
     if (loading) return (
@@ -232,6 +253,20 @@ export const IncidentList: React.FC = () => {
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button
+                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/incidents/${inc.id}`); }}
+                                            className="p-1 text-slate-300 hover:text-blue-600 transition-colors rounded"
+                                            title="View incident"
+                                        >
+                                            <Eye size={14} />
+                                        </button>
+                                        <button
+                                            onClick={(e) => openEditModal(e, inc)}
+                                            className="p-1 text-slate-300 hover:text-amber-600 transition-colors rounded"
+                                            title="Edit incident"
+                                        >
+                                            <Edit2 size={14} />
+                                        </button>
+                                        <button
                                             onClick={(e) => handleDelete(e, inc.id, inc.description)}
                                             className="p-1 text-slate-300 hover:text-red-600 transition-colors rounded"
                                             title="Delete incident"
@@ -256,6 +291,60 @@ export const IncidentList: React.FC = () => {
                 totalItems={filteredAndSortedIncidents.length}
                 pageSize={PAGE_SIZE}
             />
+
+            {selectedIncident && (
+                <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-lg w-full max-w-xl overflow-hidden">
+                        <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+                            <h3 className="font-bold text-slate-800">Edit Incident Report</h3>
+                            <button onClick={() => setSelectedIncident(null)} className="text-slate-500 hover:text-slate-700" aria-label="Close">
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <form onSubmit={handleSaveEdit} className="p-4 space-y-3">
+                            <div>
+                                <label className="block text-xs font-semibold text-slate-600 mb-1">Description</label>
+                                <textarea
+                                    rows={3}
+                                    className="w-full border border-slate-300 rounded-lg p-2 text-sm"
+                                    value={editForm.description || ''}
+                                    onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Location</label>
+                                    <input
+                                        className="w-full border border-slate-300 rounded-lg p-2 text-sm"
+                                        value={editForm.location || ''}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, location: e.target.value }))}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-slate-600 mb-1">Status</label>
+                                    <select
+                                        className="w-full border border-slate-300 rounded-lg p-2 text-sm"
+                                        value={editForm.status || 'Open'}
+                                        onChange={(e) => setEditForm(prev => ({ ...prev, status: e.target.value as Incident['status'] }))}
+                                    >
+                                        <option value="Open">Open</option>
+                                        <option value="Investigating">Investigating</option>
+                                        <option value="Closed">Closed</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+                                <button type="button" onClick={() => setSelectedIncident(null)} className="px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100 rounded">
+                                    Cancel
+                                </button>
+                                <button type="submit" className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1.5">
+                                    <Save size={14} /> Save
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

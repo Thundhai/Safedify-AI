@@ -80,7 +80,7 @@ const mapIncident = (row: any): Incident => ({
   severity: row.severity as IncidentSeverity,
   status: row.status || 'Open',
   images: row.images ? parseJson(row.images, []) : (row.image ? [row.image] : []),
-  reporter: row.reported_by || '',
+  reporter: row.reported_by_name || row.reporter_name || row.reported_by || '',
   // Context
   shift: row.shift || '',
   weatherConditions: row.weather_conditions || '',
@@ -104,7 +104,14 @@ const mapIncident = (row: any): Incident => ({
   regulatoryNotification: !!row.regulatory_notification,
   // AI
   aiClassification: undefined,
-  investigation: undefined,
+  rootCause: row.root_cause || '',
+  correctiveActions: row.corrective_actions || '',
+  investigation: row.root_cause ? {
+    method: '5-Why',
+    rootCause: row.root_cause,
+    completedBy: row.reported_by_name || row.reporter_name || row.reported_by || 'Unknown',
+    completedAt: row.updated_at || row.created_at || row.date || new Date().toISOString(),
+  } : undefined,
 });
 
 const mapAction = (row: any): ActionItem => ({
@@ -131,7 +138,7 @@ const mapObservation = (row: any): Observation => ({
   description: row.description,
   location: row.location || '',
   date: row.date,
-  observer: row.observer,
+  observer: row.observer_name || row.observer,
   isAnonymous: !!row.is_anonymous,
   images: row.images ? (typeof row.images === 'string' ? JSON.parse(row.images) : row.images) : [],
   status: row.status || 'Open',
@@ -344,7 +351,8 @@ const incidentToApi = (inc: Incident) => ({
   status: inc.status,
   image: inc.images?.[0] || null,
   images: inc.images || [],
-  root_cause: inc.investigation?.rootCause,
+  root_cause: inc.rootCause || inc.investigation?.rootCause,
+  corrective_actions: inc.correctiveActions,
   days_lost: inc.daysLost || 0,
   body_part: inc.bodyPart,
   mechanism: inc.mechanism,
