@@ -9,10 +9,11 @@ import {
 } from 'recharts';
 import { 
     AlertTriangle, TrendingUp, Activity, CheckSquare, Sparkles, Loader2, 
-    FileText, Calendar, Users, MapPin, Plus, X, Calculator, BarChart3, Shield
+    FileText, Calendar, Users, MapPin, Plus, X, Calculator, BarChart3, Shield, Download
 } from 'lucide-react';
 import { calculateHSEMetrics, getIncidents, saveStatsLog } from '../services/storageService';
 import { generateExecutiveReportAI } from '../services/geminiService';
+import { generateExecutiveAIPDF } from '../services/pdfExportService';
 import { HSEMetrics, Incident, IncidentType, HSEStatsLog } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -738,7 +739,28 @@ export const AnalyticsDashboard: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="text-center pt-4">
+                                    <div className="flex items-center justify-center gap-4 pt-4">
+                                        <button
+                                            onClick={() => {
+                                                if (!metrics) return;
+                                                generateExecutiveAIPDF({
+                                                    aiReport,
+                                                    metrics,
+                                                    incidents,
+                                                    siteName: user?.org_name || user?.email || 'Organization',
+                                                    generatedBy: user?.name || user?.email || 'System',
+                                                    dateRange: {
+                                                        from: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0]!,
+                                                        to: new Date().toISOString().split('T')[0]!,
+                                                    },
+                                                });
+                                                toast.success('AI Executive Report PDF generated!');
+                                            }}
+                                            className="flex items-center gap-2 bg-indigo-500 hover:bg-indigo-400 text-white px-6 py-2.5 rounded-xl font-bold transition-colors shadow-lg"
+                                        >
+                                            <Download size={16} />
+                                            Download PDF Report
+                                        </button>
                                         <button 
                                             onClick={() => setAiReport(null)}
                                             className="text-sm text-indigo-300 hover:text-white"

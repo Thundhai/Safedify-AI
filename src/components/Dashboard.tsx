@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { WelcomeScreen } from './WelcomeScreen';
 import { EmptyState } from './EmptyState';
 import { AreaChart, Area, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
-import { generateSafetyReport } from '../services/pdfExportService';
+import { generateComprehensiveDashboardPDF } from '../services/pdfExportService';
 
 export const Dashboard: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
@@ -226,14 +226,13 @@ export const Dashboard: React.FC = () => {
   const handleExportPDF = () => {
     const now = new Date();
     const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-    generateSafetyReport({
-      title: 'HSE Safety Report',
+    generateComprehensiveDashboardPDF({
+      siteName: user?.org_name || user?.email || 'Main Site',
+      generatedBy: user?.name || user?.email || 'System',
       dateRange: {
         from: sixMonthsAgo.toISOString().split('T')[0]!,
         to: now.toISOString().split('T')[0]!,
       },
-      siteName: 'Main Site',
-      generatedBy: user?.name || user?.email || 'System',
       safetyScore: siteScore,
       hseMetrics,
       incidents: rawIncidents,
@@ -246,6 +245,10 @@ export const Dashboard: React.FC = () => {
         daysSinceLastIncident: stats.daysSinceLastIncident,
         inspectionCount: stats.inspectionCount,
         totalObservations: stats.totalObservations,
+        openObservations: stats.openObservations,
+        closedObservations: stats.closedObservations,
+        trainingModules: trainingStats.totalModules,
+        complianceRate: trainingStats.complianceRate,
       },
     });
   };
