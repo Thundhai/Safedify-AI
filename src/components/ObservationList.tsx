@@ -31,12 +31,13 @@ export const ObservationList: React.FC = () => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        if (!user) return;
         const load = async () => {
             setObservations(await getObservations());
             setLoading(false);
         };
         load();
-    }, []);
+    }, [user]);
 
     const handleAnalyzeTrends = async () => {
         if (observations.length === 0) return;
