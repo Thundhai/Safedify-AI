@@ -6,6 +6,8 @@ import AxeBuilder from '@axe-core/playwright';
 test.describe('UI/UX & Accessibility', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
+    // Wait for React to fully mount before each test interacts with the DOM.
+    await page.waitForLoadState('networkidle');
   });
 
   test('Dashboard passes accessibility checks', async ({ page }) => {
@@ -23,8 +25,9 @@ test.describe('UI/UX & Accessibility', () => {
   });
 
   test('Primary button click and back navigation', async ({ page }) => {
-    // Find and click the first primary button
-    const button = await page.locator('button, [role=button]').first();
+    // Wait for at least one visible, enabled button before interacting.
+    const button = page.locator('button:visible:not([disabled]), [role=button]:visible').first();
+    await button.waitFor({ state: 'visible', timeout: 10000 });
     await button.click();
     // Simulate browser back
     await page.goBack();

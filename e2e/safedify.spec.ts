@@ -89,15 +89,16 @@ test.describe('CRUD — Incidents', () => {
   let incidentId: string;
 
   test.beforeAll(async ({ request }) => {
-    const res = await request.post('/api/auth/login', {
+    // Login
+    const loginRes = await request.post('/api/auth/login', {
       data: { email: 'admin@safedify.com', password: 'admin123' },
     });
-    const body = await res.json();
-    token = body.token;
-  });
+    const loginBody = await loginRes.json();
+    token = loginBody.token;
 
-  test('Create incident', async ({ request }) => {
-    const res = await request.post('/api/incidents', {
+    // Create a shared incident so all tests in this describe have a valid id,
+    // even when Playwright retries a single test in isolation.
+    const createRes = await request.post('/api/incidents', {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         title: 'E2E Test Incident',
@@ -109,10 +110,13 @@ test.describe('CRUD — Incidents', () => {
         date: new Date().toISOString(),
       },
     });
-    expect(res.ok()).toBeTruthy();
-    const body = await res.json();
-    expect(body.id).toBeTruthy();
-    incidentId = body.id;
+    const createBody = await createRes.json();
+    incidentId = createBody.id;
+  });
+
+  test('Create incident', async ({ request }) => {
+    // Creation already happened in beforeAll; verify the id was captured.
+    expect(incidentId).toBeTruthy();
   });
 
   test('List incidents includes the new one', async ({ request }) => {
@@ -135,9 +139,10 @@ test.describe('CRUD — Incidents', () => {
   });
 
   test('Update incident', async ({ request }) => {
+    // Use 'In Progress' — closing requires CAPA evidence (server-enforced).
     const res = await request.put(`/api/incidents/${incidentId}`, {
       headers: { Authorization: `Bearer ${token}` },
-      data: { title: 'Updated E2E Incident', status: 'Closed' },
+      data: { title: 'Updated E2E Incident', status: 'In Progress' },
     });
     expect(res.ok()).toBeTruthy();
   });
