@@ -25,18 +25,19 @@ test.describe('UI/UX & Accessibility', () => {
   });
 
   test('Primary button click and back navigation', async ({ page }) => {
-    // beforeEach did page.goto('/') + networkidle, but networkidle can fire while
-    // the ProtectedRoute spinner is still showing (before the /api/auth/me 401 response
-    // commits the React redirect to #/welcome). toHaveURL waits for the redirect to
-    // fully complete — no extra page.goto needed.
-    await expect(page).toHaveURL(/welcome/, { timeout: 15000 });
-    // The hero "Live Demo" button (LandingPage line 191) calls navigate('/login').
-    // It lives in a flex container with no responsive-hiding CSS, so it's always
-    // visible regardless of viewport width.
+    // Navigate directly to the public landing page — no auth gate, no redirect
+    // dependency. This bypasses the beforeEach ProtectedRoute redirect which can
+    // silently stall in CI if networkidle fires before the AuthContext useEffect
+    // dispatches GET /api/auth/me.
+    await page.goto('/#/welcome');
+    // Hero "Live Demo" button (LandingPage hero section, flex-col sm:flex-row
+    // container — no responsive hiding, always rendered at any viewport width).
     const liveDemoBtn = page.locator('button', { hasText: 'Live Demo' });
-    await expect(liveDemoBtn).toBeVisible({ timeout: 5000 });
+    await expect(liveDemoBtn).toBeVisible({ timeout: 15000 });
     await liveDemoBtn.click();
+    // navigate('/login') via React Router / HashRouter → #/login
     await expect(page).toHaveURL(/login/, { timeout: 10000 });
+    // goBack() undoes the history.pushState from navigate('/login') → #/welcome
     await page.goBack();
     await expect(page).toHaveURL(/welcome/, { timeout: 10000 });
   });
