@@ -63,7 +63,7 @@ describe('DocumentList', () => {
   it('renders document management heading', async () => {
     renderDocumentList();
     await waitFor(() => {
-      expect(screen.getByText('Document Management')).toBeInTheDocument();
+      expect(screen.getByText('Documents')).toBeInTheDocument();
     });
   });
 

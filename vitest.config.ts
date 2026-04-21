@@ -30,6 +30,7 @@ export default defineConfig({
         '**/__tests__/**',
         '**/*.yaml',
         '**/*.yml',
+        '**/*.md',
         '**/*.db',
         '**/*.env*',
         '**/backups/**',
