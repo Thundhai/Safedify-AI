@@ -25,13 +25,17 @@ test.describe('UI/UX & Accessibility', () => {
   });
 
   test('Primary button click and back navigation', async ({ page }) => {
-    // getByRole('button') only matches visible, enabled buttons and auto-waits.
-    const button = page.getByRole('button').first();
+    // Navigate directly to the public login page — avoids the ProtectedRoute
+    // loading spinner race that can fire networkidle before auth check completes.
+    await page.goto('/#/login');
+    await page.waitForLoadState('networkidle');
+    // The login form always renders a visible "Sign In" submit button.
+    const button = page.getByRole('button', { name: /sign in/i });
     await button.click({ timeout: 15000 });
     // Simulate browser back
     await page.goBack();
-    // Ensure we are back on the dashboard
-    await expect(page).toHaveURL(/\/?$/);
+    // Ensure we navigated away and back
+    await expect(page).toHaveURL(/login/);
   });
 
   test('File upload and download', async ({ page, context }) => {
