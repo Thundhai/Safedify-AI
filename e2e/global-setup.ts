@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import { randomUUID } from 'crypto';
 import { writeFileSync, unlinkSync } from 'fs';
 import { tmpdir } from 'os';
@@ -14,8 +14,18 @@ export default async function globalSetup() {
 
   // Drop tables owned by safedify_user + truncate postgres-owned tables
   try {
-    execSync(
-      `${psql} -c "DO $$ DECLARE r RECORD; BEGIN FOR r IN (SELECT tablename, tableowner FROM pg_tables WHERE schemaname = 'public') LOOP IF r.tableowner = current_user THEN EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE'; ELSE EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' CASCADE'; END IF; END LOOP; END $$;"`,
+    execFileSync(
+      'psql',
+      [
+        '-h',
+        'localhost',
+        '-U',
+        'safedify_user',
+        '-d',
+        'safedify',
+        '-c',
+        "DO $$ DECLARE r RECORD; BEGIN FOR r IN (SELECT tablename, tableowner FROM pg_tables WHERE schemaname = 'public') LOOP IF r.tableowner = current_user THEN EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE'; ELSE EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' CASCADE'; END IF; END LOOP; END $$;",
+      ],
       { stdio: 'inherit', env: psqlEnv }
     );
   } catch (err) {
