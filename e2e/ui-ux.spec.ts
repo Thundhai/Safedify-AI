@@ -25,19 +25,20 @@ test.describe('UI/UX & Accessibility', () => {
   });
 
   test('Primary button click and back navigation', async ({ page }) => {
-    // Go directly to the public login route (no auth gate, not lazy-loaded).
-    await page.goto('/#/login');
-    // Poll for the submit button — this waits for React to finish rendering
-    // the Login component regardless of load events (hash nav is instant but
-    // React mount is async, so networkidle is unreliable here).
-    const submitBtn = page.locator('button[type="submit"]');
-    await expect(submitBtn).toBeVisible({ timeout: 15000 });
-    await submitBtn.click();
-    // Submitting empty credentials triggers form validation and stays on /login.
-    await expect(page).toHaveURL(/login/);
+    // beforeEach did page.goto('/') + networkidle, but networkidle can fire while
+    // the ProtectedRoute spinner is still showing (before the /api/auth/me 401 response
+    // commits the React redirect to #/welcome). toHaveURL waits for the redirect to
+    // fully complete — no extra page.goto needed.
+    await expect(page).toHaveURL(/welcome/, { timeout: 15000 });
+    // The hero "Live Demo" button (LandingPage line 191) calls navigate('/login').
+    // It lives in a flex container with no responsive-hiding CSS, so it's always
+    // visible regardless of viewport width.
+    const liveDemoBtn = page.locator('button', { hasText: 'Live Demo' });
+    await expect(liveDemoBtn).toBeVisible({ timeout: 5000 });
+    await liveDemoBtn.click();
+    await expect(page).toHaveURL(/login/, { timeout: 10000 });
     await page.goBack();
-    // goBack returns to the page before /#/login (/#/welcome via beforeEach redirect).
-    await expect(page).toHaveURL(/.+/);
+    await expect(page).toHaveURL(/welcome/, { timeout: 10000 });
   });
 
   test('File upload and download', async ({ page, context }) => {
