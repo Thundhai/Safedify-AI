@@ -248,7 +248,10 @@ export const IncidentList: React.FC = () => {
                                         </button>
                                         <div>
                                             <p className="font-semibold text-slate-800 dark:text-slate-100">{inc.description}</p>
-                                            <p className="text-xs text-slate-500">{inc.category && <span className="font-medium text-slate-600 dark:text-slate-400">{inc.category} • </span>}{inc.location} • {new Date(inc.date).toLocaleDateString()}</p>
+                                            <p className="text-xs text-slate-500">
+                                              {inc.incidentNumber && <span className="font-mono font-bold text-blue-700 dark:text-blue-400 mr-1.5 bg-blue-50 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">{inc.incidentNumber}</span>}
+                                              {inc.category && <span className="font-medium text-slate-600 dark:text-slate-400">{inc.category} • </span>}{inc.location} • {new Date(inc.date).toLocaleDateString()}
+                                            </p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">

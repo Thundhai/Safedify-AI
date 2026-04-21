@@ -106,6 +106,8 @@ const mapIncident = (row: any): Incident => ({
   aiClassification: undefined,
   rootCause: row.root_cause || '',
   correctiveActions: row.corrective_actions || '',
+  incidentNumber: row.incident_number || undefined,
+  aiRecommendations: parseJson(row.ai_recommendations, []),
   investigation: row.root_cause ? {
     method: '5-Why',
     rootCause: row.root_cause,
@@ -369,6 +371,7 @@ const incidentToApi = (inc: Incident) => ({
   area_secured: inc.areaSecured,
   emergency_services_notified: inc.emergencyServicesNotified,
   regulatory_notification: inc.regulatoryNotification,
+  ai_recommendations: inc.aiRecommendations?.length ? JSON.stringify(inc.aiRecommendations) : null,
 });
 
 const actionToApi = (a: ActionItem) => ({
@@ -423,11 +426,11 @@ export const getIncidentById = async (id: string): Promise<Incident | undefined>
   } catch { return undefined; }
 };
 
-export const saveIncident = async (incident: Incident): Promise<void> => {
+export const saveIncident = async (incident: Incident): Promise<{ id: string; incident_number?: string }> => {
   if (incident.images?.length) {
     incident = { ...incident, images: await uploadImagesIfNeeded(incident.images) };
   }
-  await apiCreateIncident(incidentToApi(incident));
+  return apiCreateIncident(incidentToApi(incident));
 };
 
 export const updateIncident = async (incident: Incident): Promise<void> => {

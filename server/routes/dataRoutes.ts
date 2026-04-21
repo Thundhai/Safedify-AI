@@ -287,17 +287,52 @@ router.get('/incidents/:id', validateParams(uuidParamSchema), async (req: AuthRe
   res.json(row);
 });
 
+// Mapping from incident type label to 3–4 char document prefix
+function typeToAbbr(type: string): string {
+  const map: Record<string, string> = {
+    'Near Miss':            'NM',
+    'First Aid':            'FA',
+    'Medical Treatment':    'MT',
+    'Restricted Work Case': 'RWC',
+    'Lost Time Injury':     'LTI',
+    'Fatality':             'FAT',
+    'Environmental':        'ENV',
+    'Property Damage':      'PD',
+    'Fire':                 'FIRE',
+    'Security':             'SEC',
+    'Vehicle Incident':     'VEH',
+  };
+  return map[type] || 'INC';
+}
+
 router.post('/incidents', validate(incidentSchema), async (req: AuthRequest, res: Response) => {
   try {
   const b = req.body;
   const id = uuid();
+
+  // Generate structured incident_number: [TYPE_ABBR]-[NNN] (per org + type, sequential)
+  const abbr = typeToAbbr(b.type || 'Near Miss');
+  const seqResult = await pool.query(
+    `SELECT COALESCE(MAX(
+       CASE WHEN incident_number ~ '^[A-Z]+-[0-9]+$'
+         THEN SUBSTRING(incident_number FROM '[0-9]+$')::INTEGER
+         ELSE 0 END
+     ), 0) + 1 AS next_seq
+     FROM incidents
+     WHERE org_id = $1 AND type = $2`,
+    [req.user?.org_id, b.type || 'Near Miss']
+  );
+  const seqNum: number = seqResult.rows[0]?.next_seq ?? 1;
+  const incidentNumber = `${abbr}-${String(seqNum).padStart(3, '0')}`;
+
   await pool.query(
     `INSERT INTO incidents (id, description, location, date, type, category, severity, status, reported_by, image, images,
       root_cause, corrective_actions, days_lost, body_part, mechanism, immediate_action,
       date_reported, department, shift, weather_conditions, task_being_performed,
       injured_persons, witnesses, ppe_worn, ppe_adequate, environmental_impact,
-      immediate_actions_taken, area_secured, emergency_services_notified, regulatory_notification, org_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32)`
+      immediate_actions_taken, area_secured, emergency_services_notified, regulatory_notification,
+      incident_number, ai_recommendations, org_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34)`
   , [id, b.description ?? null, b.location ?? null, b.date || new Date().toISOString(), b.type ?? null, b.category || 'Near Miss',
     b.severity ?? null, b.status || 'Open', req.user?.id ?? null,
     b.image || (b.images?.[0] ?? null),
@@ -310,8 +345,9 @@ router.post('/incidents', validate(incidentSchema), async (req: AuthRequest, res
     b.ppe_worn ? JSON.stringify(b.ppe_worn) : null,
     b.ppe_adequate != null ? b.ppe_adequate : null,
     b.environmental_impact ?? null, b.immediate_actions_taken ?? null,
-    b.area_secured ? true : false, b.emergency_services_notified ? true : false, b.regulatory_notification ? true : false, req.user?.org_id]);
-  res.status(201).json({ id, message: 'Incident created' });
+    b.area_secured ? true : false, b.emergency_services_notified ? true : false, b.regulatory_notification ? true : false,
+    incidentNumber, b.ai_recommendations ?? null, req.user?.org_id]);
+  res.status(201).json({ id, incident_number: incidentNumber, message: 'Incident created' });
 
   // Fire-and-forget notification
   notifyAllManagers({
@@ -397,6 +433,7 @@ router.put('/incidents/:id', validateParams(uuidParamSchema), validate(incidentS
   if (b.area_secured !== undefined) { fields.push(`area_secured = $${fields.length + 1}`); values.push(b.area_secured ? true : false); }
   if (b.emergency_services_notified !== undefined) { fields.push(`emergency_services_notified = $${fields.length + 1}`); values.push(b.emergency_services_notified ? true : false); }
   if (b.regulatory_notification !== undefined) { fields.push(`regulatory_notification = $${fields.length + 1}`); values.push(b.regulatory_notification ? true : false); }
+  if (b.ai_recommendations !== undefined) { fields.push(`ai_recommendations = $${fields.length + 1}`); values.push(b.ai_recommendations ?? null); }
 
   fields.push(`updated_at = NOW()`);
   values.push(req.params.id);

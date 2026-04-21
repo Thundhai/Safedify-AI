@@ -69,6 +69,7 @@ export const completeLoginWith2FA = async (token: string): Promise<AuthUser | nu
                 org_id: data.user.org_id,
                 org_name: data.user.org_name,
             };
+            setAuthToken(data.token);
             localStorage.setItem(AUTH_KEY, JSON.stringify(user));
             pending2FAChallengeToken = null;
             return user;
@@ -132,7 +133,11 @@ export const getCurrentUser = (): AuthUser | null => {
  */
 export const verifySession = async (): Promise<AuthUser | null> => {
     const token = getAuthToken();
-    if (!token) return getCurrentUser();
+    if (!token) {
+        // No token in storage — ensure user data is also cleared
+        logout();
+        return null;
+    }
     
     try {
         const data = await apiGetMe();
@@ -151,9 +156,12 @@ export const verifySession = async (): Promise<AuthUser | null> => {
             return user;
         }
     } catch {
-        // Token expired or invalid — keep local user for now
+        // Token expired or invalid — force full logout so user is redirected to login
+        logout();
+        return null;
     }
-    return getCurrentUser();
+    logout();
+    return null;
 };
 
 export const updateProfile = async (data: { name: string }): Promise<AuthUser | null> => {

@@ -95,6 +95,8 @@ CREATE TABLE IF NOT EXISTS incidents (
     area_secured BOOLEAN DEFAULT FALSE,
     emergency_services_notified BOOLEAN DEFAULT FALSE,
     regulatory_notification BOOLEAN DEFAULT FALSE,
+    incident_number TEXT,
+    ai_recommendations TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

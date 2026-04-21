@@ -261,10 +261,12 @@ export const IncidentReport: React.FC = () => {
           confidence: aiResult.confidence, reasoning: aiResult.reasoning,
           causes: aiResult.causes, contributingFactors: aiResult.contributingFactors,
         } : undefined,
+        aiRecommendations: recommendations.length > 0 ? recommendations : undefined,
       };
 
-      await saveIncident(newInc);
-      toast.success('Incident report submitted successfully!');
+      const result = await saveIncident(newInc);
+      const incNum = result?.incident_number;
+      toast.success(incNum ? `Incident ${incNum} submitted successfully!` : 'Incident report submitted successfully!');
       navigate('/incidents');
     } catch (err: any) {
       console.error('Save incident error:', err);

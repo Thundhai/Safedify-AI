@@ -146,6 +146,7 @@ export function downloadIncidentPDF(
     startY: y,
     margin: { left: M, right: M },
     body: [
+      ['Incident No.', incident.incidentNumber || incident.id.substring(0, 8).toUpperCase()],
       ['Incident ID', incident.id],
       ['Date & Time of Incident', fmtDateTime(incident.date)],
       ['Date Reported', fmtDate(incident.dateReported)],
@@ -289,6 +290,30 @@ export function downloadIncidentPDF(
   }
 
   const capa = parseCapaPayload((incident as any).correctiveActions);
+
+  // ── Section 8: AI Corrective & Preventive Recommendations ──
+  if (incident.aiRecommendations && incident.aiRecommendations.length > 0) {
+    y = ensureSpace(doc, y, 35);
+    doc.setTextColor(...C.primary);
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.text('8. Corrective & Preventive Actions (AI Recommended)', M, y);
+    y += 3;
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: M, right: M },
+      head: [['#', 'Recommended Corrective / Preventive Action']],
+      body: incident.aiRecommendations.map((rec, i) => [String(i + 1), rec]),
+      headStyles: { fillColor: C.primary, textColor: C.white, fontStyle: 'bold', fontSize: 8 },
+      bodyStyles: { fontSize: 8, textColor: C.dark },
+      columnStyles: { 0: { cellWidth: 10, halign: 'center' } },
+      alternateRowStyles: { fillColor: C.light },
+      theme: 'grid',
+    });
+    y = (doc as any).lastAutoTable.finalY + 8;
+  }
+
   if (capa.selectedActions.length > 0) {
     y = ensureSpace(doc, y, 35);
     doc.setTextColor(...C.primary);
@@ -678,7 +703,7 @@ export function downloadIncidentCSV(
 ): string {
   const docNum = generateDocNumber(orgName, 'INC', serialNumber);
   const header = [
-    'Document No', 'Organization', 'Incident ID', 'Date', 'Date Reported',
+    'Document No', 'Organization', 'Incident No.', 'Incident ID', 'Date', 'Date Reported',
     'Location', 'Department', 'Shift', 'Type', 'Category', 'Severity', 'Status',
     'Description', 'Task Being Performed', 'Weather Conditions',
     'PPE Worn', 'PPE Adequate', 'Environmental Impact',
@@ -686,6 +711,7 @@ export function downloadIncidentCSV(
     'Immediate Actions Taken',
     'Injured Persons', 'Witnesses',
     'Root Cause', 'Investigation Method', 'Investigation By', 'Investigation Date',
+    'AI Recommended Corrective/Preventive Actions',
     'CAPA Selected Actions', 'CAPA Verification Evidence',
   ];
   const capa = parseCapaPayload((incident as any).correctiveActions);
@@ -693,7 +719,9 @@ export function downloadIncidentCSV(
     .map(([k, v]) => `${k}: ${v.evidence}`)
     .join(' | ');
   const row = [
-    docNum, orgName || 'N/A', incident.id, fmtDateTime(incident.date), fmtDate(incident.dateReported),
+    docNum, orgName || 'N/A',
+    incident.incidentNumber || 'N/A', incident.id,
+    fmtDateTime(incident.date), fmtDate(incident.dateReported),
     s(incident.location), s(incident.department), s(incident.shift),
     s(incident.type), s(incident.category), s(incident.severity), s(incident.status),
     s(incident.description), s(incident.taskBeingPerformed), s(incident.weatherConditions),
@@ -704,6 +732,7 @@ export function downloadIncidentCSV(
     incident.witnesses?.map(w => w.name).join('; ') || 'None',
     s((incident as any).rootCause || incident.investigation?.rootCause), s(incident.investigation?.method),
     s(incident.investigation?.completedBy), fmtDateTime(incident.investigation?.completedAt),
+    incident.aiRecommendations?.join(' | ') || 'None',
     capa.selectedActions.join(' | ') || 'None', verificationSummary || 'Pending',
   ];
   downloadCSVBlob([header, row], `${docNum}-Incident-Report.csv`);

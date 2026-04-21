@@ -321,6 +321,10 @@ export interface Incident {
   rootCause?: string;
   correctiveActions?: string;
   investigation?: Investigation;
+  /** Structured incident number e.g. NM-001, FIRE-003 */
+  incidentNumber?: string;
+  /** AI-generated corrective/preventive action recommendations at submission time */
+  aiRecommendations?: string[];
 }
 
 export interface InspectionItem {

@@ -273,7 +273,7 @@ export function exportIncidentsPDF(incidents: Incident[], siteName: string): voi
   doc.text(`${siteName} — Exported ${new Date().toLocaleDateString()}`, pageWidth - margin - 80, 16);
 
   const rows = incidents.map(inc => [
-    inc.id.substring(0, 8),
+    inc.incidentNumber || inc.id.substring(0, 8).toUpperCase(),
     new Date(inc.date).toLocaleDateString(),
     inc.type,
     inc.category,
