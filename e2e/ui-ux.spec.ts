@@ -25,10 +25,9 @@ test.describe('UI/UX & Accessibility', () => {
   });
 
   test('Primary button click and back navigation', async ({ page }) => {
-    // Wait for at least one visible, enabled button before interacting.
-    const button = page.locator('button:visible:not([disabled]), [role=button]:visible').first();
-    await button.waitFor({ state: 'visible', timeout: 10000 });
-    await button.click();
+    // getByRole('button') only matches visible, enabled buttons and auto-waits.
+    const button = page.getByRole('button').first();
+    await button.click({ timeout: 15000 });
     // Simulate browser back
     await page.goBack();
     // Ensure we are back on the dashboard
