@@ -1,4 +1,7 @@
 import { Pool, PoolConfig } from 'pg';
+import { readFileSync, existsSync } from 'fs';
+import { fileURLToPath } from 'url';
+import path from 'path';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -143,6 +146,60 @@ if (isProduction) {
 }
 
 export default pool;
+
+// ============================================================
+// Database Initialization
+// ============================================================
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/**
+ * Apply postgres-schema.sql to the connected database.
+ * All statements use CREATE TABLE IF NOT EXISTS / ADD COLUMN IF NOT EXISTS,
+ * so this is safe to run on every startup — it is fully idempotent.
+ * Ensures the DB has the required schema regardless of when it was created.
+ */
+export async function initializeDatabase(): Promise<void> {
+  const schemaPath = path.join(__dirname, 'postgres-schema.sql');
+  if (!existsSync(schemaPath)) {
+    console.warn('[Database] postgres-schema.sql not found, skipping auto-init');
+    return;
+  }
+  try {
+    const schema = readFileSync(schemaPath, 'utf8');
+    await pool.query(schema);
+    console.log('[Database] Schema initialized / verified successfully');
+  } catch (err: any) {
+    // Log the error but do not crash — the DB may already be correctly configured
+    // and this error may be a benign DDL warning from an existing schema.
+    console.error('[Database] Schema initialization warning (non-fatal):', err.message);
+  }
+
+  // Ensure columns added in migrations exist on tables created before those migrations.
+  // ALTER TABLE ... ADD COLUMN IF NOT EXISTS is idempotent — safe to run every time.
+  const columnPatches = `
+    -- From 002_auth_security: email verification + account lockout + password policy
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_token TEXT;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_expires TIMESTAMP;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS last_failed_login TIMESTAMP;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+    ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT FALSE;
+    -- From 006_incident_number: incident numbering + AI recommendations
+    ALTER TABLE incidents ADD COLUMN IF NOT EXISTS incident_number TEXT;
+    ALTER TABLE incidents ADD COLUMN IF NOT EXISTS ai_recommendations TEXT;
+  `;
+
+  try {
+    await pool.query(columnPatches);
+    console.log('[Database] Column patches applied successfully');
+  } catch (err: any) {
+    console.error('[Database] Column patch warning (non-fatal):', err.message);
+  }
+}
 
 /**
  * Database Security Best Practices:

@@ -395,8 +395,12 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
     });
     res.status(201).json({ token, user: { ...user, org_name: orgName } });
   } catch (err: any) {
-    console.error('[Auth] Registration error:', err.message);
-    res.status(500).json({ error: 'Registration failed. Please try again.' });
+    console.error('[Auth] Registration error:', err.message, '| code:', err.code, '| detail:', err.detail);
+    const isDev = process.env.NODE_ENV !== 'production';
+    res.status(500).json({
+      error: 'Registration failed. Please try again.',
+      ...(isDev && { detail: err.message }),
+    });
   }
 });
 

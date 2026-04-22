@@ -23,7 +23,7 @@ import {
 
 // Database init (creates tables on import)
 // Removed SQLite db.js import
-import pool from './postgres.js';
+import pool, { initializeDatabase } from './postgres.js';
 
 // Auth
 import { seedDefaultUsers, authenticate } from './auth.js';
@@ -263,6 +263,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 });
 
 // ---------- Seed on load (for serverless cold starts) ----------
+initializeDatabase().catch(err => console.error('[Database] Init failed:', err.message));
 seedDefaultUsers();
 
 // ---------- Export for Vercel serverless ----------
