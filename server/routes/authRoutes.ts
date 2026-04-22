@@ -404,6 +404,36 @@ router.post('/register', registrationRateLimiter(), honeypotProtection(), valida
   }
 });
 
+// DELETE /api/auth/dev/reset-registrations
+// DEV-ONLY: Deletes all non-seeded users and their organisations so test emails can be reused.
+// Blocked in production — returns 404.
+router.delete('/dev/reset-registrations', async (req: AuthRequest, res: Response) => {
+  if (process.env.NODE_ENV === 'production') {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+  try {
+    const SEEDED_EMAILS = ['admin@safedify.com', 'worker@safedify.com', 'supervisor@safedify.com'];
+    // Delete orgs owned by non-seeded users (cascades to most related data)
+    await pool.query(
+      `DELETE FROM organizations WHERE owner_id IN (SELECT id FROM users WHERE email <> ALL($1::text[]))`,
+      [SEEDED_EMAILS]
+    );
+    // Delete the non-seeded users themselves
+    const result = await pool.query(
+      `DELETE FROM users WHERE email <> ALL($1::text[]) RETURNING email`,
+      [SEEDED_EMAILS]
+    );
+    res.json({
+      message: `Cleared ${result.rowCount} test account(s). Seeded demo accounts are untouched.`,
+      deleted: result.rows.map((r: any) => r.email),
+    });
+  } catch (err: any) {
+    console.error('[Dev] Reset failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/auth/verify-email
 router.post('/verify-email', sensitiveAuthLimiter, async (req: AuthRequest, res: Response) => {
   try {
