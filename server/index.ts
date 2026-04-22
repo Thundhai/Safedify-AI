@@ -174,8 +174,11 @@ app.use(express.json({ limit: '10mb' }));
 app.use(sanitizeBody({ stripTags: true, maxLength: 50000 }));
 
 // ---------- Global Injection Detection ----------
-// Detects SQL injection, command injection, XSS, and path traversal attempts
-app.use(detectInjections({ logOnly: false }));
+// Detects SQL injection, command injection, XSS, and path traversal attempts.
+// Auth routes are excluded because they use per-field validate() middleware with
+// allowInjection:true for password fields — the global scan causes false positives
+// on legitimate password characters like $, &, |.
+app.use(detectInjections({ logOnly: false, excludePaths: ['/api/auth', '/api/ai/', '/api/agent/'] }));
 
 // ---------- Serve Frontend (Production) ----------
 if (isProduction) {

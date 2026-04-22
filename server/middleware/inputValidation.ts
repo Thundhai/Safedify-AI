@@ -49,8 +49,8 @@ const SQL_INJECTION_PATTERNS = [
  * Command injection patterns to detect and block
  */
 const COMMAND_INJECTION_PATTERNS = [
-  // Shell command separators
-  /[;&|`$]/,
+  // Shell command separators in exploit context (not bare &/$/| which appear in passwords and org names)
+  /[;`]|\|\|/,
   // Command substitution
   /\$\(|\$\{|`/,
   // Common dangerous commands
@@ -61,8 +61,8 @@ const COMMAND_INJECTION_PATTERNS = [
   /\b(cmd|powershell|wscript|cscript)\b/i,
   // Null byte injection
   /\x00/,
-  // Environment variable access
-  /\$[A-Z_]+/,
+  // Environment variable access (only flag $VAR followed by command-like usage, not bare $ in passwords)
+  /\$[A-Z_]{3,}\s*[=;|]/,
 ];
 
 /**
