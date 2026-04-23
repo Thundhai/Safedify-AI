@@ -434,6 +434,38 @@ router.delete('/dev/reset-registrations', async (req: AuthRequest, res: Response
   }
 });
 
+// POST /api/auth/dev/verify-email
+// DEV-ONLY: Instantly marks an email as verified so you can log in without the email link.
+// Blocked in production — returns 404.
+router.post('/dev/verify-email', async (req: AuthRequest, res: Response) => {
+  if (process.env.NODE_ENV === 'production') {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
+  const { email } = req.body;
+  if (!email) {
+    res.status(400).json({ error: 'email is required' });
+    return;
+  }
+  try {
+    const result = await pool.query(
+      `UPDATE users SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires = NULL
+       WHERE email = $1 RETURNING id, email, name, role, tier, avatar, org_id`,
+      [email]
+    );
+    if (result.rowCount === 0) {
+      res.status(404).json({ error: `No account found for ${email}` });
+      return;
+    }
+    const u = result.rows[0];
+    const token = generateToken({ id: u.id, name: u.name, email: u.email, role: u.role, tier: u.tier, avatar: u.avatar, org_id: u.org_id });
+    res.json({ message: `${email} verified.`, token, user: u });
+  } catch (err: any) {
+    console.error('[Dev] Verify failed:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/auth/verify-email
 router.post('/verify-email', sensitiveAuthLimiter, async (req: AuthRequest, res: Response) => {
   try {
