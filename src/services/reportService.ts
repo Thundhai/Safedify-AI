@@ -147,7 +147,6 @@ export function downloadIncidentPDF(
     margin: { left: M, right: M },
     body: [
       ['Incident No.', incident.incidentNumber || incident.id.substring(0, 8).toUpperCase()],
-      ['Incident ID', incident.id],
       ['Date & Time of Incident', fmtDateTime(incident.date)],
       ['Date Reported', fmtDate(incident.dateReported)],
       ['Location', s(incident.location)],
@@ -370,7 +369,7 @@ export function downloadInvestigationPDF(
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.text(`Document No: ${docNum}`, M, 37);
-  doc.text(`Related Incident: ${incident.id.substring(0, 8)}`, M, 43);
+  doc.text(`Related Incident: ${incident.incidentNumber || incident.id.substring(0, 8).toUpperCase()}`, M, 43);
   doc.text(`Generated: ${fmtDateTime(new Date().toISOString())}`, W - M - 70, 37);
   y = 55;
 
@@ -703,7 +702,7 @@ export function downloadIncidentCSV(
 ): string {
   const docNum = generateDocNumber(orgName, 'INC', serialNumber);
   const header = [
-    'Document No', 'Organization', 'Incident No.', 'Incident ID', 'Date', 'Date Reported',
+    'Document No', 'Organization', 'Incident No.', 'Date', 'Date Reported',
     'Location', 'Department', 'Shift', 'Type', 'Category', 'Severity', 'Status',
     'Description', 'Task Being Performed', 'Weather Conditions',
     'PPE Worn', 'PPE Adequate', 'Environmental Impact',
@@ -720,7 +719,7 @@ export function downloadIncidentCSV(
     .join(' | ');
   const row = [
     docNum, orgName || 'N/A',
-    incident.incidentNumber || 'N/A', incident.id,
+    incident.incidentNumber || 'N/A',
     fmtDateTime(incident.date), fmtDate(incident.dateReported),
     s(incident.location), s(incident.department), s(incident.shift),
     s(incident.type), s(incident.category), s(incident.severity), s(incident.status),

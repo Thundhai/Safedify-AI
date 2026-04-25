@@ -176,6 +176,30 @@ export async function initializeDatabase(): Promise<void> {
     console.error('[Database] Schema initialization warning (non-fatal):', err.message);
   }
 
+  // Ensure the uploads table exists (defined in migration 003, not in postgres-schema.sql).
+  // The upload route uses org_id for tenant isolation — must be created before uploads work.
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS uploads (
+        id TEXT PRIMARY KEY,
+        filename TEXT NOT NULL UNIQUE,
+        mime_type TEXT NOT NULL,
+        size INTEGER NOT NULL,
+        uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        org_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_uploads_uploaded_by ON uploads(uploaded_by);
+      CREATE INDEX IF NOT EXISTS idx_uploads_filename ON uploads(filename);
+      CREATE INDEX IF NOT EXISTS idx_uploads_org_id ON uploads(org_id);
+    `);
+    // Add org_id if it was created by the old migration without it
+    await pool.query(`ALTER TABLE uploads ADD COLUMN IF NOT EXISTS org_id UUID REFERENCES organizations(id) ON DELETE SET NULL;`);
+    console.log('[Database] Uploads table verified');
+  } catch (err: any) {
+    console.error('[Database] Uploads table warning (non-fatal):', err.message);
+  }
+
   // Ensure columns added in migrations exist on tables created before those migrations.
   // ALTER TABLE ... ADD COLUMN IF NOT EXISTS is idempotent — safe to run every time.
   const columnPatches = `
@@ -198,6 +222,37 @@ export async function initializeDatabase(): Promise<void> {
     console.log('[Database] Column patches applied successfully');
   } catch (err: any) {
     console.error('[Database] Column patch warning (non-fatal):', err.message);
+  }
+
+  // Seed default roles if the roles table is empty.
+  // requirePermission() reads from this table — without it every non-Admin gets 403.
+  const defaultRoles = [
+    { name: 'Admin',               desc: 'Full system access.',     perms: ['manage_roles','manage_users','view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','approve_permit','manage_documents','ai_features'] },
+    { name: 'HSE Manager',         desc: 'HSE Dept Lead.',           perms: ['manage_users','view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','approve_permit','manage_documents','ai_features'] },
+    { name: 'HSE Supervisor',      desc: 'HSE Supervisor.',          perms: ['view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','manage_documents','ai_features'] },
+    { name: 'HSE Officer',         desc: 'HSE Officer.',             perms: ['view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','manage_documents','ai_features'] },
+    { name: 'HSE Advisor',         desc: 'HSE Advisor.',             perms: ['view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','manage_documents','ai_features'] },
+    { name: 'HSE Coordinator',     desc: 'HSE Coordinator.',         perms: ['view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','manage_documents'] },
+    { name: 'HSE Technician',      desc: 'HSE Technician.',          perms: ['view_analytics','create_incident','perform_inspection','manage_documents'] },
+    { name: 'Engineer',            desc: 'Site Engineer.',           perms: ['view_analytics','create_incident','perform_inspection','create_permit','manage_documents'] },
+    { name: 'Site Supervisor',     desc: 'Site Supervisor.',         perms: ['view_analytics','create_incident','manage_incidents','perform_inspection','create_permit'] },
+    { name: 'Construction Manager',desc: 'Construction Manager.',    perms: ['view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','approve_permit','manage_documents'] },
+    { name: 'Operations Manager',  desc: 'Operations Manager.',      perms: ['view_analytics','create_incident','manage_incidents','perform_inspection','create_permit','approve_permit','manage_documents','ai_features'] },
+    { name: 'Worker',              desc: 'General staff.',           perms: ['create_incident'] },
+  ];
+
+  try {
+    for (const r of defaultRoles) {
+      await pool.query(
+        `INSERT INTO roles (id, name, description, is_system, permissions)
+         VALUES (gen_random_uuid(), $1, $2, TRUE, $3)
+         ON CONFLICT (name) DO NOTHING`,
+        [r.name, r.desc, JSON.stringify(r.perms)]
+      );
+    }
+    console.log('[Database] Default roles seeded / verified');
+  } catch (err: any) {
+    console.error('[Database] Role seed warning (non-fatal):', err.message);
   }
 }
 

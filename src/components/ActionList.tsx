@@ -124,7 +124,7 @@ export const ActionList: React.FC = () => {
                                         <span className="flex items-center gap-1"><Calendar size={12}/> {t('actions.dueDate')}: {action.dueDate}</span>
                                         {linkedIncident && (
                                             <Link to={`/incidents/${linkedIncident.id}`} className="flex items-center gap-1 text-brand-orange hover:underline bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded-full text-xs">
-                                                <LinkIcon size={10} /> {t('actions.refIncident', { defaultValue: 'Ref: Incident' })} #{linkedIncident.id.split('-')[1]}
+                                                <LinkIcon size={10} /> {t('actions.refIncident', { defaultValue: 'Ref: Incident' })} {linkedIncident.incidentNumber || '#' + linkedIncident.id.split('-')[1]}
                                             </Link>
                                         )}
                                     </div>

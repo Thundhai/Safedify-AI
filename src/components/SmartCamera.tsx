@@ -16,6 +16,7 @@ export const SmartCamera: React.FC = () => {
   
   // Verify/Log State
   const [loggingHazard, setLoggingHazard] = useState<HazardDetection | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [observationDetails, setObservationDetails] = useState({
       location: '',
       immediateAction: ''
@@ -55,26 +56,31 @@ export const SmartCamera: React.FC = () => {
   };
 
   const confirmLogObservation = async () => {
-      if (!loggingHazard) return;
+      if (!loggingHazard || isSaving) return;
+      setIsSaving(true);
+      try {
+          const newObs: Observation = {
+              id: `obs-ai-${Date.now()}`,
+              type: 'Unsafe Condition',
+              category: 'AI Detected',
+              description: `[AI Monitor] ${loggingHazard.hazard}. Severity: ${loggingHazard.severity || 'Unknown'}. ${loggingHazard.recommendation || ''}`.trim().replace(/\.$/, '').concat('.'),
+              location: observationDetails.location || 'Unknown',
+              date: new Date().toISOString(),
+              isAnonymous: false,
+              status: 'Open',
+              immediateActionTaken: observationDetails.immediateAction,
+              images: []  // Images uploaded separately via upload route; omit raw base64 from observation body
+          };
 
-      const newObs: Observation = {
-          id: `obs-ai-${Date.now()}`,
-          type: 'Unsafe Condition',
-          category: 'AI Detected', // Or categorize based on hazard name
-          description: `[AI Monitor] Detected: ${loggingHazard.hazard}.`,
-          location: observationDetails.location || 'Unknown',
-          date: new Date().toISOString(),
-          isAnonymous: false,
-          observer: 'AI Safety Monitor',
-          status: 'Open',
-          immediateActionTaken: observationDetails.immediateAction,
-          images: image ? [image] : []
-      };
-
-      await saveObservation(newObs);
-      
-      toast.success("Hazard logged to Observations successfully.");
-      setLoggingHazard(null); // Close modal
+          await saveObservation(newObs);
+          toast.success("Hazard logged to Observations successfully.");
+          setLoggingHazard(null);
+      } catch (err: any) {
+          const msg = err?.message || 'Failed to save observation. Please try again.';
+          toast.error(msg);
+      } finally {
+          setIsSaving(false);
+      }
   };
 
   return (
@@ -218,15 +224,18 @@ export const SmartCamera: React.FC = () => {
                         <div className="flex justify-end gap-2 pt-2">
                             <button 
                                 onClick={() => setLoggingHazard(null)}
-                                className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
+                                disabled={isSaving}
+                                className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg disabled:opacity-50"
                             >
                                 Cancel
                             </button>
                             <button 
                                 onClick={confirmLogObservation}
-                                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                                disabled={isSaving}
+                                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:opacity-60"
                             >
-                                <Save size={16} /> Confirm & Log
+                                {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                {isSaving ? 'Saving...' : 'Confirm & Log'}
                             </button>
                         </div>
                     </div>

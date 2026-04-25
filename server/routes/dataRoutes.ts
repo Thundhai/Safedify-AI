@@ -23,25 +23,25 @@ const paginationQuerySchema: ValidationSchema = {
 };
 
 const incidentSchema: ValidationSchema = {
-  description: { type: 'string', required: false, maxLength: 10000, trim: true },
-  location: { type: 'string', required: false, maxLength: 500, trim: true },
+  description: { type: 'string', required: false, maxLength: 10000, trim: true, allowInjection: true },
+  location: { type: 'string', required: false, maxLength: 500, trim: true, allowInjection: true },
   date: { type: 'date', required: false },
   type: { type: 'string', required: false, maxLength: 100, trim: true },
   category: { type: 'string', required: false, maxLength: 100, trim: true, enum: ['Near Miss', 'Unsafe Act', 'Unsafe Condition', 'First Aid Case', 'Medical Treatment Case', 'Restricted Work Case', 'Lost Time Injury', 'Fatality', 'Environmental Spill', 'Environmental Emission', 'Environmental Waste Incident', 'Property Damage', 'Fire / Explosion', 'Vehicle Incident', 'Security Breach', 'Occupational Illness', 'Third Party Injury', 'Dangerous Occurrence'] },
   severity: { type: 'string', required: false, maxLength: 50, trim: true, enum: ['Low', 'Medium', 'High', 'Critical'] },
   status: { type: 'string', required: false, maxLength: 50, trim: true, enum: ['Open', 'In Progress', 'Investigating', 'Closed'] },
-  root_cause: { type: 'string', required: false, maxLength: 5000, trim: true },
-  corrective_actions: { type: 'string', required: false, maxLength: 5000, trim: true },
+  root_cause: { type: 'string', required: false, maxLength: 5000, trim: true, allowInjection: true },
+  corrective_actions: { type: 'string', required: false, maxLength: 5000, trim: true, allowInjection: true },
   days_lost: { type: 'number', required: false, min: 0, max: 9999 },
-  body_part: { type: 'string', required: false, maxLength: 200, trim: true },
-  mechanism: { type: 'string', required: false, maxLength: 500, trim: true },
-  immediate_action: { type: 'string', required: false, maxLength: 2000, trim: true },
-  department: { type: 'string', required: false, maxLength: 200, trim: true },
-  shift: { type: 'string', required: false, maxLength: 50, trim: true },
-  weather_conditions: { type: 'string', required: false, maxLength: 200, trim: true },
-  task_being_performed: { type: 'string', required: false, maxLength: 1000, trim: true },
-  environmental_impact: { type: 'string', required: false, maxLength: 2000, trim: true },
-  immediate_actions_taken: { type: 'string', required: false, maxLength: 2000, trim: true },
+  body_part: { type: 'string', required: false, maxLength: 200, trim: true, allowInjection: true },
+  mechanism: { type: 'string', required: false, maxLength: 500, trim: true, allowInjection: true },
+  immediate_action: { type: 'string', required: false, maxLength: 2000, trim: true, allowInjection: true },
+  department: { type: 'string', required: false, maxLength: 200, trim: true, allowInjection: true },
+  shift: { type: 'string', required: false, maxLength: 50, trim: true, allowInjection: true },
+  weather_conditions: { type: 'string', required: false, maxLength: 200, trim: true, allowInjection: true },
+  task_being_performed: { type: 'string', required: false, maxLength: 1000, trim: true, allowInjection: true },
+  environmental_impact: { type: 'string', required: false, maxLength: 2000, trim: true, allowInjection: true },
+  immediate_actions_taken: { type: 'string', required: false, maxLength: 2000, trim: true, allowInjection: true },
   area_secured: { type: 'boolean', required: false },
   emergency_services_notified: { type: 'boolean', required: false },
   regulatory_notification: { type: 'boolean', required: false },
@@ -53,8 +53,8 @@ const incidentSchema: ValidationSchema = {
 };
 
 const actionSchema: ValidationSchema = {
-  title: { type: 'string', required: true, maxLength: 500, trim: true },
-  description: { type: 'string', required: false, maxLength: 5000, trim: true },
+  title: { type: 'string', required: true, maxLength: 500, trim: true, allowInjection: true },
+  description: { type: 'string', required: false, maxLength: 5000, trim: true, allowInjection: true },
   assignee: { type: 'string', required: false, maxLength: 200, trim: true },
   due_date: { type: 'date', required: false },
   completed_date: { type: 'date', required: false },
@@ -70,14 +70,14 @@ const actionSchema: ValidationSchema = {
 
 const observationSchema: ValidationSchema = {
   type: { type: 'string', required: true, maxLength: 100, trim: true, enum: ['Unsafe Act', 'Unsafe Condition', 'Safe Behavior', 'Near Miss'] },
-  category: { type: 'string', required: false, maxLength: 100, trim: true },
-  description: { type: 'string', required: false, maxLength: 5000, trim: true },
-  location: { type: 'string', required: false, maxLength: 500, trim: true },
+  category: { type: 'string', required: false, maxLength: 100, trim: true, allowInjection: true },
+  description: { type: 'string', required: false, maxLength: 5000, trim: true, allowInjection: true },
+  location: { type: 'string', required: false, maxLength: 500, trim: true, allowInjection: true },
   date: { type: 'date', required: false },
   observer: { type: 'string', required: false, maxLength: 200, trim: true },
   status: { type: 'string', required: false, maxLength: 50, enum: ['Open', 'Reviewed', 'Closed'] },
   is_anonymous: { type: 'boolean', required: false },
-  immediate_action: { type: 'string', required: false, maxLength: 2000, trim: true },
+  immediate_action: { type: 'string', required: false, maxLength: 2000, trim: true, allowInjection: true },
   images: { type: 'array', required: false, maxLength: 20 },
 };
 

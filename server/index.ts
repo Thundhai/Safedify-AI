@@ -178,7 +178,11 @@ app.use(sanitizeBody({ stripTags: true, maxLength: 50000 }));
 // Auth routes are excluded because they use per-field validate() middleware with
 // allowInjection:true for password fields — the global scan causes false positives
 // on legitimate password characters like $, &, |.
-app.use(detectInjections({ logOnly: false, excludePaths: ['/api/auth', '/api/ai/', '/api/agent/'] }));
+// Data routes (observations, incidents, actions) are excluded because they accept
+// AI-generated text (descriptions, recommendations) that contains words like "--",
+// "node", "curl" etc. that match injection patterns but are safe (queries are parameterized).
+// These routes use per-field allowInjection:true in their validate() schemas instead.
+app.use(detectInjections({ logOnly: false, excludePaths: ['/api/auth', '/api/ai/', '/api/agent/', '/api/observations', '/api/incidents', '/api/actions', '/api/risk-assessments', '/api/permits', '/api/inspections'] }));
 
 // ---------- Serve Frontend (Production) ----------
 if (isProduction) {
