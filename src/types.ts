@@ -760,6 +760,7 @@ export interface HazardDetection {
   confidence: number;
   location?: string; // "Left foreground"
   recommendation: string;
+  severity?: string; // e.g. "High", "Medium", "Low"
 }
 
 export interface SiteSafetyScore {
