@@ -238,6 +238,7 @@ const mapRiskAssessment = (row: any): RiskAssessment => ({
   type: row.type || 'JHA',
   date: row.date,
   author: row.author || '',
+  location: row.location || '',
   hazards: typeof row.hazards === 'string' ? JSON.parse(row.hazards) : (row.hazards || []),
   status: row.status || 'Draft',
 });
@@ -529,6 +530,7 @@ export const saveRiskAssessment = async (ra: RiskAssessment): Promise<void> => {
       date: ra.date,
       hazards: ra.hazards,
       status: ra.status,
+      location: ra.location,
     });
   } catch {
     await apiCreateRiskAssessment({
@@ -540,6 +542,7 @@ export const saveRiskAssessment = async (ra: RiskAssessment): Promise<void> => {
       author: ra.author,
       hazards: ra.hazards,
       status: ra.status,
+      location: ra.location,
     });
   }
 };

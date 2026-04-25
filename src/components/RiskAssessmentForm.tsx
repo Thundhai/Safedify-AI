@@ -25,6 +25,7 @@ export const RiskAssessmentForm: React.FC = () => {
     type: 'JHA',
     date: new Date().toISOString(),
     author: user?.name || 'Unknown',
+    location: '',
     hazards: [],
     status: 'Draft'
   });
@@ -304,6 +305,16 @@ export const RiskAssessmentForm: React.FC = () => {
                  </select>
             </div>
             <div className="md:col-span-2 space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Project / Location / Site</label>
+                <input
+                    type="text"
+                    value={formData.location ?? ''}
+                    onChange={(e) => setFormData({...formData, location: e.target.value})}
+                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none print:border-0 print:p-0"
+                    placeholder="e.g. Site A – Block 3, Offshore Platform Alpha"
+                />
+            </div>
+            <div className="md:col-span-2 space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Task Description</label>
                 <div className="relative">
                     <SmartTextArea 
@@ -379,16 +390,16 @@ export const RiskAssessmentForm: React.FC = () => {
                     <thead>
                         <tr className="bg-slate-700 text-white text-xs">
                             <th className="p-2.5 text-center font-semibold w-8">#</th>
-                            <th className="p-2.5 text-left font-semibold min-w-[140px]">Work Activity</th>
-                            <th className="p-2.5 text-left font-semibold min-w-[180px]">Hazards / Risk</th>
-                            <th className="p-2.5 text-left font-semibold min-w-[130px]">Person at Risk</th>
-                            <th className="p-2.5 text-left font-semibold min-w-[155px]">Initial Risk Matrix</th>
-                            <th className="p-2.5 text-left font-semibold min-w-[210px]">Control Measures</th>
-                            <th className="p-2.5 text-left font-semibold min-w-[155px]">Actual Risk Matrix</th>
-                            <th className="p-2.5 text-left font-semibold min-w-[175px]">Additional Control Measures</th>
-                            <th className="p-2.5 text-left font-semibold min-w-[105px]">Priority</th>
-                            <th className="p-2.5 text-left font-semibold min-w-[120px]">Action By</th>
-                            <th className="p-2.5 text-left font-semibold min-w-[105px]">Duration</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[150px]">Work Activity</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[190px]">Hazards / Risk</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[140px]">Person at Risk</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[160px]">Initial Risk Matrix</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[220px]">Control Measures</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[160px]">Actual Risk Matrix</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[190px]">Additional Control Measures</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[110px]">Priority</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[130px]">Action By</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[120px]">Duration</th>
                             <th className="p-2.5 w-8 print:hidden"></th>
                         </tr>
                     </thead>
@@ -453,19 +464,17 @@ export const RiskAssessmentForm: React.FC = () => {
                                     <td className="p-2.5">
                                         <div className="space-y-1">
                                             {hazard.controls.map((control, cIndex) => (
-                                                <div key={control.id} className="flex items-center gap-1 group">
-                                                    <select value={control.type} onChange={(e) => updateControl(hIndex, cIndex, 'type', e.target.value)} title="Control type" className={`shrink-0 text-[9px] font-bold uppercase border rounded px-1 py-0.5 outline-none print:border-0 ${control.type === 'Elimination' ? 'bg-red-50 text-red-700 border-red-200' : control.type === 'Substitution' ? 'bg-orange-50 text-orange-700 border-orange-200' : control.type === 'Engineering' ? 'bg-blue-50 text-blue-700 border-blue-200' : control.type === 'Administrative' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                                                        {['Elimination','Substitution','Engineering','Administrative','PPE'].map(t => <option key={t} value={t}>{t}</option>)}
-                                                    </select>
-                                                    <input type="text" value={control.description} onChange={(e) => updateControl(hIndex, cIndex, 'description', e.target.value)} className="flex-1 text-xs border border-slate-200 rounded px-1.5 py-0.5 outline-none focus:border-blue-400 min-w-0 print:border-0" placeholder="Describe..." />
-                                                    <button type="button" onClick={() => removeControl(hIndex, cIndex)} className="text-slate-300 hover:text-red-500 shrink-0 opacity-0 group-hover:opacity-100 print:hidden" title="Remove control"><X size={11} /></button>
+                                                <div key={control.id} className="flex items-start gap-1 group">
+                                                    <span title={control.type} className={`shrink-0 mt-0.5 text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded ${control.type === 'Elimination' ? 'bg-red-100 text-red-700' : control.type === 'Substitution' ? 'bg-orange-100 text-orange-700' : control.type === 'Engineering' ? 'bg-blue-100 text-blue-700' : control.type === 'Administrative' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'}`}>
+                                                        {control.type[0]}
+                                                    </span>
+                                                    <textarea rows={2} value={control.description} onChange={(e) => updateControl(hIndex, cIndex, 'description', e.target.value)} className="flex-1 text-xs border border-slate-200 rounded px-1.5 py-0.5 outline-none focus:border-blue-400 resize-none min-w-0 print:border-0" placeholder="Describe control measure..." />
+                                                    <button type="button" onClick={() => removeControl(hIndex, cIndex)} className="text-slate-300 hover:text-red-500 shrink-0 mt-0.5 opacity-0 group-hover:opacity-100 print:hidden" title="Remove control"><X size={11} /></button>
                                                 </div>
                                             ))}
-                                            <div className="flex flex-wrap gap-1 pt-0.5 print:hidden">
-                                                {(['Elimination','Substitution','Engineering','Administrative','PPE'] as RiskControlType[]).map(type => (
-                                                    <button key={type} type="button" onClick={() => addManualControl(hIndex, type)} className="text-[9px] uppercase font-bold px-1 py-0.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200">+{type.substring(0,4)}</button>
-                                                ))}
-                                            </div>
+                                            <button type="button" onClick={() => addManualControl(hIndex)} className="mt-0.5 text-[10px] flex items-center gap-1 text-slate-500 hover:text-blue-600 font-medium print:hidden">
+                                                <Plus size={10} /> Add Control
+                                            </button>
                                         </div>
                                     </td>
 

@@ -459,6 +459,7 @@ export interface RiskAssessment {
   type: 'JHA' | 'HIRA' | 'TRA';
   date: string;
   author: string;
+  location?: string;
   hazards: RiskHazard[];
   status: 'Draft' | 'Approved' | 'Archived';
 }

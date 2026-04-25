@@ -936,23 +936,27 @@ router.get('/risk-assessments/:id', async (req: AuthRequest, res: Response) => {
 });
 
 router.post('/risk-assessments', requirePermission('create_incident'), async (req: AuthRequest, res: Response) => {
-  const { title, task_description, taskDescription, type, date, author, hazards, status } = req.body;
+  const { title, task_description, taskDescription, type, date, author, hazards, status, location } = req.body;
   const id = uuid();
   await pool.query(
-    'INSERT INTO risk_assessments (id, title, task_description, type, date, author, hazards, status, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-    [id, title, task_description || taskDescription, type || 'JHA', date || new Date().toISOString(), author || req.user?.name, JSON.stringify(hazards || []), status || 'Draft', req.user?.org_id]
+    'INSERT INTO risk_assessments (id, title, task_description, type, date, author, hazards, status, location, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+    [id, title, task_description || taskDescription, type || 'JHA', date || new Date().toISOString(), author || req.user?.name, JSON.stringify(hazards || []), status || 'Draft', location || null, req.user?.org_id]
   );
   res.status(201).json({ id });
 });
 
 router.put('/risk-assessments/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
-  const { title, task_description, taskDescription, type, date, hazards, status } = req.body;
-  await pool.query(
+  const { title, task_description, taskDescription, type, date, hazards, status, location } = req.body;
+  const result = await pool.query(
     `UPDATE risk_assessments SET title=COALESCE($1,title), task_description=COALESCE($2,task_description),
      type=COALESCE($3,type), date=COALESCE($4,date), hazards=COALESCE($5,hazards), status=COALESCE($6,status),
-     updated_at=NOW() WHERE id=$7 AND org_id=$8`,
-    [title, task_description || taskDescription, type, date, hazards ? JSON.stringify(hazards) : null, status, req.params.id, req.user?.org_id]
+     location=COALESCE($7,location), updated_at=NOW() WHERE id=$8 AND org_id=$9`,
+    [title, task_description || taskDescription, type, date, hazards ? JSON.stringify(hazards) : null, status, location ?? null, req.params.id, req.user?.org_id]
   );
+  if ((result as any).rowCount === 0) {
+    res.status(404).json({ error: 'Not found' });
+    return;
+  }
   res.json({ message: 'Updated' });
 });
 

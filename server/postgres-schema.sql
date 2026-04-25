@@ -300,6 +300,7 @@ CREATE TABLE IF NOT EXISTS risk_assessments (
     author UUID,
     hazards TEXT DEFAULT '[]',
     status TEXT NOT NULL DEFAULT 'Draft',
+    location TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
