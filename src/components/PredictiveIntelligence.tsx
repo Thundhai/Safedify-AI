@@ -52,8 +52,8 @@ export const PredictiveIntelligence: React.FC = () => {
             <Brain className="text-white" size={26} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Predictive &amp; Environmental Intelligence</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400">AI-driven forecasts and real-time site condition monitoring</p>
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Weather &amp; Site Safety</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Live weather conditions, site safety thresholds &amp; AI-driven risk advisories</p>
           </div>
         </div>
       </div>

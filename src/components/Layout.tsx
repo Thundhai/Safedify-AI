@@ -37,7 +37,7 @@ import {
   Globe,
   Users,
   Leaf,
-  Brain,
+  CloudSun,
   Building2
 } from 'lucide-react';
 import { SkipLink } from '../utils/accessibility';
@@ -214,7 +214,7 @@ export const Layout: React.FC = () => {
       items: [
         { to: '/', icon: LayoutDashboard, label: t('nav.dashboard') },
         { to: '/analytics', icon: BarChart2, label: t('nav.analyticsKpis') },
-        { to: '/intelligence', icon: Brain, label: t('nav.aiIntelligence') },
+        { to: '/intelligence', icon: CloudSun, label: t('nav.aiIntelligence') },
       ]
     },
     {

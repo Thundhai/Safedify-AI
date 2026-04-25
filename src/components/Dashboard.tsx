@@ -795,7 +795,7 @@ export const Dashboard: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* AI Intelligence Card */}
+            {/* Weather & Site Safety Card */}
             <button
               onClick={() => navigate('/intelligence')}
               className="group bg-gradient-to-br from-purple-600 to-indigo-700 text-white p-5 rounded-xl shadow-md hover:shadow-lg transition-all text-left relative overflow-hidden"
