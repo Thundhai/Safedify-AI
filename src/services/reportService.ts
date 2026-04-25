@@ -598,7 +598,7 @@ export function downloadObservationPDF(
   doc.setFont('helvetica', 'bold');
   doc.text(orgName || 'Safedify HSE', M, 18);
   doc.setFontSize(14);
-  doc.text('Observation Report (STOP Card)', M, 28);
+  doc.text('Observation Report', M, 28);
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.text(`Document No: ${docNum}`, M, 37);
