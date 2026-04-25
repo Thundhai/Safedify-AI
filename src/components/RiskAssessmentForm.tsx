@@ -55,29 +55,42 @@ export const RiskAssessmentForm: React.FC = () => {
     setLoadingHazards(true);
     try {
         const result = await identifyHazardsAI(formData.taskDescription, formData.type);
-        if (result.hazards && result.hazards.length > 0) {
-            const newHazards: RiskHazard[] = result.hazards.map((desc: string) => ({
-                id: `haz-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                workActivity: '',
-                description: desc,
-                personAtRisk: '',
-                probability: 3,
-                severity: 3,
-                riskScore: 9,
-                controls: [],
-                actualProbability: 3,
-                actualSeverity: 3,
-                actualRiskScore: 9,
-                additionalControls: '',
-                priority: 'Medium',
-                actionBy: '',
-                duration: ''
-            }));
+        if (result.rows && result.rows.length > 0) {
+            const newHazards: RiskHazard[] = result.rows.map((row: any) => {
+                const initP = Math.min(5, Math.max(1, parseInt(row.initialProbability) || 3));
+                const initS = Math.min(5, Math.max(1, parseInt(row.initialSeverity) || 3));
+                const actP  = Math.min(5, Math.max(1, parseInt(row.actualProbability)  || initP));
+                const actS  = Math.min(5, Math.max(1, parseInt(row.actualSeverity)     || initS));
+                return {
+                    id: `haz-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                    workActivity:       row.workActivity      || '',
+                    description:        row.hazard            || '',
+                    personAtRisk:       row.personAtRisk      || '',
+                    probability:        initP,
+                    severity:           initS,
+                    riskScore:          initP * initS,
+                    controls:           (row.controls || []).map((c: any) => ({
+                        id: `ctrl-${Date.now()}-${Math.random().toString(36).substr(2, 7)}`,
+                        type: c.type || 'Administrative',
+                        description: c.description || ''
+                    })),
+                    actualProbability:  actP,
+                    actualSeverity:     actS,
+                    actualRiskScore:    actP * actS,
+                    additionalControls: row.additionalControls || '',
+                    priority:           row.priority           || 'Medium',
+                    actionBy:           row.actionBy           || '',
+                    duration:           row.duration           || ''
+                };
+            });
             setFormData(prev => ({ ...prev, hazards: [...prev.hazards, ...newHazards] }));
+            toast.success(`${newHazards.length} rows auto-filled from AI`);
+        } else {
+            toast.error("AI returned no hazards — try refining your task description.");
         }
     } catch (e) {
         console.error(e);
-        toast.error("Failed to suggest hazards.");
+        toast.error("Failed to auto-fill hazards.");
     } finally {
         setLoadingHazards(false);
     }
@@ -317,7 +330,7 @@ export const RiskAssessmentForm: React.FC = () => {
                             className="flex items-center gap-2 bg-purple-100 text-purple-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-purple-200 transition-colors"
                         >
                             {loadingHazards ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                            Suggest Hazards
+                            AI Auto-Fill Assessment
                         </button>
                     </div>
                 </div>

@@ -639,12 +639,24 @@ Give a concise, actionable recommendation to address this issue and pass the ins
  */
 export const identifyHazardsAI = async (taskDescription: string, type: string) => {
   try {
-    const prompt = `Identify potential hazards for this work task:
+    const prompt = `You are a senior HSE officer. For the work task below, generate a complete risk assessment table. For EACH hazard row, provide ALL fields fully filled in.
 
 Task: "${taskDescription}"
 Assessment Type: ${type}
 
-Provide a comprehensive list of potential hazards that could occur during this task.`;
+Return 3-6 hazard rows. For each row:
+- workActivity: the specific work step or activity (e.g. "Rigging and lifting")
+- hazard: the specific hazard/risk description
+- personAtRisk: who is at risk (e.g. "Rigger, Banksman, Bystanders")
+- initialProbability: 1-5 (before controls)
+- initialSeverity: 1-5 (before controls)
+- controls: array of control measures with type (Elimination/Substitution/Engineering/Administrative/PPE) and description
+- actualProbability: 1-5 (after controls applied — should be lower than initial)
+- actualSeverity: 1-5 (after controls applied — should be lower or equal to initial)
+- additionalControls: any further measures or monitoring required
+- priority: Critical / High / Medium / Low
+- actionBy: responsible person or role (e.g. "Site Supervisor", "Safety Officer")
+- duration: timeframe for action (e.g. "Immediate", "Before task", "Ongoing", "1 week")`;
 
     const response = await aiGenerate({
       model: MODEL_NAME,
@@ -655,15 +667,43 @@ Provide a comprehensive list of potential hazards that could occur during this t
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            hazards: { type: Type.ARRAY, items: { type: Type.STRING } },
-            riskLevel: { type: Type.STRING },
-            additionalNotes: { type: Type.STRING }
+            rows: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  workActivity:       { type: Type.STRING },
+                  hazard:             { type: Type.STRING },
+                  personAtRisk:       { type: Type.STRING },
+                  initialProbability: { type: Type.INTEGER },
+                  initialSeverity:    { type: Type.INTEGER },
+                  controls: {
+                    type: Type.ARRAY,
+                    items: {
+                      type: Type.OBJECT,
+                      properties: {
+                        type:        { type: Type.STRING, enum: ["Elimination","Substitution","Engineering","Administrative","PPE"] },
+                        description: { type: Type.STRING }
+                      },
+                      required: ["type","description"]
+                    }
+                  },
+                  actualProbability:  { type: Type.INTEGER },
+                  actualSeverity:     { type: Type.INTEGER },
+                  additionalControls: { type: Type.STRING },
+                  priority:           { type: Type.STRING, enum: ["Critical","High","Medium","Low"] },
+                  actionBy:           { type: Type.STRING },
+                  duration:           { type: Type.STRING }
+                },
+                required: ["workActivity","hazard","personAtRisk","initialProbability","initialSeverity","controls","actualProbability","actualSeverity","additionalControls","priority","actionBy","duration"]
+              }
+            }
           },
-          required: ["hazards"]
+          required: ["rows"]
         }
       }
     });
-    return safeParseJSON(response.text, {"hazards": []});
+    return safeParseJSON(response.text, { rows: [] });
   } catch (error) {
     console.error("Hazard Identification Error:", error);
     throw error;
