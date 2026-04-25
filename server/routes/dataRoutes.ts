@@ -947,17 +947,22 @@ router.post('/risk-assessments', requirePermission('create_incident'), async (re
 
 router.put('/risk-assessments/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
   const { title, task_description, taskDescription, type, date, hazards, status, location } = req.body;
-  const result = await pool.query(
-    `UPDATE risk_assessments SET title=COALESCE($1,title), task_description=COALESCE($2,task_description),
-     type=COALESCE($3,type), date=COALESCE($4,date), hazards=COALESCE($5,hazards), status=COALESCE($6,status),
-     location=COALESCE($7,location), updated_at=NOW() WHERE id=$8 AND org_id=$9`,
-    [title, task_description || taskDescription, type, date, hazards ? JSON.stringify(hazards) : null, status, location ?? null, req.params.id, req.user?.org_id]
-  );
-  if ((result as any).rowCount === 0) {
-    res.status(404).json({ error: 'Not found' });
-    return;
+  try {
+    const result = await pool.query(
+      `UPDATE risk_assessments SET title=COALESCE($1,title), task_description=COALESCE($2,task_description),
+       type=COALESCE($3,type), date=COALESCE($4,date), hazards=COALESCE($5,hazards), status=COALESCE($6,status),
+       location=COALESCE($7,location), updated_at=NOW() WHERE id=$8 AND org_id=$9`,
+      [title, task_description || taskDescription, type, date, hazards ? JSON.stringify(hazards) : null, status, location ?? null, req.params.id, req.user?.org_id]
+    );
+    if ((result as any).rowCount === 0) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+    res.json({ message: 'Updated' });
+  } catch (err: any) {
+    console.error('[PUT /risk-assessments] DB error:', err.message);
+    res.status(400).json({ error: 'Invalid request — check the assessment ID is a valid UUID.' });
   }
-  res.json({ message: 'Updated' });
 });
 
 router.delete('/risk-assessments/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {

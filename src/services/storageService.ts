@@ -521,30 +521,30 @@ export const getRiskAssessmentById = async (id: string): Promise<RiskAssessment 
   } catch { return undefined; }
 };
 
+const raBody = (ra: RiskAssessment) => ({
+  title: ra.title,
+  taskDescription: ra.taskDescription,
+  type: ra.type,
+  date: ra.date,
+  hazards: ra.hazards,
+  status: ra.status,
+  location: ra.location ?? '',
+});
+
+/** Create a new risk assessment. Returns the server-assigned UUID. */
+export const createRiskAssessment = async (ra: RiskAssessment): Promise<string> => {
+  const result = await apiCreateRiskAssessment({ ...raBody(ra), author: ra.author });
+  return result.id as string;
+};
+
+/** Update an existing risk assessment by its server UUID. */
+export const updateRiskAssessment = async (ra: RiskAssessment): Promise<void> => {
+  await apiUpdateRiskAssessment(ra.id, raBody(ra));
+};
+
+/** @deprecated Use createRiskAssessment / updateRiskAssessment directly. */
 export const saveRiskAssessment = async (ra: RiskAssessment): Promise<void> => {
-  try {
-    await apiUpdateRiskAssessment(ra.id, {
-      title: ra.title,
-      taskDescription: ra.taskDescription,
-      type: ra.type,
-      date: ra.date,
-      hazards: ra.hazards,
-      status: ra.status,
-      location: ra.location,
-    });
-  } catch {
-    await apiCreateRiskAssessment({
-      id: ra.id,
-      title: ra.title,
-      taskDescription: ra.taskDescription,
-      type: ra.type,
-      date: ra.date,
-      author: ra.author,
-      hazards: ra.hazards,
-      status: ra.status,
-      location: ra.location,
-    });
-  }
+  await updateRiskAssessment(ra);
 };
 
 export const deleteRiskAssessment = async (id: string): Promise<void> => {

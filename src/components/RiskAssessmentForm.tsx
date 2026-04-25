@@ -4,7 +4,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, Save, Sparkles, Loader2, Plus, Trash2, Printer, AlertTriangle, X, Info, CheckCircle2
 } from 'lucide-react';
-import { getRiskAssessmentById, saveRiskAssessment } from '../services/storageService';
+import { getRiskAssessmentById, createRiskAssessment, updateRiskAssessment } from '../services/storageService';
 import { identifyHazardsAI, suggestControlsAI, explainRiskScoreAI, reviewRiskAssessmentAI } from '../services/geminiService';
 import { SmartTextArea } from './SmartTextInput';
 import { RiskAssessment, RiskHazard, RiskControl, RiskControlType } from '../types';
@@ -219,12 +219,19 @@ export const RiskAssessmentForm: React.FC = () => {
 
   const handleSave = async () => {
     if (!formData.title) { toast.error("Title is required"); return; }
-    if (isSaving) return; // Prevent double submission
+    if (isSaving) return;
     setIsSaving(true);
     try {
-      await saveRiskAssessment(formData);
-      toast.success("Risk Assessment Saved!");
-      navigate('/risk-assessments');
+      if (isNew) {
+        const savedId = await createRiskAssessment(formData);
+        toast.success("Risk Assessment Saved!");
+        // Navigate to the real server UUID so future saves hit PUT correctly
+        navigate(`/risk-assessments/${savedId}`, { replace: true });
+      } else {
+        await updateRiskAssessment(formData);
+        toast.success("Risk Assessment Updated!");
+        navigate('/risk-assessments');
+      }
     } catch (err: any) {
       console.error("Save risk assessment failed", err);
       toast.error(err?.message || "Failed to save risk assessment. Please try again.");
