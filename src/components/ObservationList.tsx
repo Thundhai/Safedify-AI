@@ -199,15 +199,15 @@ export const ObservationList: React.FC = () => {
                     <h3 className="text-2xl font-bold text-slate-800">{stats.total}</h3>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-red-100 shadow-sm">
-                    <p className="text-red-500 text-xs uppercase font-bold">{t('observations.unsafeAct')}</p>
+                    <p className="text-red-500 text-xs uppercase font-bold">UNSAFE ACT</p>
                     <h3 className="text-2xl font-bold text-red-700">{stats.unsafeActs}</h3>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-orange-100 shadow-sm">
-                    <p className="text-orange-500 text-xs uppercase font-bold">{t('observations.unsafeCondition')}</p>
+                    <p className="text-orange-500 text-xs uppercase font-bold">UNSAFE CONDITION</p>
                     <h3 className="text-2xl font-bold text-orange-700">{stats.conditions}</h3>
                 </div>
                 <div className="bg-white p-4 rounded-xl border border-green-100 shadow-sm">
-                    <p className="text-green-500 text-xs uppercase font-bold">{t('observations.safeAct')}</p>
+                    <p className="text-green-500 text-xs uppercase font-bold">SAFE BEHAVIOR</p>
                     <h3 className="text-2xl font-bold text-green-700">{stats.safe}</h3>
                 </div>
             </div>
@@ -263,10 +263,10 @@ export const ObservationList: React.FC = () => {
                     className="bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
                 >
                     <option value="All">{t('observations.allTypes', { defaultValue: 'All Types' })}</option>
-                    <option value="Unsafe Act">{t('observations.unsafeAct')}</option>
-                    <option value="Unsafe Condition">{t('observations.unsafeCondition')}</option>
-                    <option value="Safe Behavior">{t('observations.safeBehavior', { defaultValue: 'Safe Behavior' })}</option>
-                    <option value="Near Miss">{t('observations.nearMiss')}</option>
+                    <option value="Unsafe Act">UNSAFE ACT</option>
+                    <option value="Unsafe Condition">UNSAFE CONDITION</option>
+                    <option value="Safe Behavior">SAFE BEHAVIOR</option>
+                    <option value="Near Miss">NEAR MISS</option>
                 </select>
 
                 <select
@@ -286,8 +286,8 @@ export const ObservationList: React.FC = () => {
                     className="bg-slate-50 border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
                 >
                     <option value="All">{t('observations.allStatuses', { defaultValue: 'All Statuses' })}</option>
-                    <option value="Open">{t('observations.statusOpen')}</option>
-                    <option value="Closed">{t('observations.statusClosed')}</option>
+                    <option value="Open">OPEN</option>
+                    <option value="Closed">CLOSED</option>
                 </select>
 
                 {(filterType !== 'All' || filterCategory !== 'All' || filterStatus !== 'All') && (
@@ -437,10 +437,10 @@ export const ObservationList: React.FC = () => {
                                             onChange={(e) => setEditForm({...editForm, type: e.target.value as ObservationType})}
                                             aria-label="Observation type"
                                         >
-                                            <option value="Unsafe Act">{t('observations.unsafeAct')}</option>
-                                            <option value="Unsafe Condition">{t('observations.unsafeCondition')}</option>
-                                            <option value="Safe Behavior">{t('observations.safeBehavior', { defaultValue: 'Safe Behavior' })}</option>
-                                            <option value="Near Miss">{t('observations.nearMiss')}</option>
+                                            <option value="Unsafe Act">UNSAFE ACT</option>
+                                            <option value="Unsafe Condition">UNSAFE CONDITION</option>
+                                            <option value="Safe Behavior">SAFE BEHAVIOR</option>
+                                            <option value="Near Miss">NEAR MISS</option>
                                         </select>
                                     </div>
                                     <div>
@@ -497,8 +497,8 @@ export const ObservationList: React.FC = () => {
                                         onChange={(e) => setEditForm({...editForm, status: e.target.value as any})}
                                         aria-label="Observation status"
                                     >
-                                        <option value="Open">{t('observations.statusOpen')}</option>
-                                        <option value="Closed">{t('observations.statusClosed')}</option>
+                                        <option value="Open">OPEN</option>
+                                        <option value="Closed">CLOSED</option>
                                     </select>
                                 </div>
 
@@ -581,7 +581,7 @@ export const ObservationList: React.FC = () => {
                                     </button>
                                   </div>
                                   <div className="flex justify-between items-center text-sm">
-                                    <span className="text-slate-500">{t('common.status')}: <span className={`font-bold ${selectedObs.status === 'Open' ? 'text-blue-600' : 'text-slate-600'}`}>{selectedObs.status === 'Open' ? t('observations.statusOpen') : t('observations.statusClosed')}</span></span>
+                                    <span className="text-slate-500">{t('common.status')}: <span className={`font-bold ${selectedObs.status === 'Open' ? 'text-blue-600' : 'text-slate-600'}`}>{selectedObs.status === 'Open' ? 'OPEN' : 'CLOSED'}</span></span>
                                     <div className="flex gap-2">
                                         <button 
                                             onClick={(e) => openEditModal(selectedObs, e)}
