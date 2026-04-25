@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { Plus, Eye, CheckCircle, Sparkles, Loader2, Camera, Trash2, Edit2, X, Save, MapPin, Tag, FileText, Printer, Filter, Download, FileSpreadsheet } from 'lucide-react';
+import { Plus, Eye, CheckCircle, Sparkles, Loader2, Camera, Trash2, Edit2, X, Save, MapPin, Tag, FileText, Printer, Filter, Download, FileSpreadsheet, ChevronUp } from 'lucide-react';
+import { SmartCamera } from './SmartCamera';
 import { getObservations, deleteObservation, updateObservation } from '../services/storageService';
 import { analyzeObservationTrendsAI } from '../services/geminiService';
 import { apiExportData } from '../services/apiService';
@@ -29,6 +30,7 @@ export const ObservationList: React.FC = () => {
     const [isEditMode, setIsEditMode] = useState(false);
     const [editForm, setEditForm] = useState<Partial<Observation>>({});
     const [loading, setLoading] = useState(true);
+    const [showAIScanner, setShowAIScanner] = useState(false);
 
     useEffect(() => {
         if (!user) return;
@@ -152,14 +154,29 @@ export const ObservationList: React.FC = () => {
                     >
                         <Printer size={18} /> {t('observations.printPDF', { defaultValue: 'Print / PDF' })}
                     </button>
-                    <Link to="/smart-camera" className="bg-purple-100 text-purple-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-purple-200 shadow-sm flex items-center justify-center gap-2">
-                        <Camera size={18} /> {t('observations.aiPhotoScan', { defaultValue: 'AI Photo Scan' })}
-                    </Link>
+                    <button
+                        onClick={() => setShowAIScanner(prev => !prev)}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium shadow-sm flex items-center justify-center gap-2 ${
+                            showAIScanner
+                                ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                        }`}
+                    >
+                        {showAIScanner ? <ChevronUp size={18} /> : <Camera size={18} />}
+                        {showAIScanner ? 'Hide AI Scanner' : t('observations.aiPhotoScan', { defaultValue: 'AI Photo Scan' })}
+                    </button>
                     <Link to="/observations/new" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm flex items-center justify-center gap-2">
                         <Plus size={18} /> {t('observations.addManual', { defaultValue: 'Add Manual' })}
                     </Link>
                 </div>
             </div>
+
+            {/* AI Safety Monitor — inline panel */}
+            {showAIScanner && (
+                <div className="border border-purple-200 rounded-xl overflow-hidden bg-purple-50/30 print:hidden">
+                    <SmartCamera />
+                </div>
+            )}
 
             {/* Print Header - Visible only on Print */}
             <div className="hidden print:block mb-8 border-b-2 border-slate-800 pb-4">

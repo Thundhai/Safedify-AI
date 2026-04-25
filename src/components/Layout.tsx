@@ -23,7 +23,6 @@ import {
   RefreshCw,
   Cloud,
   CloudOff,
-  Camera,
   Map,
   Trophy,
   ChevronDown,
@@ -227,7 +226,6 @@ export const Layout: React.FC = () => {
         { to: '/incidents', icon: AlertTriangle, label: t('nav.incidents') },
         { to: '/observations', icon: Eye, label: t('nav.observationsStop') },
         { to: '/environmental-log', icon: Leaf, label: t('nav.environmentalLog') },
-        { to: '/smart-camera', icon: Camera, label: t('nav.aiSafetyMonitor') },
         { to: '/emergency', icon: Siren, label: t('nav.emergency') },
       ]
     },
