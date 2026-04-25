@@ -58,11 +58,20 @@ export const RiskAssessmentForm: React.FC = () => {
         if (result.hazards && result.hazards.length > 0) {
             const newHazards: RiskHazard[] = result.hazards.map((desc: string) => ({
                 id: `haz-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                workActivity: '',
                 description: desc,
+                personAtRisk: '',
                 probability: 3,
                 severity: 3,
                 riskScore: 9,
-                controls: []
+                controls: [],
+                actualProbability: 3,
+                actualSeverity: 3,
+                actualRiskScore: 9,
+                additionalControls: '',
+                priority: 'Medium',
+                actionBy: '',
+                duration: ''
             }));
             setFormData(prev => ({ ...prev, hazards: [...prev.hazards, ...newHazards] }));
         }
@@ -141,18 +150,23 @@ export const RiskAssessmentForm: React.FC = () => {
     const updatedHazards = [...formData.hazards];
     const current = updatedHazards[index]!;
     
-    // Recalculate score if prob/sev changes
-    if (updates.probability || updates.severity) {
+    // Recalculate initial score if prob/sev changes
+    if (updates.probability !== undefined || updates.severity !== undefined) {
         const p = updates.probability ?? current.probability;
         const s = updates.severity ?? current.severity;
         updates.riskScore = p * s;
-        
-        // Clear explanation if score changes significantly as it might not be valid
         if (riskExplanations[current.id]) {
             const newExplanations = {...riskExplanations};
             delete newExplanations[current.id];
             setRiskExplanations(newExplanations);
         }
+    }
+
+    // Recalculate actual risk score
+    if (updates.actualProbability !== undefined || updates.actualSeverity !== undefined) {
+        const p = updates.actualProbability ?? current.actualProbability ?? current.probability;
+        const s = updates.actualSeverity ?? current.actualSeverity ?? current.severity;
+        updates.actualRiskScore = p * s;
     }
 
     updatedHazards[index] = { ...current, ...updates };
@@ -346,176 +360,180 @@ export const RiskAssessmentForm: React.FC = () => {
                 <AlertTriangle className="text-orange-500" /> Hazard Identification & Risk Control
             </h3>
 
-            <div className="space-y-6">
-                {formData.hazards.map((hazard, hIndex) => {
-                    const riskLevel = getRiskLevel(hazard.riskScore);
-                    return (
-                        <div key={hazard.id} className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50/50 print:break-inside-avoid print:bg-white print:border-slate-300">
-                            {/* Hazard Header */}
-                            <div className="p-4 bg-slate-100 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4 print:bg-slate-50">
-                                <div className="flex-1">
-                                    <input 
-                                        type="text" 
-                                        value={hazard.description}
-                                        onChange={(e) => updateHazard(hIndex, { description: e.target.value })}
-                                        className="w-full bg-transparent font-medium text-slate-800 border-b border-transparent focus:border-slate-400 outline-none"
-                                        placeholder="Describe Hazard..."
-                                    />
-                                </div>
-                                <button type="button" onClick={() => removeHazard(hIndex)} className="text-slate-400 hover:text-red-500 print:hidden">
-                                    <Trash2 size={18} />
-                                </button>
-                            </div>
+            {/* Scrollable Table */}
+            <div className="overflow-x-auto rounded-lg border border-slate-200 print:overflow-visible">
+                <table className="w-full text-sm border-collapse min-w-[1400px] print:min-w-0">
+                    <thead>
+                        <tr className="bg-slate-700 text-white text-xs">
+                            <th className="p-2.5 text-center font-semibold w-8">#</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[140px]">Work Activity</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[180px]">Hazards / Risk</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[130px]">Person at Risk</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[155px]">Initial Risk Matrix</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[210px]">Control Measures</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[155px]">Actual Risk Matrix</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[175px]">Additional Control Measures</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[105px]">Priority</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[120px]">Action By</th>
+                            <th className="p-2.5 text-left font-semibold min-w-[105px]">Duration</th>
+                            <th className="p-2.5 w-8 print:hidden"></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                        {formData.hazards.map((hazard, hIndex) => {
+                            const initialLevel = getRiskLevel(hazard.riskScore);
+                            const actualScore = hazard.actualRiskScore ?? hazard.riskScore;
+                            const actualLevel = getRiskLevel(actualScore);
+                            return (
+                                <tr key={hazard.id} className={`align-top ${hIndex % 2 === 0 ? 'bg-white' : 'bg-slate-50'} print:bg-white`}>
+                                    {/* # */}
+                                    <td className="p-2.5 text-center text-slate-400 font-semibold">{hIndex + 1}</td>
 
-                            <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                {/* Risk Matrix Calculation */}
-                                <div className="space-y-4">
-                                    <h4 className="text-xs font-bold uppercase text-slate-500">Risk Assessment Matrix</h4>
-                                    <div className="grid grid-cols-2 gap-4 print:hidden">
-                                        <div>
-                                            <label className="block text-xs text-slate-500 mb-1">Probability (1-5)</label>
-                                            <input 
-                                                type="range" min="1" max="5" 
-                                                value={hazard.probability} 
-                                                onChange={(e) => updateHazard(hIndex, { probability: parseInt(e.target.value) })}
-                                                className="w-full accent-blue-600 cursor-pointer"
-                                            />
-                                            <div className="text-center text-sm font-medium text-slate-700">{hazard.probability}</div>
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs text-slate-500 mb-1">Severity (1-5)</label>
-                                            <input 
-                                                type="range" min="1" max="5" 
-                                                value={hazard.severity} 
-                                                onChange={(e) => updateHazard(hIndex, { severity: parseInt(e.target.value) })}
-                                                className="w-full accent-blue-600 cursor-pointer"
-                                            />
-                                            <div className="text-center text-sm font-medium text-slate-700">{hazard.severity}</div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="flex items-center justify-between bg-white p-3 rounded border border-slate-200 print:border-0 print:p-0">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-medium text-slate-600">
-                                                Risk Score: <span className="font-bold text-slate-900">{hazard.riskScore}</span> (P:{hazard.probability} x S:{hazard.severity})
-                                            </span>
-                                            <button 
-                                                type="button"
-                                                onClick={() => handleExplainRisk(hazard)}
-                                                className="flex items-center gap-1 text-[10px] bg-purple-50 text-purple-600 px-2 py-1 rounded border border-purple-100 hover:bg-purple-100 transition-colors print:hidden"
-                                                title="Get AI explanation of this risk score"
-                                            >
-                                                <Sparkles size={10} /> Explain Score
-                                            </button>
-                                        </div>
-                                        <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${riskLevel.color} text-white print:border print:border-slate-300 print:text-black print:bg-white`}>
-                                            {riskLevel.label}
-                                        </span>
-                                    </div>
+                                    {/* Work Activity */}
+                                    <td className="p-2.5">
+                                        <textarea rows={3} value={hazard.workActivity ?? ''} onChange={(e) => updateHazard(hIndex, { workActivity: e.target.value })} className="w-full border border-slate-200 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 outline-none resize-none print:border-0 print:p-0" placeholder="e.g. Lifting operations" />
+                                    </td>
 
-                                    {/* Explanation Box */}
-                                    {(loadingExplanation === hazard.id || riskExplanations[hazard.id]) && (
-                                        <div className="mt-2 text-xs bg-purple-50 text-purple-900 p-3 rounded-lg border border-purple-100 flex gap-2 animate-in fade-in slide-in-from-top-1 print:hidden relative">
-                                            <Sparkles size={14} className="shrink-0 mt-0.5 text-purple-600" />
-                                            <div className="flex-1">
-                                                {loadingExplanation === hazard.id ? (
-                                                    <span className="flex items-center gap-2">
-                                                        <Loader2 size={12} className="animate-spin" /> Analyzing risk context...
-                                                    </span>
-                                                ) : (
-                                                    <span className="leading-relaxed font-medium">{riskExplanations[hazard.id]}</span>
-                                                )}
-                                            </div>
-                                            <button onClick={() => {
-                                                const newExp = {...riskExplanations};
-                                                delete newExp[hazard.id];
-                                                setRiskExplanations(newExp);
-                                            }} className="absolute top-1 right-1 text-purple-400 hover:text-purple-700">
-                                                <X size={12} />
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Controls */}
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <h4 className="text-xs font-bold uppercase text-slate-500">Controls</h4>
-                                        <button 
-                                            type="button"
-                                            onClick={() => handleSuggestControls(hIndex)}
-                                            disabled={loadingControls === hazard.id}
-                                            className="text-xs flex items-center gap-1 text-purple-600 hover:text-purple-700 font-medium bg-purple-50 px-2 py-1 rounded border border-purple-100 hover:bg-purple-100 transition-colors print:hidden"
-                                        >
-                                            {loadingControls === hazard.id ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                                            AI Suggest Controls
+                                    {/* Hazards / Risk */}
+                                    <td className="p-2.5">
+                                        <textarea rows={3} value={hazard.description} onChange={(e) => updateHazard(hIndex, { description: e.target.value })} className="w-full border border-slate-200 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 outline-none resize-none print:border-0 print:p-0" placeholder="Describe hazard..." />
+                                        <button type="button" onClick={() => handleSuggestControls(hIndex)} disabled={loadingControls === hazard.id} className="mt-1 text-[10px] flex items-center gap-1 text-purple-600 hover:text-purple-700 font-medium print:hidden">
+                                            {loadingControls === hazard.id ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />} AI Controls
                                         </button>
-                                    </div>
-                                    
-                                    <div className="space-y-2">
-                                        {hazard.controls.map((control, cIndex) => (
-                                            <div key={control.id} className="flex items-start gap-2 bg-white p-3 rounded border border-slate-200 shadow-sm text-sm group hover:border-blue-300 transition-colors print:shadow-none print:border-slate-300">
-                                                 {/* Type Badge / Select */}
-                                                 <div className="shrink-0 relative">
-                                                    <select 
-                                                        value={control.type}
-                                                        onChange={(e) => updateControl(hIndex, cIndex, 'type', e.target.value)}
-                                                        className={`appearance-none pl-2 pr-6 py-1 rounded text-[10px] font-bold uppercase cursor-pointer outline-none border transition-colors print:border-0 print:p-0 print:appearance-none ${
-                                                            control.type === 'Elimination' ? 'bg-red-50 text-red-700 border-red-100' :
-                                                            control.type === 'Substitution' ? 'bg-orange-50 text-orange-700 border-orange-100' :
-                                                            control.type === 'Engineering' ? 'bg-blue-50 text-blue-700 border-blue-100' :
-                                                            control.type === 'Administrative' ? 'bg-yellow-50 text-yellow-700 border-yellow-100' :
-                                                            'bg-green-50 text-green-700 border-green-100'
-                                                        }`}
-                                                     >
-                                                         {['Elimination', 'Substitution', 'Engineering', 'Administrative', 'PPE'].map(t => (
-                                                             <option key={t} value={t}>{t}</option>
-                                                         ))}
-                                                     </select>
-                                                     <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1 opacity-50 print:hidden">
-                                                        <svg className="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
-                                                     </div>
-                                                 </div>
+                                    </td>
 
-                                                 <input 
-                                                    type="text"
-                                                    value={control.description}
-                                                    onChange={(e) => updateControl(hIndex, cIndex, 'description', e.target.value)}
-                                                    className="flex-1 bg-transparent border-0 border-b border-transparent focus:border-slate-300 p-0 py-0.5 text-slate-700 focus:ring-0 placeholder:text-slate-300 transition-all text-sm print:text-black"
-                                                    placeholder="Describe control measure..."
-                                                 />
-                                                 <button type="button" onClick={() => removeControl(hIndex, cIndex)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity print:hidden">
-                                                    <X size={16} />
-                                                 </button>
+                                    {/* Person at Risk */}
+                                    <td className="p-2.5">
+                                        <textarea rows={3} value={hazard.personAtRisk ?? ''} onChange={(e) => updateHazard(hIndex, { personAtRisk: e.target.value })} className="w-full border border-slate-200 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 outline-none resize-none print:border-0 print:p-0" placeholder="e.g. Rigger, Operator" />
+                                    </td>
+
+                                    {/* Initial Risk Matrix */}
+                                    <td className="p-2.5">
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center gap-1.5 print:hidden">
+                                                <span className="text-[10px] text-slate-400 w-5">P:</span>
+                                                <input type="range" min="1" max="5" value={hazard.probability} onChange={(e) => updateHazard(hIndex, { probability: parseInt(e.target.value) })} className="flex-1 accent-blue-600 h-1.5 cursor-pointer" title="Probability" aria-label="Probability" />
+                                                <span className="text-xs font-bold text-slate-700 w-4">{hazard.probability}</span>
                                             </div>
-                                        ))}
-                                        
-                                        {/* Manual Add Buttons */}
-                                        <div className="flex flex-wrap gap-2 pt-2 print:hidden">
-                                            <span className="text-xs text-slate-400 self-center mr-1">Add Control:</span>
-                                             <button type="button" onClick={() => addManualControl(hIndex, 'Elimination')} className="px-2 py-1 text-[10px] uppercase font-bold text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors">Elimination</button>
-                                             <button type="button" onClick={() => addManualControl(hIndex, 'Substitution')} className="px-2 py-1 text-[10px] uppercase font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded hover:bg-orange-100 transition-colors">Subst.</button>
-                                             <button type="button" onClick={() => addManualControl(hIndex, 'Engineering')} className="px-2 py-1 text-[10px] uppercase font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors">Engineering</button>
-                                             <button type="button" onClick={() => addManualControl(hIndex, 'Administrative')} className="px-2 py-1 text-[10px] uppercase font-bold text-yellow-600 bg-yellow-50 border border-yellow-200 rounded hover:bg-yellow-100 transition-colors">Admin</button>
-                                             <button type="button" onClick={() => addManualControl(hIndex, 'PPE')} className="px-2 py-1 text-[10px] uppercase font-bold text-green-600 bg-green-50 border border-green-200 rounded hover:bg-green-100 transition-colors">PPE</button>
+                                            <div className="flex items-center gap-1.5 print:hidden">
+                                                <span className="text-[10px] text-slate-400 w-5">S:</span>
+                                                <input type="range" min="1" max="5" value={hazard.severity} onChange={(e) => updateHazard(hIndex, { severity: parseInt(e.target.value) })} className="flex-1 accent-blue-600 h-1.5 cursor-pointer" title="Severity" aria-label="Severity" />
+                                                <span className="text-xs font-bold text-slate-700 w-4">{hazard.severity}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${initialLevel.color} text-white`}>{initialLevel.label}</span>
+                                                <span className="text-xs text-slate-500">({hazard.riskScore})</span>
+                                                <button type="button" onClick={() => handleExplainRisk(hazard)} className="text-purple-400 hover:text-purple-600 print:hidden" title="AI Explain">
+                                                    {loadingExplanation === hazard.id ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                                                </button>
+                                            </div>
+                                            {riskExplanations[hazard.id] && (
+                                                <div className="text-[10px] bg-purple-50 text-purple-800 p-1.5 rounded border border-purple-100 print:hidden relative">
+                                                    <p className="pr-3">{riskExplanations[hazard.id]}</p>
+                                                    <button onClick={() => { const n = {...riskExplanations}; delete n[hazard.id]; setRiskExplanations(n); }} className="absolute top-0.5 right-0.5 text-purple-400" title="Dismiss"><X size={10} /></button>
+                                                </div>
+                                            )}
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
+                                    </td>
 
-                <button 
-                    type="button"
-                    onClick={() => setFormData(prev => ({ ...prev, hazards: [...prev.hazards, {
-                        id: `haz-${Date.now()}`, description: '', probability: 1, severity: 1, riskScore: 1, controls: []
-                    }]}))}
-                    className="w-full py-4 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:bg-slate-50 hover:border-slate-400 font-medium transition-colors flex items-center justify-center gap-2 print:hidden"
-                >
-                    <Plus size={20} /> Add Hazard Manually
-                </button>
+                                    {/* Control Measures */}
+                                    <td className="p-2.5">
+                                        <div className="space-y-1">
+                                            {hazard.controls.map((control, cIndex) => (
+                                                <div key={control.id} className="flex items-center gap-1 group">
+                                                    <select value={control.type} onChange={(e) => updateControl(hIndex, cIndex, 'type', e.target.value)} title="Control type" className={`shrink-0 text-[9px] font-bold uppercase border rounded px-1 py-0.5 outline-none print:border-0 ${control.type === 'Elimination' ? 'bg-red-50 text-red-700 border-red-200' : control.type === 'Substitution' ? 'bg-orange-50 text-orange-700 border-orange-200' : control.type === 'Engineering' ? 'bg-blue-50 text-blue-700 border-blue-200' : control.type === 'Administrative' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                                                        {['Elimination','Substitution','Engineering','Administrative','PPE'].map(t => <option key={t} value={t}>{t}</option>)}
+                                                    </select>
+                                                    <input type="text" value={control.description} onChange={(e) => updateControl(hIndex, cIndex, 'description', e.target.value)} className="flex-1 text-xs border border-slate-200 rounded px-1.5 py-0.5 outline-none focus:border-blue-400 min-w-0 print:border-0" placeholder="Describe..." />
+                                                    <button type="button" onClick={() => removeControl(hIndex, cIndex)} className="text-slate-300 hover:text-red-500 shrink-0 opacity-0 group-hover:opacity-100 print:hidden" title="Remove control"><X size={11} /></button>
+                                                </div>
+                                            ))}
+                                            <div className="flex flex-wrap gap-1 pt-0.5 print:hidden">
+                                                {(['Elimination','Substitution','Engineering','Administrative','PPE'] as RiskControlType[]).map(type => (
+                                                    <button key={type} type="button" onClick={() => addManualControl(hIndex, type)} className="text-[9px] uppercase font-bold px-1 py-0.5 rounded bg-slate-100 text-slate-500 hover:bg-slate-200">+{type.substring(0,4)}</button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    {/* Actual Risk Matrix */}
+                                    <td className="p-2.5">
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center gap-1.5 print:hidden">
+                                                <span className="text-[10px] text-slate-400 w-5">P:</span>
+                                                <input type="range" min="1" max="5" value={hazard.actualProbability ?? hazard.probability} onChange={(e) => updateHazard(hIndex, { actualProbability: parseInt(e.target.value) })} className="flex-1 accent-green-600 h-1.5 cursor-pointer" title="Actual Probability" aria-label="Actual Probability" />
+                                                <span className="text-xs font-bold text-slate-700 w-4">{hazard.actualProbability ?? hazard.probability}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 print:hidden">
+                                                <span className="text-[10px] text-slate-400 w-5">S:</span>
+                                                <input type="range" min="1" max="5" value={hazard.actualSeverity ?? hazard.severity} onChange={(e) => updateHazard(hIndex, { actualSeverity: parseInt(e.target.value) })} className="flex-1 accent-green-600 h-1.5 cursor-pointer" title="Actual Severity" aria-label="Actual Severity" />
+                                                <span className="text-xs font-bold text-slate-700 w-4">{hazard.actualSeverity ?? hazard.severity}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${actualLevel.color} text-white`}>{actualLevel.label}</span>
+                                                <span className="text-xs text-slate-500">({actualScore})</span>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    {/* Additional Control Measures */}
+                                    <td className="p-2.5">
+                                        <textarea rows={3} value={hazard.additionalControls ?? ''} onChange={(e) => updateHazard(hIndex, { additionalControls: e.target.value })} className="w-full border border-slate-200 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 outline-none resize-none print:border-0 print:p-0" placeholder="Additional measures..." />
+                                    </td>
+
+                                    {/* Priority */}
+                                    <td className="p-2.5">
+                                        <select value={hazard.priority ?? 'Medium'} onChange={(e) => updateHazard(hIndex, { priority: e.target.value })} title="Priority" className={`w-full border rounded p-1.5 text-xs font-bold uppercase outline-none print:border-0 ${hazard.priority === 'Critical' ? 'bg-red-50 text-red-700 border-red-200' : hazard.priority === 'High' ? 'bg-orange-50 text-orange-700 border-orange-200' : hazard.priority === 'Low' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>
+                                            <option value="Critical">Critical</option>
+                                            <option value="High">High</option>
+                                            <option value="Medium">Medium</option>
+                                            <option value="Low">Low</option>
+                                        </select>
+                                    </td>
+
+                                    {/* Action By */}
+                                    <td className="p-2.5">
+                                        <input type="text" value={hazard.actionBy ?? ''} onChange={(e) => updateHazard(hIndex, { actionBy: e.target.value })} className="w-full border border-slate-200 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 outline-none print:border-0 print:p-0" placeholder="Name / Role" />
+                                    </td>
+
+                                    {/* Duration */}
+                                    <td className="p-2.5">
+                                        <input type="text" value={hazard.duration ?? ''} onChange={(e) => updateHazard(hIndex, { duration: e.target.value })} className="w-full border border-slate-200 rounded p-1.5 text-xs focus:ring-1 focus:ring-blue-400 outline-none print:border-0 print:p-0" placeholder="e.g. Immediate" />
+                                    </td>
+
+                                    {/* Delete */}
+                                    <td className="p-2.5 print:hidden">
+                                        <button type="button" onClick={() => removeHazard(hIndex)} className="text-slate-400 hover:text-red-500 transition-colors" title="Delete row"><Trash2 size={15} /></button>
+                                    </td>
+                                </tr>
+                            );
+                        })}
+                        {formData.hazards.length === 0 && (
+                            <tr>
+                                <td colSpan={12} className="p-8 text-center text-slate-400">
+                                    <AlertTriangle size={32} className="mx-auto mb-2 opacity-20" />
+                                    <p className="text-sm">No hazards added yet. Use AI to suggest or add manually below.</p>
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
             </div>
+
+            <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, hazards: [...prev.hazards, {
+                    id: `haz-${Date.now()}`,
+                    workActivity: '', description: '', personAtRisk: '',
+                    probability: 1, severity: 1, riskScore: 1,
+                    controls: [],
+                    actualProbability: 1, actualSeverity: 1, actualRiskScore: 1,
+                    additionalControls: '', priority: 'Medium', actionBy: '', duration: ''
+                }]}))}
+                className="mt-4 w-full py-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:bg-slate-50 hover:border-slate-400 font-medium transition-colors flex items-center justify-center gap-2 print:hidden text-sm"
+            >
+                <Plus size={18} /> Add Row
+            </button>
         </div>
       </div>
     </div>

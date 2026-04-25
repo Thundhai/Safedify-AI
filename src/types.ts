@@ -436,11 +436,20 @@ export interface RiskControl {
 
 export interface RiskHazard {
   id: string;
+  workActivity?: string;
   description: string;
-  probability: number; // 1-5
-  severity: number; // 1-5
-  riskScore: number; // Calculated (Prob * Sev)
+  personAtRisk?: string;
+  probability: number; // 1-5 (Initial)
+  severity: number; // 1-5 (Initial)
+  riskScore: number; // Initial Risk Score (Prob * Sev)
   controls: RiskControl[];
+  actualProbability?: number; // 1-5 (Residual)
+  actualSeverity?: number; // 1-5 (Residual)
+  actualRiskScore?: number; // Residual Risk Score
+  additionalControls?: string;
+  priority?: string;
+  actionBy?: string;
+  duration?: string;
 }
 
 export interface RiskAssessment {
