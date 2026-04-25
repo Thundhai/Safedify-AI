@@ -4,7 +4,7 @@ import { getEmergencyContacts, getEmergencyDrills, saveEmergencyDrill, saveEmerg
 import { compressImage } from '../services/offlineService';
 import { EmergencyContact, EmergencyDrill, EmergencyContactType } from '../types';
 import { 
-    Phone, MapPin, Users, History, AlertTriangle, Shield, Navigation, 
+    Phone, MapPin, Users, History, AlertTriangle, Shield, 
     Ambulance, Flame, UserCheck, Loader2, CheckCircle, Clock, X, FileText, Upload, List,
     Globe, Plus, Trash2, Search
 } from 'lucide-react';
@@ -99,7 +99,7 @@ const GLOBAL_EMERGENCY_DATA: Record<string, EmergencyContact[]> = {
 };
 
 export const EmergencyDashboard: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'sos' | 'contacts' | 'muster' | 'drills'>('sos');
+    const [activeTab, setActiveTab] = useState<'sos' | 'contacts' | 'drills'>('sos');
     
     // Contacts State
     const [orgContacts, setOrgContacts] = useState<EmergencyContact[]>([]);
@@ -114,11 +114,6 @@ export const EmergencyDashboard: React.FC = () => {
 
     const [drills, setDrills] = useState<EmergencyDrill[]>([]);
     
-    // Muster State
-    const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
-    const [isLocating, setIsLocating] = useState(false);
-    const [checkedIn, setCheckedIn] = useState(false);
-
     // Drill Modal State
     const [showDrillModal, setShowDrillModal] = useState(false);
     const [newDrill, setNewDrill] = useState<Partial<EmergencyDrill>>({
@@ -183,31 +178,6 @@ export const EmergencyDashboard: React.FC = () => {
             await deleteEmergencyContact(id);
             await refreshContacts();
         }
-    };
-
-    const handleMusterCheckIn = () => {
-        if (!navigator.geolocation) {
-            toast.error("Geolocation is not supported by your browser");
-            return;
-        }
-
-        setIsLocating(true);
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                setUserLocation({
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                });
-                setIsLocating(false);
-                setCheckedIn(true);
-            },
-            (error) => {
-                console.error("Error getting location", error.message);
-                setIsLocating(false);
-                toast.error("Unable to retrieve location. Please check GPS settings.");
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
-        );
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -303,14 +273,6 @@ export const EmergencyDashboard: React.FC = () => {
                     }`}
                 >
                     <Phone size={18} /> SOS & Contacts
-                </button>
-                <button 
-                    onClick={() => setActiveTab('muster')}
-                    className={`flex-1 py-3 px-4 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-all ${
-                        activeTab === 'muster' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'
-                    }`}
-                >
-                    <Navigation size={18} /> Muster Point
                 </button>
                 <button 
                     onClick={() => setActiveTab('drills')}
@@ -457,51 +419,6 @@ export const EmergencyDashboard: React.FC = () => {
                                     </div>
                                 ))
                             )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* MUSTER TAB */}
-            {activeTab === 'muster' && (
-                <div className="space-y-6 animate-in fade-in">
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
-                        <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <Users size={40} />
-                        </div>
-                        <h3 className="text-2xl font-bold text-slate-800 mb-2">Muster Point Check-In</h3>
-                        <p className="text-slate-500 max-w-md mx-auto mb-8">
-                            In case of emergency evacuation, proceed to your designated Muster Point immediately and check in.
-                        </p>
-
-                        {!checkedIn ? (
-                            <button 
-                                onClick={handleMusterCheckIn}
-                                disabled={isLocating}
-                                className="w-full max-w-sm bg-green-600 hover:bg-green-700 text-white py-4 rounded-xl text-lg font-bold shadow-lg shadow-green-200 transition-all flex items-center justify-center gap-3"
-                            >
-                                {isLocating ? <Loader2 className="animate-spin" /> : <UserCheck size={24} />}
-                                {isLocating ? "Locating..." : "I AM SAFE - CHECK IN"}
-                            </button>
-                        ) : (
-                            <div className="bg-green-50 border border-green-200 rounded-xl p-6 max-w-sm mx-auto">
-                                <CheckCircle size={48} className="text-green-600 mx-auto mb-4" />
-                                <h4 className="text-xl font-bold text-green-800">Checked In Successfully</h4>
-                                <p className="text-green-700 mt-2">Time: {new Date().toLocaleTimeString()}</p>
-                                {userLocation && (
-                                    <p className="text-xs text-green-600 mt-1 font-mono">
-                                        Loc: {userLocation.lat.toFixed(6)}, {userLocation.lng.toFixed(6)}
-                                    </p>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                    
-                    <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl flex gap-4 items-start">
-                        <AlertTriangle className="text-yellow-600 shrink-0 mt-1" />
-                        <div>
-                            <h4 className="font-bold text-yellow-800">Primary Muster Point</h4>
-                            <p className="text-yellow-700 text-sm">Contact your site HSE manager for your designated muster point location.</p>
                         </div>
                     </div>
                 </div>
