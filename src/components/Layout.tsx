@@ -23,7 +23,6 @@ import {
   RefreshCw,
   Cloud,
   CloudOff,
-  Map,
   Trophy,
   ChevronDown,
   ChevronRight,
@@ -236,7 +235,6 @@ export const Layout: React.FC = () => {
         { to: '/risk-assessments', icon: ShieldAlert, label: t('nav.riskAssessment') },
         { to: '/permits', icon: FileSignature, label: t('nav.permitToWork') },
         { to: '/inspections', icon: ClipboardCheck, label: t('nav.inspections') },
-        { to: '/geo-fencing', icon: Map, label: t('nav.geoFencing') },
       ]
     },
     {

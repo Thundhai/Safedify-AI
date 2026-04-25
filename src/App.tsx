@@ -47,7 +47,6 @@ const IncidentList = React.lazy(() => lazyRetry(() => import('./components/Incid
 const InspectionForm = React.lazy(() => lazyRetry(() => import('./components/InspectionForm').then(m => ({ default: m.InspectionForm }))));
 const AITools = React.lazy(() => lazyRetry(() => import('./components/AITools').then(m => ({ default: m.AITools }))));
 const SmartCamera = React.lazy(() => lazyRetry(() => import('./components/SmartCamera').then(m => ({ default: m.SmartCamera }))));
-const GeoFencing = React.lazy(() => lazyRetry(() => import('./components/GeoFencing').then(m => ({ default: m.GeoFencing }))));
 const Gamification = React.lazy(() => lazyRetry(() => import('./components/Gamification').then(m => ({ default: m.Gamification }))));
 const RiskAssessmentList = React.lazy(() => lazyRetry(() => import('./components/RiskAssessmentList').then(m => ({ default: m.RiskAssessmentList }))));
 const RiskAssessmentForm = React.lazy(() => lazyRetry(() => import('./components/RiskAssessmentForm').then(m => ({ default: m.RiskAssessmentForm }))));
@@ -198,7 +197,6 @@ function App() {
               <Route path="analytics" element={<AnalyticsDashboard />} />
               <Route path="intelligence" element={<PredictiveIntelligence />} />
               <Route path="smart-camera" element={<SmartCamera />} />
-              <Route path="geo-fencing" element={<GeoFencing />} />
               <Route path="gamification" element={<Gamification />} />
               <Route path="incidents" element={<IncidentList />} />
               <Route path="incidents/new" element={<IncidentReport />} />
