@@ -23,7 +23,6 @@ import {
   RefreshCw,
   Cloud,
   CloudOff,
-  Trophy,
   ChevronDown,
   ChevronRight,
   Moon,
@@ -243,10 +242,8 @@ export const Layout: React.FC = () => {
       items: [
         { to: '/workers', icon: Users, label: t('nav.workers') },
         { to: '/training', icon: GraduationCap, label: t('nav.training') },
-        { to: '/ppe', icon: HardHat, label: t('nav.ppe') },
         { to: '/assets', icon: Wrench, label: t('nav.assets') },
         { to: '/contractors', icon: Briefcase, label: t('nav.contractors') },
-        { to: '/regulatory-news', icon: Globe, label: t('nav.regulatoryNews') },
       ]
     },
     {
@@ -255,7 +252,6 @@ export const Layout: React.FC = () => {
       items: [
         { to: '/actions', icon: CheckSquare, label: t('nav.actionItems') },
         { to: '/documents', icon: FileText, label: t('nav.documents') },
-        { to: '/gamification', icon: Trophy, label: t('nav.safetyChampions') },
         { to: '/sites', icon: Building2, label: t('nav.sitesTeams') },
       ]
     }

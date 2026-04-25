@@ -47,7 +47,6 @@ const IncidentList = React.lazy(() => lazyRetry(() => import('./components/Incid
 const InspectionForm = React.lazy(() => lazyRetry(() => import('./components/InspectionForm').then(m => ({ default: m.InspectionForm }))));
 const AITools = React.lazy(() => lazyRetry(() => import('./components/AITools').then(m => ({ default: m.AITools }))));
 const SmartCamera = React.lazy(() => lazyRetry(() => import('./components/SmartCamera').then(m => ({ default: m.SmartCamera }))));
-const Gamification = React.lazy(() => lazyRetry(() => import('./components/Gamification').then(m => ({ default: m.Gamification }))));
 const RiskAssessmentList = React.lazy(() => lazyRetry(() => import('./components/RiskAssessmentList').then(m => ({ default: m.RiskAssessmentList }))));
 const RiskAssessmentForm = React.lazy(() => lazyRetry(() => import('./components/RiskAssessmentForm').then(m => ({ default: m.RiskAssessmentForm }))));
 const ObservationList = React.lazy(() => lazyRetry(() => import('./components/ObservationList').then(m => ({ default: m.ObservationList }))));
@@ -56,7 +55,6 @@ const TrainingDashboard = React.lazy(() => lazyRetry(() => import('./components/
 const WorkerDetail = React.lazy(() => lazyRetry(() => import('./components/WorkerDetail').then(m => ({ default: m.WorkerDetail }))));
 const WorkersList = React.lazy(() => lazyRetry(() => import('./components/WorkersList').then(m => ({ default: m.WorkersList }))));
 const WorkerForm = React.lazy(() => lazyRetry(() => import('./components/WorkerForm').then(m => ({ default: m.WorkerForm }))));
-const PPEDashboard = React.lazy(() => lazyRetry(() => import('./components/PPEDashboard').then(m => ({ default: m.PPEDashboard }))));
 const PermitList = React.lazy(() => lazyRetry(() => import('./components/PermitList').then(m => ({ default: m.PermitList }))));
 const PermitForm = React.lazy(() => lazyRetry(() => import('./components/PermitForm').then(m => ({ default: m.PermitForm }))));
 const AssetList = React.lazy(() => lazyRetry(() => import('./components/AssetList').then(m => ({ default: m.AssetList }))));
@@ -66,7 +64,6 @@ const ContractorDetail = React.lazy(() => lazyRetry(() => import('./components/C
 const DocumentList = React.lazy(() => lazyRetry(() => import('./components/DocumentList').then(m => ({ default: m.DocumentList }))));
 const DocumentForm = React.lazy(() => lazyRetry(() => import('./components/DocumentForm').then(m => ({ default: m.DocumentForm }))));
 const EmergencyDashboard = React.lazy(() => lazyRetry(() => import('./components/EmergencyDashboard').then(m => ({ default: m.EmergencyDashboard }))));
-const RegulatoryNews = React.lazy(() => lazyRetry(() => import('./components/RegulatoryNews').then(m => ({ default: m.RegulatoryNews }))));
 const PricingPlans = React.lazy(() => lazyRetry(() => import('./components/PricingPlans').then(m => ({ default: m.PricingPlans }))));
 const RoleManagement = React.lazy(() => lazyRetry(() => import('./components/RoleManagement').then(m => ({ default: m.RoleManagement }))));
 const ProfileSettings = React.lazy(() => lazyRetry(() => import('./components/ProfileSettings').then(m => ({ default: m.ProfileSettings }))));
@@ -197,7 +194,6 @@ function App() {
               <Route path="analytics" element={<AnalyticsDashboard />} />
               <Route path="intelligence" element={<PredictiveIntelligence />} />
               <Route path="smart-camera" element={<SmartCamera />} />
-              <Route path="gamification" element={<Gamification />} />
               <Route path="incidents" element={<IncidentList />} />
               <Route path="incidents/new" element={<IncidentReport />} />
               <Route path="incidents/:id" element={<IncidentDetail />} />
@@ -217,7 +213,6 @@ function App() {
               <Route path="workers/:id/edit" element={<WorkerForm />} />
               <Route path="training" element={<TrainingDashboard />} />
               <Route path="training/worker/:id" element={<WorkerDetail />} />
-              <Route path="ppe" element={<PPEDashboard />} />
               <Route path="assets" element={<AssetList />} />
               <Route path="assets/:id" element={<AssetDetail />} />
               <Route path="actions" element={<ActionList />} />
@@ -227,7 +222,6 @@ function App() {
               <Route path="pricing" element={<PricingPlans />} />
               <Route path="roles" element={<RoleManagement />} />
               <Route path="profile" element={<ProfileSettings />} />
-              <Route path="regulatory-news" element={<RegulatoryNews />} />
               <Route path="sites" element={<SiteManagement />} />
             </Route>
             
