@@ -938,11 +938,16 @@ router.get('/risk-assessments/:id', async (req: AuthRequest, res: Response) => {
 router.post('/risk-assessments', requirePermission('create_incident'), async (req: AuthRequest, res: Response) => {
   const { title, task_description, taskDescription, type, date, author, hazards, status, location } = req.body;
   const id = uuid();
-  await pool.query(
-    'INSERT INTO risk_assessments (id, title, task_description, type, date, author, hazards, status, location, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
-    [id, title, task_description || taskDescription, type || 'JHA', date || new Date().toISOString(), author || req.user?.name, JSON.stringify(hazards || []), status || 'Draft', location || null, req.user?.org_id]
-  );
-  res.status(201).json({ id });
+  try {
+    await pool.query(
+      'INSERT INTO risk_assessments (id, title, task_description, type, date, author, hazards, status, location, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+      [id, title, task_description || taskDescription, type || 'JHA', date || new Date().toISOString(), author || req.user?.name, JSON.stringify(hazards || []), status || 'Draft', location || null, req.user?.org_id]
+    );
+    res.status(201).json({ id });
+  } catch (err: any) {
+    console.error('[POST /risk-assessments] DB error:', err.message);
+    res.status(500).json({ error: 'Failed to save risk assessment. Please try again.' });
+  }
 });
 
 router.put('/risk-assessments/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {

@@ -215,6 +215,8 @@ export async function initializeDatabase(): Promise<void> {
     -- From 006_incident_number: incident numbering + AI recommendations
     ALTER TABLE incidents ADD COLUMN IF NOT EXISTS incident_number TEXT;
     ALTER TABLE incidents ADD COLUMN IF NOT EXISTS ai_recommendations TEXT;
+    -- From 008_risk_assessment_location: project/location/site field
+    ALTER TABLE risk_assessments ADD COLUMN IF NOT EXISTS location TEXT;
   `;
 
   try {
