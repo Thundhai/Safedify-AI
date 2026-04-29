@@ -201,32 +201,45 @@ export async function initializeDatabase(): Promise<void> {
   }
 
   // Ensure columns added in migrations exist on tables created before those migrations.
-  // ALTER TABLE ... ADD COLUMN IF NOT EXISTS is idempotent — safe to run every time.
-  const columnPatches = `
-    -- From 002_auth_security: email verification + account lockout + password policy
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE;
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_token TEXT;
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_expires TIMESTAMP;
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0;
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP;
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS last_failed_login TIMESTAMP;
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-    ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT FALSE;
-    -- From 006_incident_number: incident numbering + AI recommendations
-    ALTER TABLE incidents ADD COLUMN IF NOT EXISTS incident_number TEXT;
-    ALTER TABLE incidents ADD COLUMN IF NOT EXISTS ai_recommendations TEXT;
-    -- From 008_risk_assessment_location: project/location/site field
-    ALTER TABLE risk_assessments ADD COLUMN IF NOT EXISTS location TEXT;
-    -- Fix author column type: was incorrectly defined as UUID, must be TEXT (stores user name)
-    ALTER TABLE risk_assessments ALTER COLUMN author TYPE TEXT USING COALESCE(author::TEXT, '');
-  `;
+  // Each patch runs independently so a single failure never blocks the others.
+  const columnPatches: Array<{ sql: string; label: string }> = [
+    { label: 'users.email_verified',              sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE` },
+    { label: 'users.email_verification_token',    sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_token TEXT` },
+    { label: 'users.email_verification_expires',  sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_expires TIMESTAMP` },
+    { label: 'users.failed_login_attempts',       sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_login_attempts INTEGER DEFAULT 0` },
+    { label: 'users.locked_until',               sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_until TIMESTAMP` },
+    { label: 'users.last_failed_login',           sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_failed_login TIMESTAMP` },
+    { label: 'users.password_changed_at',         sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP` },
+    { label: 'users.must_change_password',        sql: `ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT FALSE` },
+    { label: 'incidents.incident_number',         sql: `ALTER TABLE incidents ADD COLUMN IF NOT EXISTS incident_number TEXT` },
+    { label: 'incidents.ai_recommendations',      sql: `ALTER TABLE incidents ADD COLUMN IF NOT EXISTS ai_recommendations TEXT` },
+    { label: 'risk_assessments.location',         sql: `ALTER TABLE risk_assessments ADD COLUMN IF NOT EXISTS location TEXT` },
+  ];
 
-  try {
-    await pool.query(columnPatches);
-    console.log('[Database] Column patches applied successfully');
-  } catch (err: any) {
-    console.error('[Database] Column patch warning (non-fatal):', err.message);
+  for (const patch of columnPatches) {
+    try {
+      await pool.query(patch.sql);
+    } catch (err: any) {
+      console.error(`[Database] Column patch warning (${patch.label}):`, err.message);
+    }
   }
+
+  // Fix risk_assessments.author: production DB may have it as UUID type but we store user names (TEXT).
+  // This is a multi-step operation: check the current type, then alter only if needed.
+  try {
+    const typeCheck = await pool.query(
+      `SELECT data_type FROM information_schema.columns WHERE table_name='risk_assessments' AND column_name='author'`
+    );
+    if (typeCheck.rows[0]?.data_type === 'uuid') {
+      // Drop the UUID constraint and re-create as TEXT
+      await pool.query(`ALTER TABLE risk_assessments ALTER COLUMN author TYPE TEXT USING NULL`);
+      console.log('[Database] Converted risk_assessments.author from UUID to TEXT');
+    }
+  } catch (err: any) {
+    console.error('[Database] risk_assessments.author type fix warning:', err.message);
+  }
+
+  console.log('[Database] Column patches applied');
 
   // Seed default roles if the roles table is empty.
   // requirePermission() reads from this table — without it every non-Admin gets 403.

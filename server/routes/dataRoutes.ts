@@ -919,29 +919,35 @@ router.get('/risk-assessments', async (req: AuthRequest, res: Response) => {
   const orgId = req.user?.org_id;
   const countResult = await pool.query('SELECT COUNT(*) as total FROM risk_assessments WHERE org_id = $1', [orgId]);
   const total = countResult.rows[0]?.total || 0;
-  const rowsResult = await pool.query('SELECT * FROM risk_assessments WHERE org_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3', [orgId, limit, offset]);
+  const rowsResult = await pool.query(
+    `SELECT ra.*, u.name as author_name FROM risk_assessments ra LEFT JOIN users u ON ra.author = u.id WHERE ra.org_id = $1 ORDER BY ra.created_at DESC LIMIT $2 OFFSET $3`,
+    [orgId, limit, offset]
+  );
   const rows = rowsResult.rows;
   res.set('X-Total-Count', String(total));
   res.set('X-Page', String(page));
   res.set('X-Per-Page', String(limit));
   res.set('X-Total-Pages', String(Math.ceil(total / limit)));
-  res.json(rows.map((r: any) => ({ ...r, hazards: JSON.parse(r.hazards || '[]') })));
+  res.json(rows.map((r: any) => ({ ...r, author: r.author_name || r.author, hazards: JSON.parse(r.hazards || '[]') })));
 });
 
 router.get('/risk-assessments/:id', async (req: AuthRequest, res: Response) => {
-  const result = await pool.query('SELECT * FROM risk_assessments WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
+  const result = await pool.query(
+    `SELECT ra.*, u.name as author_name FROM risk_assessments ra LEFT JOIN users u ON ra.author = u.id WHERE ra.id = $1 AND ra.org_id = $2`,
+    [req.params.id, req.user?.org_id]
+  );
   const row = result.rows[0];
   if (!row) { res.status(404).json({ error: 'Not found' }); return; }
-  res.json({ ...row, hazards: JSON.parse(row.hazards || '[]') });
+  res.json({ ...row, author: row.author_name || row.author, hazards: JSON.parse(row.hazards || '[]') });
 });
 
 router.post('/risk-assessments', requirePermission('create_incident'), async (req: AuthRequest, res: Response) => {
-  const { title, task_description, taskDescription, type, date, author, hazards, status, location } = req.body;
+  const { title, task_description, taskDescription, type, date, hazards, status, location } = req.body;
   const id = uuid();
   try {
     await pool.query(
       'INSERT INTO risk_assessments (id, title, task_description, type, date, author, hazards, status, location, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
-      [id, title, task_description || taskDescription, type || 'JHA', date || new Date().toISOString(), author || req.user?.name, JSON.stringify(hazards || []), status || 'Draft', location || null, req.user?.org_id]
+      [id, title, task_description || taskDescription, type || 'JHA', date || new Date().toISOString(), req.user?.id ?? null, JSON.stringify(hazards || []), status || 'Draft', location || null, req.user?.org_id]
     );
     res.status(201).json({ id });
   } catch (err: any) {
