@@ -297,7 +297,7 @@ CREATE TABLE IF NOT EXISTS risk_assessments (
     task_description TEXT,
     type TEXT NOT NULL DEFAULT 'JHA',
     date TIMESTAMP NOT NULL,
-    author UUID,
+    author TEXT,
     hazards TEXT DEFAULT '[]',
     status TEXT NOT NULL DEFAULT 'Draft',
     location TEXT,

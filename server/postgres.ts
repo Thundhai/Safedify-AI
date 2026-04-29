@@ -217,6 +217,8 @@ export async function initializeDatabase(): Promise<void> {
     ALTER TABLE incidents ADD COLUMN IF NOT EXISTS ai_recommendations TEXT;
     -- From 008_risk_assessment_location: project/location/site field
     ALTER TABLE risk_assessments ADD COLUMN IF NOT EXISTS location TEXT;
+    -- Fix author column type: was incorrectly defined as UUID, must be TEXT (stores user name)
+    ALTER TABLE risk_assessments ALTER COLUMN author TYPE TEXT USING COALESCE(author::TEXT, '');
   `;
 
   try {
