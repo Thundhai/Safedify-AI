@@ -5,10 +5,12 @@ import {
   ArrowLeft, Save, Sparkles, Loader2, AlertCircle, CheckCircle, Clock, ShieldAlert, CheckSquare, X, QrCode
 } from 'lucide-react';
 import { getPermitById, savePermit, getRiskAssessments } from '../services/storageService';
-import { auditPermitAI } from '../services/geminiService';
+import { auditPermitAI, complianceGapAnalysisAI } from '../services/geminiService';
 import { SmartTextInput, SmartTextArea } from './SmartTextInput';
-import { Permit, PermitType, PermitStatus, RiskAssessment } from '../types';
+import { Permit, PermitType, PermitStatus, RiskAssessment, ComplianceGap } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { apiCreateAction } from '../services/apiService';
+import { CompliancePanel } from './CompliancePanel';
 import toast from 'react-hot-toast';
 
 export const PermitForm: React.FC = () => {
@@ -44,6 +46,8 @@ export const PermitForm: React.FC = () => {
 
   const [riskAssessments, setRiskAssessments] = useState<RiskAssessment[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
+  const [complianceGaps, setComplianceGaps] = useState<ComplianceGap[]>([]);
+  const [complianceLoading, setComplianceLoading] = useState(false);
   
   useEffect(() => {
     const load = async () => {
@@ -108,6 +112,91 @@ export const PermitForm: React.FC = () => {
       }));
   };
 
+  // ---------- Compliance Scan ----------
+
+  const handleRunComplianceScan = async () => {
+    if (!formData.description) {
+      toast.error("Add a work description first.");
+      return;
+    }
+    setComplianceLoading(true);
+    try {
+      const ra = riskAssessments.find(r => r.id === formData.riskAssessmentId);
+      const hazards = ra ? ra.hazards : [];
+      const controlsText = formData.controls.map(c => `${c.checked ? '[✓]' : '[ ]'} ${c.label}`);
+      const rawGaps = await complianceGapAnalysisAI(formData.type, formData.description, controlsText, hazards);
+      setComplianceGaps(rawGaps.map(g => ({ ...g, applied: false })));
+      if (rawGaps.length === 0) {
+        toast.success("No compliance gaps detected — permit looks good!");
+      } else {
+        const fixable = rawGaps.filter(g => g.resolution === 'ai_fixable').length;
+        const physical = rawGaps.filter(g => g.resolution === 'action_required').length;
+        toast(`Found ${fixable} AI-fixable gap${fixable !== 1 ? 's' : ''} and ${physical} physical action${physical !== 1 ? 's' : ''} required.`, { icon: '🔍' });
+      }
+    } catch (e) {
+      console.error("Compliance scan error:", e);
+      toast.error("Compliance scan failed. You can still proceed manually.");
+    } finally {
+      setComplianceLoading(false);
+    }
+  };
+
+  const handleApplyFix = (gapId: string) => {
+    const gap = complianceGaps.find(g => g.id === gapId);
+    if (!gap || !gap.aiSuggestion) return;
+    const newControl = {
+      id: `compliance-${gapId}`,
+      label: `[AI Fix] ${gap.aiSuggestion}`,
+      checked: true,
+    };
+    setFormData(prev => ({
+      ...prev,
+      controls: prev.controls.some(c => c.id === newControl.id)
+        ? prev.controls
+        : [...prev.controls, newControl],
+    }));
+    setComplianceGaps(prev => prev.map(g => g.id === gapId ? { ...g, applied: true } : g));
+    toast.success("Control added to checklist.");
+  };
+
+  const handleApplyAll = () => {
+    const fixable = complianceGaps.filter(g => g.resolution === 'ai_fixable' && !g.applied && g.aiSuggestion);
+    const newControls = fixable.map(gap => ({
+      id: `compliance-${gap.id}`,
+      label: `[AI Fix] ${gap.aiSuggestion!}`,
+      checked: true,
+    }));
+    setFormData(prev => {
+      const existingIds = new Set(prev.controls.map(c => c.id));
+      const toAdd = newControls.filter(c => !existingIds.has(c.id));
+      return { ...prev, controls: [...prev.controls, ...toAdd] };
+    });
+    setComplianceGaps(prev => prev.map(g =>
+      g.resolution === 'ai_fixable' && !g.applied ? { ...g, applied: true } : g
+    ));
+    toast.success(`${fixable.length} AI fixes applied to checklist.`);
+  };
+
+  const handleCreateActionItem = async (gap: ComplianceGap) => {
+    try {
+      const result = await apiCreateAction({
+        title: gap.actionItemTitle || gap.description,
+        description: `Compliance gap identified during permit audit (${formData.type}): ${gap.description}`,
+        priority: 'High',
+        status: 'Open',
+        action_type: 'Corrective',
+        category: 'Permit Compliance',
+      });
+      setComplianceGaps(prev => prev.map(g =>
+        g.id === gap.id ? { ...g, applied: true, actionItemId: result?.id } : g
+      ));
+      toast.success("Action Item created — permit will remain blocked until this is resolved.");
+    } catch (e: any) {
+      console.error("Create action item failed:", e);
+      toast.error(e?.message || "Failed to create Action Item.");
+    }
+  };
+
   const performAudit = async (): Promise<boolean> => {
     if (!formData.description) {
         toast.error("Please enter a work description.");
@@ -161,6 +250,12 @@ export const PermitForm: React.FC = () => {
 
       // If submitting for approval, run mandatory audit
       if (status === PermitStatus.PENDING) {
+          // Block if any action_required compliance gaps haven't been addressed
+          const unresolvedPhysical = complianceGaps.filter(g => g.resolution === 'action_required' && !g.applied);
+          if (unresolvedPhysical.length > 0) {
+            toast.error(`${unresolvedPhysical.length} physical action${unresolvedPhysical.length !== 1 ? 's' : ''} must be resolved before submitting. Create Action Items for each.`);
+            return;
+          }
           const passed = await performAudit();
           if (!passed) {
               toast.error("Compliance Check Failed. Please address the critical control gaps highlighted below before submitting.");
@@ -339,18 +434,20 @@ export const PermitForm: React.FC = () => {
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
                   <div className="flex justify-between items-center border-b border-slate-100 pb-2">
                     <h3 className="font-bold text-slate-800">Safety Controls & Checks</h3>
-                    <button 
-                        onClick={handleRequestAudit}
-                        disabled={loadingAudit}
-                        className="text-xs flex items-center gap-1 text-purple-600 hover:text-purple-700 font-medium bg-purple-50 px-3 py-1.5 rounded-lg transition-colors border border-purple-100"
-                    >
-                        {loadingAudit ? <Loader2 size={14} className="animate-spin"/> : <Sparkles size={14}/>}
-                        Manual AI Check
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                          onClick={handleRequestAudit}
+                          disabled={loadingAudit}
+                          className="text-xs flex items-center gap-1 text-slate-500 hover:text-slate-700 font-medium bg-slate-100 px-3 py-1.5 rounded-lg transition-colors border border-slate-200"
+                      >
+                          {loadingAudit ? <Loader2 size={14} className="animate-spin"/> : <ShieldAlert size={14}/>}
+                          Quick Check
+                      </button>
+                    </div>
                   </div>
 
-                  {/* AI Audit Feedback */}
-                  {formData.aiAuditIssues && formData.aiAuditIssues.length > 0 && (
+                  {/* AI Audit Feedback (legacy simple view) */}
+                  {formData.aiAuditIssues && formData.aiAuditIssues.length > 0 && complianceGaps.length === 0 && (
                       <div className="bg-red-50 border border-red-200 rounded-lg p-4 animate-in fade-in">
                           <h4 className="text-sm font-bold text-red-800 flex items-center gap-2 mb-2">
                               <ShieldAlert size={16} /> AI Detected Gaps (Must Resolve)
@@ -383,6 +480,17 @@ export const PermitForm: React.FC = () => {
                       ))}
                   </div>
               </div>
+
+              {/* Compliance Panel */}
+              <CompliancePanel
+                gaps={complianceGaps}
+                loading={complianceLoading}
+                onRunScan={handleRunComplianceScan}
+                onApplyFix={handleApplyFix}
+                onApplyAll={handleApplyAll}
+                onCreateActionItem={handleCreateActionItem}
+                disabled={isReadOnly && formData.status !== PermitStatus.DRAFT}
+              />
           </div>
 
           {/* Sidebar Info */}

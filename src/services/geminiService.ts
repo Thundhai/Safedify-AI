@@ -1087,6 +1087,69 @@ Review for completeness, adequacy of controls, and compliance with safety standa
 };
 
 /**
+ * 20b. Compliance Gap Analysis — categorises audit gaps into AI-fixable vs action-required.
+ * Returns a structured list of ComplianceGap objects.
+ */
+export const complianceGapAnalysisAI = async (
+  permitType: string,
+  description: string,
+  controlsText: string[],
+  hazards: { description: string; controls: { description: string }[] }[]
+): Promise<{ id: string; description: string; resolution: 'ai_fixable' | 'action_required'; aiSuggestion?: string; actionItemTitle?: string }[]> => {
+  const hazardSummary = hazards.map(h =>
+    `Hazard: "${h.description}" — Current controls: ${h.controls.map(c => c.description).join(', ') || 'None'}`
+  ).join('\n');
+
+  const prompt = `You are an HSE compliance expert reviewing a Permit to Work.
+
+Permit Type: ${permitType}
+Work Description: "${description}"
+Current Permit Controls (checked/unchecked): ${controlsText.join('; ') || 'None'}
+Linked Risk Assessment Hazards:
+${hazardSummary || 'No risk assessment linked'}
+
+Identify SPECIFIC compliance gaps. For each gap, decide:
+- "ai_fixable": The gap is a missing control measure or documentation item that can be resolved by adding specific text to the permit checklist. Provide the exact wording for the aiSuggestion field.
+- "action_required": The gap requires physical action in the real world (equipment must be placed, person must be assigned, physical inspection must occur). Provide a clear actionItemTitle.
+
+Return between 0 and 8 gaps. Only return real, significant gaps — not minor nitpicks. If the permit looks compliant, return an empty array.`;
+
+  try {
+    const response = await aiGenerate({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        ...NO_THINK,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              id: { type: Type.STRING },
+              description: { type: Type.STRING },
+              resolution: { type: Type.STRING, enum: ['ai_fixable', 'action_required'] },
+              aiSuggestion: { type: Type.STRING },
+              actionItemTitle: { type: Type.STRING },
+            },
+            required: ['id', 'description', 'resolution'],
+          }
+        }
+      }
+    });
+    const parsed = safeParseJSON(response.text, []);
+    // Ensure every gap has a unique id
+    return (Array.isArray(parsed) ? parsed : []).map((g: any, i: number) => ({
+      ...g,
+      id: g.id || `gap-${i}-${Date.now()}`,
+    }));
+  } catch (error) {
+    console.error("Compliance Gap Analysis Error:", error);
+    return []; // fail open — don't block the permit form
+  }
+};
+
+/**
  * 21. Certificate Data Extraction for Assets
  */
 export const extractCertificateDataAI = async (base64Image: string) => {

@@ -594,6 +594,20 @@ export interface Permit {
   aiAuditIssues?: string[]; // AI detected issues
 }
 
+// --- Compliance Gap (Permit Compliance Scan) ---
+
+export interface ComplianceGap {
+  id: string;
+  description: string;                       // What is missing / wrong
+  resolution: 'ai_fixable' | 'action_required';
+  // ai_fixable: AI can generate a control text to add to the permit checklist
+  aiSuggestion?: string;                     // Proposed control measure text
+  // action_required: Must be physically resolved; an Action Item is created
+  actionItemTitle?: string;                  // Suggested Action Item title
+  applied?: boolean;                         // True once fix applied / action created
+  actionItemId?: string;                     // ID of created Action Item (if any)
+}
+
 // --- Asset & Equipment Types ---
 
 export type AssetCategory = 'Lifting Equipment' | 'Vehicle' | 'Machine' | 'Fire/Emergency' | 'Tools';
