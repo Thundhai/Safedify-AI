@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { authenticate, requireRole, type AuthRequest } from '../auth.js';
+import pool from '../postgres';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -37,6 +38,23 @@ router.post('/backup', (_req: AuthRequest, res: Response) => {
   const filepath = path.join(BACKUPS_DIR, filename);
   fs.writeFileSync(filepath, JSON.stringify({ created: new Date().toISOString(), type: 'manual' }));
   res.json({ filename, message: 'Backup created' });
+});
+
+// GET /api/admin/errors — Last 100 api_error events from security_logs (Admin only)
+router.get('/errors', async (_req: AuthRequest, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, event_type, severity, user_id, email, ip_address, endpoint, method,
+              status_code, details, metadata, created_at
+       FROM security_logs
+       WHERE event_type = 'api_error'
+       ORDER BY created_at DESC
+       LIMIT 100`
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 export default router;

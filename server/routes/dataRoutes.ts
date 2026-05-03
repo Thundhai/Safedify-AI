@@ -8,6 +8,7 @@ import {
   validate, validateParams, validateQuery,
   ValidationSchema, sanitizeString 
 } from '../middleware/inputValidation.js';
+import { logSecurityEvent, getClientIp } from '../middleware/securityLogger.js';
 
 const router = Router();
 
@@ -958,6 +959,15 @@ router.post('/risk-assessments', requirePermission('create_incident'), async (re
     res.status(201).json({ id });
   } catch (err: any) {
     console.error('[POST /risk-assessments] DB error:', err.message);
+    logSecurityEvent({
+      type: 'api_error', severity: 'warning',
+      userId: req.user?.id, ip: getClientIp(req),
+      userAgent: req.headers['user-agent'] || '',
+      endpoint: '/api/risk-assessments', method: 'POST',
+      statusCode: 500,
+      details: `risk-assessment POST failed: ${err.message}`,
+      metadata: { code: err.code, table: err.table, constraint: err.constraint },
+    }).catch(() => {});
     res.status(500).json({ error: err.message });
   }
 });
@@ -983,6 +993,15 @@ router.put('/risk-assessments/:id', requirePermission('manage_incidents'), async
     res.json({ message: 'Updated' });
   } catch (err: any) {
     console.error('[PUT /risk-assessments] DB error:', err.message);
+    logSecurityEvent({
+      type: 'api_error', severity: 'warning',
+      userId: req.user?.id, ip: getClientIp(req),
+      userAgent: req.headers['user-agent'] || '',
+      endpoint: `/api/risk-assessments/${req.params.id}`, method: 'PUT',
+      statusCode: 500,
+      details: `risk-assessment PUT failed: ${err.message}`,
+      metadata: { code: err.code, table: err.table, constraint: err.constraint },
+    }).catch(() => {});
     res.status(500).json({ error: err.message });
   }
 });
