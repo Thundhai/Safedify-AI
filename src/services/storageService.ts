@@ -767,13 +767,9 @@ export const getPermitById = async (id: string): Promise<Permit | undefined> => 
 };
 
 export const savePermit = async (permit: Permit): Promise<void> => {
-  try {
-    await apiUpdatePermit(permit.id, {
-      status: permit.status,
-      approver: permit.approver,
-      approver_comments: permit.approverComments,
-    });
-  } catch {
+  // New permits have a temp 'ptw-' id — go straight to CREATE
+  const isNew = !permit.id || permit.id.startsWith('ptw-');
+  if (isNew) {
     await apiCreatePermit({
       type: permit.type,
       location: permit.location,
@@ -783,6 +779,12 @@ export const savePermit = async (permit: Permit): Promise<void> => {
       requestor: permit.requestor,
       status: permit.status,
       controls: permit.controls,
+    });
+  } else {
+    await apiUpdatePermit(permit.id, {
+      status: permit.status,
+      approver: permit.approver,
+      approver_comments: permit.approverComments,
     });
   }
 };

@@ -100,7 +100,7 @@ const permitSchema: ValidationSchema = {
   valid_from: { type: 'date', required: false },
   valid_until: { type: 'date', required: false },
   requestor: { type: 'string', required: false, maxLength: 200, trim: true },
-  status: { type: 'string', required: false, maxLength: 50, enum: ['Draft', 'Pending', 'Active', 'Expired', 'Rejected', 'Cancelled'] },
+  status: { type: 'string', required: false, maxLength: 50, enum: ['Draft', 'Pending', 'Pending Approval', 'Active', 'Expired', 'Rejected', 'Cancelled', 'Closed'] },
   approver: { type: 'string', required: false, maxLength: 200, trim: true },
   approver_comments: { type: 'string', required: false, maxLength: 2000, trim: true },
   controls: { type: 'array', required: false, maxLength: 100 },

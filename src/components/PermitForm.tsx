@@ -239,8 +239,9 @@ export const PermitForm: React.FC = () => {
   };
 
   const handleSave = async (status: PermitStatus) => {
-      if (!formData.description) {
-          toast.error("Please enter a work description.");
+      // Only block on missing description when submitting — drafts can be saved at any time
+      if (status === PermitStatus.PENDING && !formData.description) {
+          toast.error("Please enter a work description before submitting for approval.");
           return;
       }
 
