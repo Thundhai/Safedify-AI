@@ -267,7 +267,9 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 });
 
 // ---------- Seed on load (for serverless cold starts) ----------
-initializeDatabase().catch(err => console.error('[Database] Init failed:', err.message));
+// MUST be awaited — ensures all column patches run before any request is handled.
+// top-level await works because this file is compiled as ESM.
+await initializeDatabase();
 seedDefaultUsers();
 
 // ---------- Export for Vercel serverless ----------
