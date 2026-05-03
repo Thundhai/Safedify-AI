@@ -178,23 +178,19 @@ export const PermitForm: React.FC = () => {
   };
 
   const handleCreateActionItem = async (gap: ComplianceGap) => {
-    try {
-      const result = await apiCreateAction({
-        title: gap.actionItemTitle || gap.description,
-        description: `Compliance gap identified during permit audit (${formData.type}): ${gap.description}`,
-        priority: 'High',
-        status: 'Open',
-        action_type: 'Corrective',
-        category: 'Permit Compliance',
-      });
-      setComplianceGaps(prev => prev.map(g =>
-        g.id === gap.id ? { ...g, applied: true, actionItemId: result?.id } : g
-      ));
-      toast.success("Action Item created — permit will remain blocked until this is resolved.");
-    } catch (e: any) {
-      console.error("Create action item failed:", e);
-      toast.error(e?.message || "Failed to create Action Item.");
-    }
+    const result = await apiCreateAction({
+      title: gap.actionItemTitle || gap.description,
+      description: `Compliance gap identified during permit audit (${formData.type}): ${gap.description}`,
+      priority: 'High',
+      status: 'Open',
+      action_type: 'Corrective',
+      category: 'Permit Compliance',
+    });
+    // Only runs on success (throws on failure — caught by CompliancePanel)
+    setComplianceGaps(prev => prev.map(g =>
+      g.id === gap.id ? { ...g, applied: true, actionItemId: result?.id } : g
+    ));
+    toast.success('Action Item created — permit will remain blocked until this is resolved.');
   };
 
   const performAudit = async (): Promise<boolean> => {

@@ -36,6 +36,7 @@ export const CompliancePanel: React.FC<CompliancePanelProps> = ({
 }) => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [creatingAction, setCreatingAction] = useState<Record<string, boolean>>({});
+  const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
   const [showApplyAllConfirm, setShowApplyAllConfirm] = useState(false);
 
   const fixableGaps = gaps.filter(g => g.resolution === 'ai_fixable' && !g.applied);
@@ -47,8 +48,12 @@ export const CompliancePanel: React.FC<CompliancePanelProps> = ({
 
   const handleCreateAction = async (gap: ComplianceGap) => {
     setCreatingAction(prev => ({ ...prev, [gap.id]: true }));
+    setActionErrors(prev => ({ ...prev, [gap.id]: '' }));
     try {
       await onCreateActionItem(gap);
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to create Action Item. Please try again.';
+      setActionErrors(prev => ({ ...prev, [gap.id]: msg }));
     } finally {
       setCreatingAction(prev => ({ ...prev, [gap.id]: false }));
     }
@@ -218,6 +223,11 @@ export const CompliancePanel: React.FC<CompliancePanelProps> = ({
                         {!gap.applied && (
                           <p className="text-xs text-slate-500 mt-1">
                             This permit will remain blocked until this action is completed.
+                          </p>
+                        )}
+                        {actionErrors[gap.id] && (
+                          <p className="text-xs text-red-600 font-medium mt-2 bg-red-50 border border-red-200 rounded px-2 py-1">
+                            ✗ {actionErrors[gap.id]}
                           </p>
                         )}
                       </div>

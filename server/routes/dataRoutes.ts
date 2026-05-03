@@ -477,10 +477,16 @@ router.get('/actions', validateQuery(paginationQuerySchema), async (req: AuthReq
 router.post('/actions', validate(actionSchema), requirePermission('create_incident'), async (req: AuthRequest, res: Response) => {
   const { title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, effectiveness } = req.body;
   const id = uuid();
-  await pool.query(
-    'INSERT INTO actions (id, title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, effectiveness, created_by, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',
-    [id, title, description, assignee, due_date, priority || 'Medium', status || 'Open', action_type || 'Corrective', category || 'Other', indicator || 'Lagging', related_incident_id, effectiveness || 'Not Assessed', req.user?.id, req.user?.org_id]
-  );
+  try {
+    await pool.query(
+      'INSERT INTO actions (id, title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, effectiveness, created_by, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',
+      [id, title, description, assignee, due_date, priority || 'Medium', status || 'Open', action_type || 'Corrective', category || 'Other', indicator || 'Lagging', related_incident_id, effectiveness || 'Not Assessed', req.user?.id, req.user?.org_id]
+    );
+  } catch (err: any) {
+    console.error('[POST /actions] DB error:', err.message);
+    res.status(500).json({ error: err.message });
+    return;
+  }
   res.status(201).json({ id });
 
   // Notify assignee if set
