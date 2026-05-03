@@ -130,9 +130,11 @@ export function detectBot(req: Request): BotDetectionResult {
     }
   }
   
-  // 2. Check request timing
+  // 2. Check request timing — only after a 30s observation window to avoid
+  //    false-positives from SPA startup bursts (10-15 parallel requests at load).
   const tracker = ipTrackers.get(ip);
-  if (tracker && tracker.requestTimes.length >= 3) {
+  const observationMs = tracker ? (Date.now() - tracker.firstRequest) : 0;
+  if (tracker && tracker.requestTimes.length >= 10 && observationMs > 30000) {
     const intervals = [];
     for (let i = 1; i < tracker.requestTimes.length; i++) {
       intervals.push(tracker.requestTimes[i] - tracker.requestTimes[i - 1]);
@@ -146,7 +148,7 @@ export function detectBot(req: Request): BotDetectionResult {
     }
     
     // Check for machine-like regularity (very consistent timing)
-    if (intervals.length >= 5) {
+    if (intervals.length >= 10) {
       const stdDev = Math.sqrt(intervals.reduce((sq, n) => sq + Math.pow(n - avgInterval, 2), 0) / intervals.length);
       if (stdDev < 10 && avgInterval < 500) {
         reasons.push('Machine-like request timing');

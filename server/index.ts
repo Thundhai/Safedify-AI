@@ -105,11 +105,14 @@ app.use(securityMonitor());
 // ---------- Unusual Traffic Pattern Detection (sensitive endpoint velocity) ----------
 app.use(trafficAnomalyDetector());
 
-// ---------- Abuse Protection (request tracking, IP blocking, bot detection) ----------
+// ---------- Abuse Protection (request tracking, IP blocking) ----------
+// Note: botProtection({ blockBots: true }) removed — timing-based detection
+// false-positives on all SPA users whose startup fires 10-15 parallel requests.
+// Auth routes are protected by loginRateLimiter + authLimiter instead.
 app.use(trackRequestTiming());
 app.use(blockedIpCheck());
 if (isProduction) {
-  app.use(botProtection({ blockBots: true }));
+  app.use(botProtection({ blockBots: false })); // log only
   app.use(antiScrapingProtection());
 }
 
