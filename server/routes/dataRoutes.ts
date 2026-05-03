@@ -945,34 +945,45 @@ router.post('/risk-assessments', requirePermission('create_incident'), async (re
   const { title, task_description, taskDescription, type, date, hazards, status, location } = req.body;
   const id = uuid();
   try {
+    // Core INSERT — only columns that have always existed in the schema.
+    // location is handled separately below so a missing column never blocks saving.
     await pool.query(
-      'INSERT INTO risk_assessments (id, title, task_description, type, date, author, hazards, status, location, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
-      [id, title, task_description || taskDescription, type || 'JHA', date || new Date().toISOString(), req.user?.id ?? null, JSON.stringify(hazards || []), status || 'Draft', location || null, req.user?.org_id]
+      'INSERT INTO risk_assessments (id, title, task_description, type, date, author, hazards, status, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+      [id, title || 'Untitled', task_description || taskDescription || '', type || 'JHA', date || new Date().toISOString(), req.user?.id ?? null, JSON.stringify(hazards || []), status || 'Draft', req.user?.org_id]
     );
+    // Best-effort: set location if the column exists
+    if (location) {
+      try { await pool.query('UPDATE risk_assessments SET location=$1 WHERE id=$2', [location, id]); } catch { /* column may not exist yet */ }
+    }
     res.status(201).json({ id });
   } catch (err: any) {
     console.error('[POST /risk-assessments] DB error:', err.message);
-    res.status(500).json({ error: 'Failed to save risk assessment. Please try again.' });
+    res.status(500).json({ error: err.message });
   }
 });
 
 router.put('/risk-assessments/:id', requirePermission('manage_incidents'), async (req: AuthRequest, res: Response) => {
   const { title, task_description, taskDescription, type, date, hazards, status, location } = req.body;
   try {
+    // Core UPDATE — only columns that have always existed in the schema.
     const result = await pool.query(
       `UPDATE risk_assessments SET title=COALESCE($1,title), task_description=COALESCE($2,task_description),
-       type=COALESCE($3,type), date=COALESCE($4,date), hazards=COALESCE($5,hazards), status=COALESCE($6,status),
-       location=COALESCE($7,location), updated_at=NOW() WHERE id=$8 AND org_id=$9`,
-      [title, task_description || taskDescription, type, date, hazards ? JSON.stringify(hazards) : null, status, location ?? null, req.params.id, req.user?.org_id]
+       type=COALESCE($3,type), date=COALESCE($4,date), hazards=COALESCE($5,hazards),
+       status=COALESCE($6,status) WHERE id=$7 AND org_id=$8`,
+      [title, task_description || taskDescription, type, date, hazards ? JSON.stringify(hazards) : null, status, req.params.id, req.user?.org_id]
     );
     if ((result as any).rowCount === 0) {
-      res.status(404).json({ error: 'Not found' });
+      res.status(404).json({ error: 'Not found or no permission' });
       return;
     }
+    // Best-effort: update location and updated_at if those columns exist
+    try {
+      await pool.query(`UPDATE risk_assessments SET location=COALESCE($1,location), updated_at=NOW() WHERE id=$2`, [location ?? null, req.params.id]);
+    } catch { /* columns may not exist yet */ }
     res.json({ message: 'Updated' });
   } catch (err: any) {
     console.error('[PUT /risk-assessments] DB error:', err.message);
-    res.status(400).json({ error: 'Invalid request — check the assessment ID is a valid UUID.' });
+    res.status(500).json({ error: err.message });
   }
 });
 

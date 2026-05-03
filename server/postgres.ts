@@ -231,8 +231,8 @@ export async function initializeDatabase(): Promise<void> {
       `SELECT data_type FROM information_schema.columns WHERE table_name='risk_assessments' AND column_name='author'`
     );
     if (typeCheck.rows[0]?.data_type === 'uuid') {
-      // Drop the UUID constraint and re-create as TEXT
-      await pool.query(`ALTER TABLE risk_assessments ALTER COLUMN author TYPE TEXT USING NULL`);
+      // Cast existing UUID values to their text representation (NULL stays NULL)
+      await pool.query(`ALTER TABLE risk_assessments ALTER COLUMN author TYPE TEXT USING author::TEXT`);
       console.log('[Database] Converted risk_assessments.author from UUID to TEXT');
     }
   } catch (err: any) {
