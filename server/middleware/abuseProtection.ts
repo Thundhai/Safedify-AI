@@ -455,9 +455,15 @@ export function antiScrapingProtection() {
     if (!tracker) {
       return next();
     }
-    
-    // Calculate requests per minute
+
+    // Skip check if the observation window is under 30 seconds —
+    // SPA startup bursts look like scraping on a short window.
     const windowMs = Date.now() - tracker.firstRequest;
+    if (windowMs < 30000) {
+      return next();
+    }
+    
+    // Calculate requests per minute over the full observation window
     const requestsPerMinute = (tracker.count / windowMs) * 60000;
     
     if (requestsPerMinute > ABUSE_CONFIG.api.scrapeThreshold) {

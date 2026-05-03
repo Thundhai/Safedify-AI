@@ -122,7 +122,7 @@ app.use(morgan(isProduction ? 'combined' : 'dev'));
 // ---------- Rate Limiting (with security logging) ----------
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,  // 15 minutes
-  max: isProduction ? 100 : 1000,
+  max: isProduction ? 600 : 1000,  // 600 = ~40 req/min; a normal SPA session uses 15-30 per page load
   standardHeaders: true,
   legacyHeaders: false,
   handler: rateLimitLogger,
