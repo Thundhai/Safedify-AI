@@ -218,11 +218,11 @@ export const PermitForm: React.FC = () => {
 
         setLoadingAudit(false);
 
-        if (!result.issues || result.issues.length === 0) {
-            return true; // Passed
-        } else {
-            return false; // Failed
+        // Only block on a hard "Fail" rating — "Pass" and "Conditional" allow submission
+        if (result.overallRating === 'Fail') {
+            return false;
         }
+        return true;
     } catch (e) {
         console.error(e);
         toast.error("AI Audit failed. Proceeding without check.");
