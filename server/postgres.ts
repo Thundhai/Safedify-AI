@@ -214,6 +214,7 @@ export async function initializeDatabase(): Promise<void> {
     { label: 'incidents.incident_number',         sql: `ALTER TABLE incidents ADD COLUMN IF NOT EXISTS incident_number TEXT` },
     { label: 'incidents.ai_recommendations',      sql: `ALTER TABLE incidents ADD COLUMN IF NOT EXISTS ai_recommendations TEXT` },
     { label: 'risk_assessments.location',         sql: `ALTER TABLE risk_assessments ADD COLUMN IF NOT EXISTS location TEXT` },
+    { label: 'actions.created_by',               sql: `ALTER TABLE actions ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL` },
   ];
 
   for (const patch of columnPatches) {

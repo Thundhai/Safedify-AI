@@ -147,6 +147,7 @@ CREATE TABLE IF NOT EXISTS actions (
     related_incident_id UUID REFERENCES incidents(id),
     verified_by UUID,
     effectiveness TEXT DEFAULT 'Not Assessed',
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
