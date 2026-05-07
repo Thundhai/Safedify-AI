@@ -484,9 +484,36 @@ router.post('/actions', validate(actionSchema), requirePermission('create_incide
       [id, title, description, assignee, due_date, priority || 'Medium', status || 'Open', action_type || 'Corrective', category || 'Other', indicator || 'Lagging', related_incident_id, related_permit_id || null, effectiveness || 'Not Assessed', req.user?.id, req.user?.org_id]
     );
   } catch (err: any) {
-    console.error('[POST /actions] DB error:', err.message);
-    res.status(500).json({ error: err.message });
-    return;
+    // If column doesn't exist yet on a cold-started instance, run the patch and retry once
+    if (err.message?.includes('related_permit_id') && err.message?.includes('does not exist')) {
+      try {
+        await pool.query(`ALTER TABLE actions ADD COLUMN IF NOT EXISTS related_permit_id TEXT`);
+        await pool.query(
+          'INSERT INTO actions (id, title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, related_permit_id, effectiveness, created_by, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',
+          [id, title, description, assignee, due_date, priority || 'Medium', status || 'Open', action_type || 'Corrective', category || 'Other', indicator || 'Lagging', related_incident_id, related_permit_id || null, effectiveness || 'Not Assessed', req.user?.id, req.user?.org_id]
+        );
+      } catch (retryErr: any) {
+        console.error('[POST /actions] retry error:', retryErr.message);
+        res.status(500).json({ error: 'Failed to create action item. Please try again.' });
+        return;
+      }
+    } else if (err.message?.includes('created_by') && err.message?.includes('does not exist')) {
+      try {
+        await pool.query(`ALTER TABLE actions ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`);
+        await pool.query(
+          'INSERT INTO actions (id, title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, related_permit_id, effectiveness, created_by, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',
+          [id, title, description, assignee, due_date, priority || 'Medium', status || 'Open', action_type || 'Corrective', category || 'Other', indicator || 'Lagging', related_incident_id, related_permit_id || null, effectiveness || 'Not Assessed', req.user?.id, req.user?.org_id]
+        );
+      } catch (retryErr: any) {
+        console.error('[POST /actions] retry error:', retryErr.message);
+        res.status(500).json({ error: 'Failed to create action item. Please try again.' });
+        return;
+      }
+    } else {
+      console.error('[POST /actions] DB error:', err.message);
+      res.status(500).json({ error: 'Failed to create action item. Please try again.' });
+      return;
+    }
   }
   res.status(201).json({ id });
 
