@@ -413,6 +413,7 @@ export interface ActionItem {
   category: ActionCategory;
   indicator: IndicatorType;
   relatedIncidentId?: string;
+  relatedPermitId?: string;
   verifiedBy?: string;
   effectiveness?: 'Effective' | 'Partially Effective' | 'Ineffective' | 'Not Assessed';
 }

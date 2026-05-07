@@ -129,6 +129,7 @@ const mapAction = (row: any): ActionItem => ({
   category: row.category || 'Other',
   indicator: row.indicator || 'Lagging',
   relatedIncidentId: row.related_incident_id,
+  relatedPermitId: row.related_permit_id,
   verifiedBy: row.verified_by,
   effectiveness: row.effectiveness || 'Not Assessed',
 });

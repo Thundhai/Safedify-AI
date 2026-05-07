@@ -48,6 +48,16 @@ export const PermitForm: React.FC = () => {
   const [loadingAudit, setLoadingAudit] = useState(false);
   const [complianceGaps, setComplianceGaps] = useState<ComplianceGap[]>([]);
   const [complianceLoading, setComplianceLoading] = useState(false);
+
+  // ---- localStorage key is tied to the permit ID so gaps survive page refreshes ----
+  const gapsStorageKey = `safedify_compliance_gaps_${formData.id}`;
+
+  // Save gaps to localStorage whenever they change
+  useEffect(() => {
+    if (complianceGaps.length > 0) {
+      try { localStorage.setItem(gapsStorageKey, JSON.stringify(complianceGaps)); } catch { /* quota */ }
+    }
+  }, [complianceGaps, gapsStorageKey]);
   
   useEffect(() => {
     const load = async () => {
@@ -56,13 +66,25 @@ export const PermitForm: React.FC = () => {
 
       if (!isNew && id) {
         const existing = await getPermitById(id);
-        if (existing) setFormData(existing);
+        if (existing) {
+          setFormData(existing);
+          // Restore any previously-scanned compliance gaps for this permit
+          try {
+            const saved = localStorage.getItem(`safedify_compliance_gaps_${existing.id}`);
+            if (saved) setComplianceGaps(JSON.parse(saved));
+          } catch { /* ignore parse errors */ }
+        }
       } else {
           // Initialize default checklist for new
           setFormData(prev => ({
               ...prev,
               controls: checklistTemplates[PermitType.HOT_WORK].map((l, i) => ({ id: `c-${i}`, label: l, checked: false }))
           }));
+          // Restore gaps for this new-permit temp ID (survives browser refresh)
+          try {
+            const saved = localStorage.getItem(gapsStorageKey);
+            if (saved) setComplianceGaps(JSON.parse(saved));
+          } catch { /* ignore */ }
       }
     };
     load();
@@ -180,17 +202,18 @@ export const PermitForm: React.FC = () => {
   const handleCreateActionItem = async (gap: ComplianceGap) => {
     const result = await apiCreateAction({
       title: gap.actionItemTitle || gap.description,
-      description: `Compliance gap identified during permit audit (${formData.type}): ${gap.description}`,
+      description: `[Permit: ${formData.id}] Compliance gap identified during ${formData.type} permit audit: ${gap.description}`,
       priority: 'High',
       status: 'Open',
       action_type: 'Corrective',
       category: 'Permit Compliance',
+      related_permit_id: formData.id,
     });
     // Only runs on success (throws on failure — caught by CompliancePanel)
     setComplianceGaps(prev => prev.map(g =>
       g.id === gap.id ? { ...g, applied: true, actionItemId: result?.id } : g
     ));
-    toast.success('Action Item created — permit will remain blocked until this is resolved.');
+    // success toast shown by CompliancePanel
   };
 
   const performAudit = async (): Promise<boolean> => {
@@ -247,11 +270,17 @@ export const PermitForm: React.FC = () => {
 
       // If submitting for approval, run mandatory audit
       if (status === PermitStatus.PENDING) {
-          // Block if any action_required compliance gaps haven't been addressed
+          // Warn (don't hard-block) about unresolved physical gaps.
+          // Action items may have been created in a previous session — we can't
+          // guarantee state survives a full reload, so we trust the user's judgment.
           const unresolvedPhysical = complianceGaps.filter(g => g.resolution === 'action_required' && !g.applied);
           if (unresolvedPhysical.length > 0) {
-            toast.error(`${unresolvedPhysical.length} physical action${unresolvedPhysical.length !== 1 ? 's' : ''} must be resolved before submitting. Create Action Items for each.`);
-            return;
+            const confirmed = window.confirm(
+              `⚠️ ${unresolvedPhysical.length} physical action${unresolvedPhysical.length !== 1 ? 's' : ''} flagged by the compliance scan have not been marked as resolved.\n\n` +
+              `If you have already created Action Items for them, click OK to continue.\n` +
+              `Click Cancel to go back and create Action Items first.`
+            );
+            if (!confirmed) return;
           }
           const passed = await performAudit();
           if (!passed) {
@@ -263,6 +292,8 @@ export const PermitForm: React.FC = () => {
       try {
         const updated = { ...formData, status };
         await savePermit(updated);
+        // Clean up persisted compliance gaps — permit is now saved
+        try { localStorage.removeItem(gapsStorageKey); } catch { /* ignore */ }
         toast.success(`Permit ${status === PermitStatus.PENDING ? 'submitted for approval' : 'saved'}.`);
         navigate('/permits');
       } catch (err: any) {

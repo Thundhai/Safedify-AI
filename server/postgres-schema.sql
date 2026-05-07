@@ -148,6 +148,7 @@ CREATE TABLE IF NOT EXISTS actions (
     verified_by UUID,
     effectiveness TEXT DEFAULT 'Not Assessed',
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    related_permit_id TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

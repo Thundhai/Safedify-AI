@@ -9,9 +9,10 @@
  */
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Sparkles, Wrench, AlertTriangle, CheckCircle2,
-  ChevronDown, ChevronUp, Loader2, ClipboardList, Zap,
+  ChevronDown, ChevronUp, Loader2, ClipboardList, Zap, ExternalLink,
 } from 'lucide-react';
 import { ComplianceGap } from '../types';
 
@@ -34,6 +35,7 @@ export const CompliancePanel: React.FC<CompliancePanelProps> = ({
   onCreateActionItem,
   disabled = false,
 }) => {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [creatingAction, setCreatingAction] = useState<Record<string, boolean>>({});
   const [actionErrors, setActionErrors] = useState<Record<string, string>>({});
@@ -51,6 +53,20 @@ export const CompliancePanel: React.FC<CompliancePanelProps> = ({
     setActionErrors(prev => ({ ...prev, [gap.id]: '' }));
     try {
       await onCreateActionItem(gap);
+      toast.success(
+        (t) => (
+          <span className="flex items-center gap-2">
+            Action Item created!
+            <button
+              onClick={() => { toast.dismiss(t.id); navigate('/actions'); }}
+              className="underline font-semibold text-blue-600 hover:text-blue-800"
+            >
+              View in Actions →
+            </button>
+          </span>
+        ),
+        { duration: 6000 }
+      );
     } catch (e: any) {
       const msg = e?.message || 'Failed to create Action Item. Please try again.';
       setActionErrors(prev => ({ ...prev, [gap.id]: msg }));
@@ -213,7 +229,16 @@ export const CompliancePanel: React.FC<CompliancePanelProps> = ({
                           {gap.description}
                         </p>
                         {gap.applied && gap.actionItemId && (
-                          <p className="text-xs text-green-600 font-medium mt-0.5">✓ Action Item created — permit blocked until resolved</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <p className="text-xs text-green-600 font-medium">✓ Action Item created</p>
+                            <button
+                              onClick={() => navigate('/actions')}
+                              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium underline"
+                            >
+                              <ExternalLink size={11} />
+                              View in Actions
+                            </button>
+                          </div>
                         )}
                         {!gap.applied && gap.actionItemTitle && (
                           <p className="text-xs text-amber-700 mt-1 bg-amber-50 px-2 py-1 rounded border border-amber-100">

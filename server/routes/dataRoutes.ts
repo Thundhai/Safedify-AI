@@ -65,6 +65,7 @@ const actionSchema: ValidationSchema = {
   category: { type: 'string', required: false, maxLength: 100, trim: true },
   indicator: { type: 'string', required: false, maxLength: 50, enum: ['Leading', 'Lagging'] },
   related_incident_id: { type: 'uuid', required: false },
+  related_permit_id: { type: 'string', required: false, maxLength: 200, trim: true },
   effectiveness: { type: 'string', required: false, maxLength: 100, enum: ['Not Assessed', 'Effective', 'Partially Effective', 'Not Effective'] },
   verified_by: { type: 'string', required: false, maxLength: 200, trim: true },
 };
@@ -475,12 +476,12 @@ router.get('/actions', validateQuery(paginationQuerySchema), async (req: AuthReq
 });
 
 router.post('/actions', validate(actionSchema), requirePermission('create_incident'), async (req: AuthRequest, res: Response) => {
-  const { title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, effectiveness } = req.body;
+  const { title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, related_permit_id, effectiveness } = req.body;
   const id = uuid();
   try {
     await pool.query(
-      'INSERT INTO actions (id, title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, effectiveness, created_by, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',
-      [id, title, description, assignee, due_date, priority || 'Medium', status || 'Open', action_type || 'Corrective', category || 'Other', indicator || 'Lagging', related_incident_id, effectiveness || 'Not Assessed', req.user?.id, req.user?.org_id]
+      'INSERT INTO actions (id, title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, related_permit_id, effectiveness, created_by, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',
+      [id, title, description, assignee, due_date, priority || 'Medium', status || 'Open', action_type || 'Corrective', category || 'Other', indicator || 'Lagging', related_incident_id, related_permit_id || null, effectiveness || 'Not Assessed', req.user?.id, req.user?.org_id]
     );
   } catch (err: any) {
     console.error('[POST /actions] DB error:', err.message);
