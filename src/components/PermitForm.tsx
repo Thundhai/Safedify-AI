@@ -46,6 +46,7 @@ export const PermitForm: React.FC = () => {
 
   const [riskAssessments, setRiskAssessments] = useState<RiskAssessment[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [complianceGaps, setComplianceGaps] = useState<ComplianceGap[]>([]);
   const [complianceLoading, setComplianceLoading] = useState(false);
 
@@ -262,17 +263,14 @@ export const PermitForm: React.FC = () => {
   };
 
   const handleSave = async (status: PermitStatus) => {
-      // Only block on missing description when submitting — drafts can be saved at any time
+      // Only block on missing description when submitting
       if (status === PermitStatus.PENDING && !formData.description) {
           toast.error("Please enter a work description before submitting for approval.");
           return;
       }
 
-      // If submitting for approval, run mandatory audit
+      // Soft-warn about unresolved physical gaps but never block
       if (status === PermitStatus.PENDING) {
-          // Warn (don't hard-block) about unresolved physical gaps.
-          // Action items may have been created in a previous session — we can't
-          // guarantee state survives a full reload, so we trust the user's judgment.
           const unresolvedPhysical = complianceGaps.filter(g => g.resolution === 'action_required' && !g.applied);
           if (unresolvedPhysical.length > 0) {
             const confirmed = window.confirm(
@@ -282,23 +280,26 @@ export const PermitForm: React.FC = () => {
             );
             if (!confirmed) return;
           }
-          const passed = await performAudit();
-          if (!passed) {
-              toast.error("Compliance Check Failed. Please address the critical control gaps highlighted below before submitting.");
-              return;
-          }
       }
 
+      // Save first — AI audit runs after, so a slow/failed AI call never blocks saving
+      setIsSaving(true);
       try {
         const updated = { ...formData, status };
         await savePermit(updated);
-        // Clean up persisted compliance gaps — permit is now saved
         try { localStorage.removeItem(gapsStorageKey); } catch { /* ignore */ }
-        toast.success(`Permit ${status === PermitStatus.PENDING ? 'submitted for approval' : 'saved'}.`);
+        toast.success(`Permit ${status === PermitStatus.PENDING ? 'submitted for approval' : 'saved as draft'}.`);
         navigate('/permits');
       } catch (err: any) {
         console.error("Save permit failed", err);
         toast.error(err?.message || "Failed to save permit. Please try again.");
+      } finally {
+        setIsSaving(false);
+      }
+
+      // Run AI audit in background (non-blocking) for submitted permits
+      if (status === PermitStatus.PENDING) {
+          performAudit().catch(() => { /* silently ignore background audit errors */ });
       }
   };
 
@@ -345,16 +346,19 @@ export const PermitForm: React.FC = () => {
         <div className="flex gap-2">
             {!isReadOnly || formData.status === PermitStatus.DRAFT ? (
                 <>
-                    <button onClick={() => handleSave(PermitStatus.DRAFT)} className="px-4 py-2 text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 font-medium">
-                        Save Draft
+                    <button 
+                        onClick={() => handleSave(PermitStatus.DRAFT)}
+                        disabled={isSaving}
+                        className="px-4 py-2 text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 font-medium disabled:opacity-60">
+                        {isSaving ? <Loader2 size={16} className="inline animate-spin mr-1" /> : null}Save Draft
                     </button>
                     <button 
                         onClick={() => handleSave(PermitStatus.PENDING)} 
-                        disabled={loadingAudit}
+                        disabled={isSaving}
                         className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-sm disabled:opacity-70"
                     >
-                        {loadingAudit ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                        Submit
+                        {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                        {isSaving ? 'Saving...' : 'Submit'}
                     </button>
                 </>
             ) : formData.status === PermitStatus.PENDING ? (
