@@ -95,15 +95,15 @@ const inspectionSchema: ValidationSchema = {
 };
 
 const permitSchema: ValidationSchema = {
-  type: { type: 'string', required: true, maxLength: 100, trim: true },
-  location: { type: 'string', required: false, maxLength: 500, trim: true },
-  description: { type: 'string', required: false, maxLength: 5000, trim: true },
+  type: { type: 'string', required: true, maxLength: 100, trim: true, allowInjection: true },
+  location: { type: 'string', required: false, maxLength: 500, trim: true, allowInjection: true },
+  description: { type: 'string', required: false, maxLength: 5000, trim: true, allowInjection: true },
   valid_from: { type: 'date', required: false },
   valid_until: { type: 'date', required: false },
-  requestor: { type: 'string', required: false, maxLength: 200, trim: true },
+  requestor: { type: 'string', required: false, maxLength: 200, trim: true, allowInjection: true },
   status: { type: 'string', required: false, maxLength: 50, enum: ['Draft', 'Pending', 'Pending Approval', 'Active', 'Expired', 'Rejected', 'Cancelled', 'Closed'] },
-  approver: { type: 'string', required: false, maxLength: 200, trim: true },
-  approver_comments: { type: 'string', required: false, maxLength: 2000, trim: true },
+  approver: { type: 'string', required: false, maxLength: 200, trim: true, allowInjection: true },
+  approver_comments: { type: 'string', required: false, maxLength: 2000, trim: true, allowInjection: true },
   controls: { type: 'array', required: false, maxLength: 100 },
 };
 

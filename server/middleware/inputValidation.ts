@@ -408,6 +408,9 @@ function validateField(value: any, schema: FieldSchema, fieldName: string): { va
           return { valid: false, error: `${fieldName} must be a valid date` };
         }
         sanitized = parsed.toISOString();
+      } else {
+        // Valid ISO string — preserve it as-is
+        sanitized = value;
       }
       break;
       
@@ -455,6 +458,9 @@ function validateField(value: any, schema: FieldSchema, fieldName: string): { va
           sanitizedArray.push(result.sanitized);
         }
         sanitized = sanitizedArray;
+      } else {
+        // No item schema — preserve the array as-is
+        sanitized = value;
       }
       break;
       
