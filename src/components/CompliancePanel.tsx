@@ -10,6 +10,7 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import {
   Sparkles, Wrench, AlertTriangle, CheckCircle2,
   ChevronDown, ChevronUp, Loader2, ClipboardList, Zap, ExternalLink,
