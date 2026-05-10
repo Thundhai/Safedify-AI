@@ -18,16 +18,22 @@ import toast from 'react-hot-toast';
 // Roles that can approve / reject permits (UI-level check; server enforces too)
 const APPROVER_ROLES = ['Admin', 'HSE Manager', 'HSE Supervisor', 'Construction Manager', 'Operations Manager'];
 
-const ACTION_STATUS_CYCLE: Record<string, string> = {
+type ActionItemStatus = ActionItem['status'];
+
+const ACTION_STATUS_CYCLE: Record<string, ActionItemStatus> = {
   'Open': 'In Progress',
-  'In Progress': 'Completed',
-  'Completed': 'Open',
+  'In Progress': 'Done',
+  'Done': 'Open',
+  'Overdue': 'In Progress',
+  'Verified': 'Open',
 };
 
 const ACTION_STATUS_COLOR: Record<string, string> = {
   'Open': 'bg-yellow-100 text-yellow-800 border-yellow-200',
   'In Progress': 'bg-blue-100 text-blue-800 border-blue-200',
-  'Completed': 'bg-green-100 text-green-800 border-green-200',
+  'Done': 'bg-green-100 text-green-800 border-green-200',
+  'Overdue': 'bg-red-100 text-red-800 border-red-200',
+  'Verified': 'bg-purple-100 text-purple-800 border-purple-200',
 };
 
 function useCountdown(validUntil: string, active: boolean) {
@@ -327,7 +333,7 @@ export const PermitForm: React.FC = () => {
     [PermitStatus.CLOSED]: { color: 'bg-slate-100 text-slate-600 border-slate-200', icon: <CheckSquare size={14} />, label: 'Closed' },
     [PermitStatus.EXPIRED]: { color: 'bg-orange-100 text-orange-800 border-orange-300', icon: <AlertTriangle size={14} />, label: 'Expired' },
   };
-  const currentStatus = statusConfig[formData.status] || statusConfig[PermitStatus.DRAFT];
+  const currentStatus = statusConfig[formData.status] ?? statusConfig[PermitStatus.DRAFT]!;
 
   const qrData = JSON.stringify({ id: formData.id, type: formData.type, validUntil: formData.validUntil });
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrData)}`;
