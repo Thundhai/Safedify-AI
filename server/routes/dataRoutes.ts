@@ -671,19 +671,19 @@ router.post('/permits', validate(permitSchema), requirePermission('create_permit
   try {
     await doInsert();
   } catch (err: any) {
-    // Self-heal: created_by column may not exist on older DB instances
-    if (err.message?.includes('created_by') && err.message?.includes('does not exist')) {
-      try {
-        await pool.query(`ALTER TABLE permits ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`);
-        await doInsert();
-      } catch (retryErr: any) {
-        console.error('[POST /permits] retry after created_by patch failed:', retryErr.message);
-        res.status(500).json({ error: 'Failed to create permit. Please try again.' });
-        return;
-      }
-    } else {
-      console.error('[POST /permits] DB error:', err.message);
-      res.status(500).json({ error: 'Failed to create permit. Please try again.' });
+    // Log the actual DB error so it appears in Vercel function logs
+    console.error('[POST /permits] DB error, attempting self-heal. Error:', err.message);
+    // Run ALL known schema fixes for permits in parallel, then retry once
+    await Promise.allSettled([
+      pool.query(`ALTER TABLE permits ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`),
+      pool.query(`ALTER TABLE permits ALTER COLUMN requestor TYPE TEXT USING requestor::TEXT`),
+      pool.query(`ALTER TABLE permits ALTER COLUMN approver TYPE TEXT USING approver::TEXT`),
+    ]);
+    try {
+      await doInsert();
+    } catch (retryErr: any) {
+      console.error('[POST /permits] retry after self-heal failed:', retryErr.message);
+      res.status(500).json({ error: `Failed to create permit: ${retryErr.message}` });
       return;
     }
   }
