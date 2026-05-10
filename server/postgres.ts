@@ -218,13 +218,14 @@ export async function initializeDatabase(): Promise<void> {
     { label: 'actions.related_permit_id',          sql: `ALTER TABLE actions ADD COLUMN IF NOT EXISTS related_permit_id TEXT` },
   ];
 
-  for (const patch of columnPatches) {
-    try {
-      await pool.query(patch.sql);
-    } catch (err: any) {
-      console.error(`[Database] Column patch warning (${patch.label}):`, err.message);
-    }
-  }
+  // Run all column patches in PARALLEL — a sleeping DB causes one 5s stall instead of 13×5s
+  await Promise.allSettled(
+    columnPatches.map(patch =>
+      pool.query(patch.sql).catch((err: any) =>
+        console.error(`[Database] Column patch warning (${patch.label}):`, err.message)
+      )
+    )
+  );
 
   // Fix risk_assessments.author: production DB may have it as UUID type but we store user names (TEXT).
   // This is a multi-step operation: check the current type, then alter only if needed.
@@ -260,19 +261,20 @@ export async function initializeDatabase(): Promise<void> {
     { name: 'Worker',              desc: 'General staff.',           perms: ['create_incident'] },
   ];
 
-  try {
-    for (const r of defaultRoles) {
-      await pool.query(
+  // Seed all roles in PARALLEL — avoids 12 sequential round-trips
+  await Promise.allSettled(
+    defaultRoles.map(r =>
+      pool.query(
         `INSERT INTO roles (id, name, description, is_system, permissions)
          VALUES (gen_random_uuid(), $1, $2, TRUE, $3)
          ON CONFLICT (name) DO NOTHING`,
         [r.name, r.desc, JSON.stringify(r.perms)]
-      );
-    }
-    console.log('[Database] Default roles seeded / verified');
-  } catch (err: any) {
-    console.error('[Database] Role seed warning (non-fatal):', err.message);
-  }
+      ).catch((err: any) =>
+        console.error(`[Database] Role seed warning (${r.name}):`, err.message)
+      )
+    )
+  );
+  console.log('[Database] Default roles seeded / verified');
 }
 
 /**

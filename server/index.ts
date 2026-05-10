@@ -269,10 +269,11 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
   });
 });
 
-// ---------- Seed on load (for serverless cold starts) ----------
-// MUST be awaited — ensures all column patches run before any request is handled.
-// top-level await works because this file is compiled as ESM.
-await initializeDatabase();
+// Run DB init in the background — do NOT await at module level.
+// Awaiting here caused a 140-second block (28 sequential queries × 5s connection timeout)
+// on Neon/Supabase cold starts, making every request hang until the client aborted.
+// All patches are idempotent (IF NOT EXISTS) so skipping them on the first request is safe.
+initializeDatabase().catch(err => console.warn('[DB] Init warning:', err.message));
 seedDefaultUsers();
 
 // ---------- Export for Vercel serverless ----------
