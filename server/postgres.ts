@@ -216,6 +216,9 @@ export async function initializeDatabase(): Promise<void> {
     { label: 'risk_assessments.location',         sql: `ALTER TABLE risk_assessments ADD COLUMN IF NOT EXISTS location TEXT` },
     { label: 'actions.created_by',               sql: `ALTER TABLE actions ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL` },
     { label: 'actions.related_permit_id',          sql: `ALTER TABLE actions ADD COLUMN IF NOT EXISTS related_permit_id TEXT` },
+    { label: 'permits.created_by',                 sql: `ALTER TABLE permits ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL` },
+    { label: 'permits.requestor_text',             sql: `ALTER TABLE permits ALTER COLUMN requestor TYPE TEXT USING requestor::TEXT` },
+    { label: 'permits.approver_text',              sql: `ALTER TABLE permits ALTER COLUMN approver TYPE TEXT USING approver::TEXT` },
   ];
 
   // Run all column patches in PARALLEL — a sleeping DB causes one 5s stall instead of 13×5s

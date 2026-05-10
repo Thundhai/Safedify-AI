@@ -662,10 +662,31 @@ router.get('/permits', validateQuery(paginationQuerySchema), async (req: AuthReq
 router.post('/permits', validate(permitSchema), requirePermission('create_permit'), async (req: AuthRequest, res: Response) => {
   const { type, location, description, valid_from, valid_until, requestor, status, controls } = req.body;
   const id = uuid();
-  await pool.query(
+
+  const doInsert = () => pool.query(
     'INSERT INTO permits (id, type, location, description, valid_from, valid_until, requestor, status, controls, created_by, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
-    [id, type, location, description, valid_from, valid_until, requestor, status || 'Draft', JSON.stringify(controls || []), req.user?.id, req.user?.org_id]
+    [id, type, location, description, valid_from, valid_until, requestor ?? null, status || 'Draft', JSON.stringify(controls || []), req.user?.id ?? null, req.user?.org_id ?? null]
   );
+
+  try {
+    await doInsert();
+  } catch (err: any) {
+    // Self-heal: created_by column may not exist on older DB instances
+    if (err.message?.includes('created_by') && err.message?.includes('does not exist')) {
+      try {
+        await pool.query(`ALTER TABLE permits ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`);
+        await doInsert();
+      } catch (retryErr: any) {
+        console.error('[POST /permits] retry after created_by patch failed:', retryErr.message);
+        res.status(500).json({ error: 'Failed to create permit. Please try again.' });
+        return;
+      }
+    } else {
+      console.error('[POST /permits] DB error:', err.message);
+      res.status(500).json({ error: 'Failed to create permit. Please try again.' });
+      return;
+    }
+  }
   res.status(201).json({ id });
 });
 

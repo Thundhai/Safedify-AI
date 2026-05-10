@@ -176,12 +176,13 @@ CREATE TABLE IF NOT EXISTS permits (
     description TEXT NOT NULL,
     valid_from TIMESTAMP,
     valid_until TIMESTAMP,
-    requestor UUID,
-    approver UUID,
+    requestor TEXT,
+    approver TEXT,
     status TEXT NOT NULL DEFAULT 'Draft',
     controls TEXT,
     approver_comments TEXT,
     ai_audit_issues TEXT,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
