@@ -103,7 +103,7 @@ export const PermitList: React.FC = () => {
 
             {/* Filters */}
             <div className="flex gap-2 overflow-x-auto pb-2">
-                {['All', PermitStatus.APPROVED, PermitStatus.PENDING, PermitStatus.CLOSED].map(s => (
+                {['All', PermitStatus.APPROVED, PermitStatus.PENDING, PermitStatus.CLOSED, PermitStatus.REJECTED, PermitStatus.EXPIRED].map(s => (
                     <button 
                         key={s}
                         onClick={() => setFilter(s)}

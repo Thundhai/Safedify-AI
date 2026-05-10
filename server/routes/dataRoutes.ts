@@ -690,41 +690,136 @@ router.post('/permits', validate(permitSchema), requirePermission('create_permit
   res.status(201).json({ id });
 });
 
-router.put('/permits/:id', validateParams(uuidParamSchema), validate(permitSchema), requirePermission('approve_permit'), async (req: AuthRequest, res: Response) => {
-  const { status, approver, approver_comments } = req.body;
-  await pool.query(
-    'UPDATE permits SET status=COALESCE($1,status), approver=COALESCE($2,approver), approver_comments=COALESCE($3,approver_comments) WHERE id=$4 AND org_id=$5',
-    [status, approver, approver_comments, req.params.id, req.user?.org_id]
-  );
-  res.json({ message: 'Updated' });
-
-  // Notify permit requestor on status change
-  if (status) {
-    const permitResult = await pool.query('SELECT requestor, type, location FROM permits WHERE id = $1', [req.params.id]);
-    const permit = permitResult.rows[0];
-    if (permit?.requestor) {
-      const requestorUserResult = await pool.query('SELECT id FROM users WHERE name = $1 OR id = $2', [permit.requestor, permit.requestor]);
-      const requestorUser = requestorUserResult.rows[0];
-      if (requestorUser) {
-        notify({
-          userId: requestorUser.id,
-          type: status === 'Active' ? 'success' : status === 'Rejected' ? 'danger' : 'info',
-          title: `Permit ${status}`,
-          message: `Your ${permit.type || 'permit'} for ${permit.location || 'site'} has been ${status.toLowerCase()}.${approver_comments ? ` Comment: ${approver_comments}` : ''}`,
-          entityType: 'permit',
-          entityId: req.params.id as string,
-        }).catch((err: any) => console.error('[Notify] permit update:', err.message));
-      }
+router.put('/permits/:id', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    // Fetch current permit state
+    const permitResult = await pool.query(
+      'SELECT * FROM permits WHERE id = $1 AND org_id = $2',
+      [req.params.id, req.user?.org_id]
+    );
+    const currentPermit = permitResult.rows[0];
+    if (!currentPermit) {
+      res.status(404).json({ error: 'Permit not found' });
+      return;
     }
-    // Also notify managers of permit approval/rejection
-    notifyAllManagers({
-      orgId: req.user?.org_id,
-      type: status === 'Active' ? 'success' : status === 'Rejected' ? 'warning' : 'info',
-      title: `Permit ${status}: ${permit?.type || 'Unknown'}`,
-      message: `${permit?.type || 'Permit'} at ${permit?.location || 'site'} has been ${status.toLowerCase()}.`,
-      entityType: 'permit',
-      entityId: req.params.id as string,
-    }).catch((err: any) => console.error('[Notify] permit managers:', err.message));
+
+    const isAdmin = req.user?.role === 'Admin';
+    const isCreator =
+      currentPermit.created_by === req.user?.id ||
+      currentPermit.requestor === req.user?.name;
+
+    // Resolve approve_permit permission from roles table
+    let canApprove = isAdmin;
+    if (!canApprove) {
+      try {
+        const roleResult = await pool.query(
+          'SELECT permissions FROM roles WHERE name = $1 AND org_id = $2',
+          [req.user?.role, req.user?.org_id]
+        );
+        const perms: string[] = JSON.parse(roleResult.rows[0]?.permissions || '[]');
+        canApprove = perms.includes('approve_permit');
+      } catch { /* if roles lookup fails, canApprove stays false */ }
+    }
+
+    const { status, approver, approver_comments, type, location, description, valid_from, valid_until, requestor, controls } = req.body;
+
+    // APPROVAL or REJECTION (Pending → Active or Rejected)
+    if (status === 'Active' || status === 'Rejected') {
+      if (!canApprove) {
+        res.status(403).json({ error: 'You do not have permission to approve or reject permits.' });
+        return;
+      }
+      await pool.query(
+        'UPDATE permits SET status=$1, approver=$2, approver_comments=$3 WHERE id=$4 AND org_id=$5',
+        [status, approver || req.user?.name, approver_comments ?? null, req.params.id, req.user?.org_id]
+      );
+      res.json({ message: 'Updated' });
+      // Notify requestor
+      if (currentPermit.requestor) {
+        pool.query('SELECT id FROM users WHERE name = $1 OR id::text = $1', [currentPermit.requestor])
+          .then(r => {
+            const requestorUser = r.rows[0];
+            if (requestorUser) {
+              notify({
+                userId: requestorUser.id,
+                type: status === 'Active' ? 'success' : 'danger',
+                title: `Permit ${status === 'Active' ? 'Approved' : 'Rejected'}`,
+                message: `Your ${currentPermit.type || 'permit'} for ${currentPermit.location || 'site'} has been ${status === 'Active' ? 'approved' : 'rejected'}.${approver_comments ? ` Comment: ${approver_comments}` : ''}`,
+                entityType: 'permit',
+                entityId: req.params.id as string,
+              }).catch((e: any) => console.error('[Notify] permit requestor:', e.message));
+            }
+          }).catch(() => {});
+      }
+      notifyAllManagers({
+        orgId: req.user?.org_id,
+        type: status === 'Active' ? 'success' : 'warning',
+        title: `Permit ${status === 'Active' ? 'Approved' : 'Rejected'}: ${currentPermit.type || 'Unknown'}`,
+        message: `${currentPermit.type || 'Permit'} at ${currentPermit.location || 'site'} has been ${status === 'Active' ? 'approved' : 'rejected'}.`,
+        entityType: 'permit',
+        entityId: req.params.id as string,
+      }).catch((e: any) => console.error('[Notify] managers:', e.message));
+      return;
+    }
+
+    // CLOSURE (Active → Closed)
+    if (status === 'Closed') {
+      if (!isCreator && !canApprove) {
+        res.status(403).json({ error: 'Only the permit requestor or a manager can close this permit.' });
+        return;
+      }
+      await pool.query(
+        'UPDATE permits SET status=$1 WHERE id=$2 AND org_id=$3',
+        ['Closed', req.params.id, req.user?.org_id]
+      );
+      res.json({ message: 'Permit closed' });
+      return;
+    }
+
+    // EDIT (Draft or Rejected permit — owner only)
+    if (currentPermit.status === 'Draft' || currentPermit.status === 'Rejected') {
+      if (!isCreator && !isAdmin) {
+        res.status(403).json({ error: 'Only the permit requestor can edit this permit.' });
+        return;
+      }
+      const newStatus = status || currentPermit.status;
+      await pool.query(
+        `UPDATE permits SET
+          type=COALESCE($1,type), location=COALESCE($2,location), description=COALESCE($3,description),
+          valid_from=COALESCE($4,valid_from), valid_until=COALESCE($5,valid_until),
+          requestor=COALESCE($6,requestor), status=$7,
+          controls=COALESCE($8,controls)
+         WHERE id=$9 AND org_id=$10`,
+        [
+          type ?? null, location ?? null, description ?? null,
+          valid_from ?? null, valid_until ?? null, requestor ?? null,
+          newStatus,
+          controls != null ? JSON.stringify(controls) : null,
+          req.params.id, req.user?.org_id
+        ]
+      );
+      res.json({ message: 'Updated' });
+      return;
+    }
+
+    res.status(400).json({ error: 'Permit cannot be modified in its current state.' });
+  } catch (err: any) {
+    console.error('[PUT /permits/:id] error:', err.message);
+    res.status(500).json({ error: 'Failed to update permit: ' + err.message });
+  }
+});
+
+// Get actions linked to a specific permit
+router.get('/permits/:id/actions', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM actions WHERE related_permit_id = $1 AND org_id = $2 ORDER BY created_at DESC',
+      [req.params.id, req.user?.org_id]
+    );
+    res.json(result.rows);
+  } catch (err: any) {
+    console.error('[GET /permits/:id/actions] error:', err.message);
+    res.json([]); // Return empty array on error (column may not exist yet)
   }
 });
 

@@ -22,7 +22,7 @@ import {
   apiGetActions, apiCreateAction, apiUpdateAction, apiDeleteAction,
   apiGetObservations, apiCreateObservation, apiUpdateObservation, apiDeleteObservation,
   apiGetInspections, apiCreateInspection,
-  apiGetPermits, apiGetPermit, apiCreatePermit, apiUpdatePermit, apiDeletePermit,
+  apiGetPermits, apiGetPermit, apiCreatePermit, apiUpdatePermit, apiDeletePermit, apiGetPermitActions,
   apiGetWorkers, apiGetWorker, apiCreateWorker, apiUpdateWorker, apiDeleteWorker,
   apiGetContractors, apiGetContractor, apiCreateContractor, apiUpdateContractor, apiDeleteContractor,
   apiGetAssets, apiGetAsset, apiCreateAsset, apiUpdateAsset, apiDeleteAsset,
@@ -791,11 +791,22 @@ export const savePermit = async (permit: Permit): Promise<void> => {
       throw e;
     }
   } else {
-    const payload = {
+    // For existing permits — send all editable fields; backend decides what to apply based on status/role
+    const payload: Record<string, any> = {
       status: permit.status,
       approver: permit.approver,
       approver_comments: permit.approverComments,
     };
+    // Also include full form data so Draft/Rejected edits work
+    if (permit.status === 'Draft' || permit.status === 'Pending Approval' || permit.status === 'Rejected') {
+      payload.type = permit.type;
+      payload.location = permit.location;
+      payload.description = permit.description;
+      payload.valid_from = permit.validFrom;
+      payload.valid_until = permit.validUntil;
+      payload.requestor = permit.requestor;
+      payload.controls = permit.controls;
+    }
     console.log(`[savePermit] PUT /permits/${permit.id} payload:`, JSON.stringify(payload));
     try {
       const result = await apiUpdatePermit(permit.id, payload);
@@ -809,6 +820,13 @@ export const savePermit = async (permit: Permit): Promise<void> => {
 
 export const deletePermit = async (id: string): Promise<void> => {
   await apiDeletePermit(id);
+};
+
+export const getPermitActions = async (permitId: string): Promise<ActionItem[]> => {
+  try {
+    const rows = await apiGetPermitActions(permitId);
+    return (Array.isArray(rows) ? rows : []).map(mapAction);
+  } catch { return []; }
 };
 
 // ---------- Assets ----------
