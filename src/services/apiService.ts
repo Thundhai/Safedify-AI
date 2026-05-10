@@ -53,6 +53,7 @@ const apiFetch = async (path: string, options: RequestInit = {}, timeoutMs = 300
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({ error: res.statusText }));
+      console.error(`[apiFetch] ${method} ${path} → HTTP ${res.status}`, JSON.stringify(body));
       // Provide user-friendly error messages
       if (res.status === 504) {
         throw new Error('Server is taking too long to respond. Please try again.');

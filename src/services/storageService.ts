@@ -770,8 +770,9 @@ export const getPermitById = async (id: string): Promise<Permit | undefined> => 
 export const savePermit = async (permit: Permit): Promise<void> => {
   // New permits have a temp 'ptw-' id — go straight to CREATE
   const isNew = !permit.id || permit.id.startsWith('ptw-');
+  console.log(`[savePermit] isNew=${isNew}, id=${permit.id}, status=${permit.status}`);
   if (isNew) {
-    await apiCreatePermit({
+    const payload = {
       type: permit.type,
       location: permit.location,
       description: permit.description,
@@ -780,13 +781,29 @@ export const savePermit = async (permit: Permit): Promise<void> => {
       requestor: permit.requestor,
       status: permit.status,
       controls: permit.controls,
-    });
+    };
+    console.log('[savePermit] POST /permits payload:', JSON.stringify(payload));
+    try {
+      const result = await apiCreatePermit(payload);
+      console.log('[savePermit] POST /permits SUCCESS:', JSON.stringify(result));
+    } catch (e: any) {
+      console.error('[savePermit] POST /permits FAILED:', e?.message, e?.status, JSON.stringify(e));
+      throw e;
+    }
   } else {
-    await apiUpdatePermit(permit.id, {
+    const payload = {
       status: permit.status,
       approver: permit.approver,
       approver_comments: permit.approverComments,
-    });
+    };
+    console.log(`[savePermit] PUT /permits/${permit.id} payload:`, JSON.stringify(payload));
+    try {
+      const result = await apiUpdatePermit(permit.id, payload);
+      console.log('[savePermit] PUT /permits SUCCESS:', JSON.stringify(result));
+    } catch (e: any) {
+      console.error('[savePermit] PUT /permits FAILED:', e?.message, e?.status, JSON.stringify(e));
+      throw e;
+    }
   }
 };
 

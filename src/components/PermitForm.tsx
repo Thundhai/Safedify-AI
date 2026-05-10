@@ -50,6 +50,15 @@ export const PermitForm: React.FC = () => {
   const [complianceGaps, setComplianceGaps] = useState<ComplianceGap[]>([]);
   const [complianceLoading, setComplianceLoading] = useState(false);
 
+  // ---- DEBUG LOG ----
+  const [debugLogs, setDebugLogs] = useState<{ts: string; level: 'info'|'ok'|'error'; msg: string}[]>([]);
+  const [showDebug, setShowDebug] = useState(false);
+  const dbg = (level: 'info'|'ok'|'error', msg: string) => {
+    const ts = new Date().toISOString().slice(11, 23);
+    console.log(`[PTW-DEBUG ${ts}] [${level.toUpperCase()}] ${msg}`);
+    setDebugLogs(prev => [...prev.slice(-49), { ts, level, msg }]);
+  };
+
   // ---- localStorage key is tied to the permit ID so gaps survive page refreshes ----
   const gapsStorageKey = `safedify_compliance_gaps_${formData.id}`;
 
@@ -62,18 +71,23 @@ export const PermitForm: React.FC = () => {
   
   useEffect(() => {
     const load = async () => {
+      dbg('info', `Load effect. isNew=${isNew}, id=${id || 'none'}`);
       // Load Risks
       setRiskAssessments(await getRiskAssessments());
 
       if (!isNew && id) {
+        dbg('info', `Loading existing permit id=${id}`);
         const existing = await getPermitById(id);
         if (existing) {
+          dbg('ok', `Loaded permit: status=${existing.status}, type=${existing.type}`);
           setFormData(existing);
           // Restore any previously-scanned compliance gaps for this permit
           try {
             const saved = localStorage.getItem(`safedify_compliance_gaps_${existing.id}`);
             if (saved) setComplianceGaps(JSON.parse(saved));
           } catch { /* ignore parse errors */ }
+        } else {
+          dbg('error', `getPermitById(${id}) returned null/undefined`);
         }
       } else {
           // Initialize default checklist for new
@@ -201,20 +215,26 @@ export const PermitForm: React.FC = () => {
   };
 
   const handleCreateActionItem = async (gap: ComplianceGap) => {
-    const result = await apiCreateAction({
-      title: gap.actionItemTitle || gap.description,
-      description: `[Permit: ${formData.id}] Compliance gap identified during ${formData.type} permit audit: ${gap.description}`,
-      priority: 'High',
-      status: 'Open',
-      action_type: 'Corrective',
-      category: 'Permit Compliance',
-      related_permit_id: formData.id,
-    });
-    // Only runs on success (throws on failure — caught by CompliancePanel)
-    setComplianceGaps(prev => prev.map(g =>
-      g.id === gap.id ? { ...g, applied: true, actionItemId: result?.id } : g
-    ));
-    // success toast shown by CompliancePanel
+    dbg('info', `Creating action for gap: "${(gap.actionItemTitle || gap.description).slice(0, 60)}"`);
+    dbg('info', `Payload: related_permit_id=${formData.id}, priority=High, status=Open`);
+    try {
+      const result = await apiCreateAction({
+        title: gap.actionItemTitle || gap.description,
+        description: `[Permit: ${formData.id}] Compliance gap identified during ${formData.type} permit audit: ${gap.description}`,
+        priority: 'High',
+        status: 'Open',
+        action_type: 'Corrective',
+        category: 'Permit Compliance',
+        related_permit_id: formData.id,
+      });
+      dbg('ok', `Action created successfully. ID=${result?.id}`);
+      setComplianceGaps(prev => prev.map(g =>
+        g.id === gap.id ? { ...g, applied: true, actionItemId: result?.id } : g
+      ));
+    } catch (e: any) {
+      dbg('error', `Action creation FAILED: ${e?.message || String(e)}`);
+      throw e; // re-throw so CompliancePanel shows inline error
+    }
   };
 
   const performAudit = async (): Promise<boolean> => {
@@ -263,8 +283,12 @@ export const PermitForm: React.FC = () => {
   };
 
   const handleSave = async (status: PermitStatus) => {
+      dbg('info', `handleSave called. status=${status}, isNew=${isNew}, permitId=${formData.id}`);
+      dbg('info', `formData: type=${formData.type}, location="${formData.location}", description length=${formData.description?.length || 0}, controls=${formData.controls.length}`);
+
       // Only block on missing description when submitting
       if (status === PermitStatus.PENDING && !formData.description) {
+          dbg('error', 'BLOCKED: no description for PENDING submit');
           toast.error("Please enter a work description before submitting for approval.");
           return;
       }
@@ -272,25 +296,30 @@ export const PermitForm: React.FC = () => {
       // Soft-warn about unresolved physical gaps but never block
       if (status === PermitStatus.PENDING) {
           const unresolvedPhysical = complianceGaps.filter(g => g.resolution === 'action_required' && !g.applied);
+          dbg('info', `Unresolved physical gaps: ${unresolvedPhysical.length}`);
           if (unresolvedPhysical.length > 0) {
             const confirmed = window.confirm(
               `⚠️ ${unresolvedPhysical.length} physical action${unresolvedPhysical.length !== 1 ? 's' : ''} flagged by the compliance scan have not been marked as resolved.\n\n` +
               `If you have already created Action Items for them, click OK to continue.\n` +
               `Click Cancel to go back and create Action Items first.`
             );
-            if (!confirmed) return;
+            if (!confirmed) { dbg('info', 'User cancelled at gap warning'); return; }
           }
       }
 
       // Save first — AI audit runs after, so a slow/failed AI call never blocks saving
       setIsSaving(true);
+      dbg('info', `Calling savePermit... isNew=${isNew}, id starts with ptw-=${formData.id?.startsWith('ptw-')}`);
       try {
         const updated = { ...formData, status };
+        dbg('info', `Payload to savePermit: ${JSON.stringify({ type: updated.type, status: updated.status, location: updated.location, descLen: updated.description?.length, controls: updated.controls?.length, valid_from: updated.validFrom, valid_until: updated.validUntil })}`);
         await savePermit(updated);
+        dbg('ok', 'savePermit succeeded — navigating to /permits');
         try { localStorage.removeItem(gapsStorageKey); } catch { /* ignore */ }
         toast.success(`Permit ${status === PermitStatus.PENDING ? 'submitted for approval' : 'saved as draft'}.`);
         navigate('/permits');
       } catch (err: any) {
+        dbg('error', `savePermit FAILED: ${err?.message || String(err)}`);
         console.error("Save permit failed", err);
         toast.error(err?.message || "Failed to save permit. Please try again.");
       } finally {
@@ -299,7 +328,8 @@ export const PermitForm: React.FC = () => {
 
       // Run AI audit in background (non-blocking) for submitted permits
       if (status === PermitStatus.PENDING) {
-          performAudit().catch(() => { /* silently ignore background audit errors */ });
+          dbg('info', 'Starting background AI audit (non-blocking)');
+          performAudit().catch((e: any) => dbg('error', `Background audit error: ${e?.message}`));
       }
   };
 
@@ -583,6 +613,37 @@ export const PermitForm: React.FC = () => {
               </div>
           </div>
       </div>
+
+      {/* ===== DEBUG LOG PANEL ===== */}
+      <div className={`fixed bottom-4 right-4 z-50 w-full max-w-xl shadow-2xl rounded-xl border-2 ${debugLogs.some(l => l.level === 'error') ? 'border-red-500' : 'border-slate-400'} bg-slate-900 text-xs font-mono`}>
+        <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700 cursor-pointer" onClick={() => setShowDebug(p => !p)}>
+          <span className="font-bold text-slate-100">
+            🪲 PTW Debug Log ({debugLogs.length}) {debugLogs.some(l => l.level === 'error') ? '⛔ ERRORS' : ''}
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); const text = debugLogs.map(l => `[${l.ts}] [${l.level.toUpperCase()}] ${l.msg}`).join('\n'); navigator.clipboard.writeText(text).then(() => toast.success('Logs copied!')); }}
+              className="px-2 py-0.5 bg-slate-600 hover:bg-slate-500 text-white rounded text-xs"
+            >Copy</button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setDebugLogs([]); }}
+              className="px-2 py-0.5 bg-slate-600 hover:bg-red-700 text-white rounded text-xs"
+            >Clear</button>
+            <span className="text-slate-400">{showDebug ? '▲' : '▼'}</span>
+          </div>
+        </div>
+        {showDebug && (
+          <div className="max-h-60 overflow-y-auto p-2 space-y-0.5">
+            {debugLogs.length === 0 && <p className="text-slate-400 italic">No logs yet. Click Save Draft or Submit to start.</p>}
+            {debugLogs.map((l, i) => (
+              <div key={i} className={`${l.level === 'error' ? 'text-red-400' : l.level === 'ok' ? 'text-green-400' : 'text-slate-300'}`}>
+                <span className="text-slate-500">[{l.ts}]</span> {l.msg}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      {/* ===== END DEBUG LOG PANEL ===== */}
     </div>
   );
 };
