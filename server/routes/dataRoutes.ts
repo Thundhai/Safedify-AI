@@ -60,7 +60,7 @@ const actionSchema: ValidationSchema = {
   due_date: { type: 'date', required: false },
   completed_date: { type: 'date', required: false },
   priority: { type: 'string', required: false, maxLength: 50, enum: ['Low', 'Medium', 'High', 'Critical'] },
-  status: { type: 'string', required: false, maxLength: 50, enum: ['Open', 'In Progress', 'Done', 'Overdue', 'Cancelled'] },
+  status: { type: 'string', required: false, maxLength: 50, enum: ['Open', 'In Progress', 'Done', 'Overdue', 'Verified', 'Cancelled'] },
   action_type: { type: 'string', required: false, maxLength: 100, enum: ['Corrective', 'Preventive', 'Improvement'] },
   category: { type: 'string', required: false, maxLength: 100, trim: true },
   indicator: { type: 'string', required: false, maxLength: 50, enum: ['Leading', 'Lagging'] },

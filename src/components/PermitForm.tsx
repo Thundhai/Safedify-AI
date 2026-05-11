@@ -23,9 +23,8 @@ type ActionItemStatus = ActionItem['status'];
 const ACTION_STATUS_CYCLE: Record<string, ActionItemStatus> = {
   'Open': 'In Progress',
   'In Progress': 'Done',
-  'Done': 'Open',
+  // 'Done'/'Verified': require explicit reopen — no auto-cycle
   'Overdue': 'In Progress',
-  'Verified': 'Open',
 };
 
 const ACTION_STATUS_COLOR: Record<string, string> = {
@@ -85,6 +84,8 @@ export const PermitForm: React.FC = () => {
   const [loadingActions, setLoadingActions] = useState(false);
   const [updatingActionId, setUpdatingActionId] = useState<string | null>(null);
   const [showApproveModal, setShowApproveModal] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [closeChecklist, setCloseChecklist] = useState<Record<string, boolean>>({});
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [approverComment, setApproverComment] = useState('');
   const [rejectReason, setRejectReason] = useState('');
@@ -254,12 +255,23 @@ export const PermitForm: React.FC = () => {
       return;
     }
     if (status === PermitStatus.PENDING) {
+      // Block if compliance scan found unresolved physical action requirements
       const unresolvedPhysical = complianceGaps.filter(g => g.resolution === 'action_required' && !g.applied);
       if (unresolvedPhysical.length > 0) {
-        const confirmed = window.confirm(
-          `âš ï¸ ${unresolvedPhysical.length} physical action${unresolvedPhysical.length !== 1 ? 's' : ''} flagged by compliance scan are unresolved.\n\nIf you have created Action Items for them, click OK to continue. Cancel to go back.`
-        );
-        if (!confirmed) return;
+        toast.error(`${unresolvedPhysical.length} compliance gap${unresolvedPhysical.length !== 1 ? 's' : ''} require action items. Click "Create Action Item" for each before submitting.`);
+        return;
+      }
+      // Block if any linked actions are not yet resolved
+      const openActions = linkedActions.filter(a => a.status !== 'Done' && a.status !== 'Verified');
+      if (openActions.length > 0) {
+        toast.error(`${openActions.length} linked action${openActions.length !== 1 ? 's' : ''} ${openActions.length !== 1 ? 'are' : 'is'} not yet resolved. Complete all actions before submitting.`);
+        return;
+      }
+      // Run AI audit BEFORE saving (so user sees any issues)
+      const auditOk = await performAudit();
+      if (!auditOk) {
+        const proceed = window.confirm('AI Audit detected critical issues. Do you still want to submit this permit?');
+        if (!proceed) return;
       }
     }
     setIsSaving(true);
@@ -268,10 +280,9 @@ export const PermitForm: React.FC = () => {
       try { localStorage.removeItem(gapsStorageKey); } catch { /* ignore */ }
       toast.success(status === PermitStatus.PENDING ? 'Permit submitted for approval.' : 'Permit saved as draft.');
       navigate('/permits');
-    } catch (err: any) {
-      toast.error(err?.message || 'Failed to save permit. Please try again.');
+    } catch (err) {
+      toast.error((err as any)?.message || 'Failed to save permit. Please try again.');
     } finally { setIsSaving(false); }
-    if (status === PermitStatus.PENDING) performAudit().catch(() => {});
   };
 
   const handleApprove = async () => {
@@ -301,27 +312,91 @@ export const PermitForm: React.FC = () => {
     finally { setIsSaving(false); }
   };
 
-  const handleClose = async () => {
-    const confirmed = window.confirm('Close this permit? This confirms all work has been completed safely.');
-    if (!confirmed) return;
+  const closeChecklistItems: Record<string, string[]> = {
+    [PermitType.HOT_WORK]: [
+      'All ignition sources removed from site',
+      'Fire extinguishers returned to storage',
+      'Hot surfaces have cooled to safe temperature',
+      'Fire watch completed and sign-off obtained',
+      'Work area inspected — no smouldering materials',
+    ],
+    [PermitType.CONFINED_SPACE]: [
+      'All personnel have exited the confined space',
+      'Atmosphere re-tested and confirmed safe',
+      'Ventilation equipment removed',
+      'Entry points sealed and secured',
+      'All tools and materials accounted for',
+    ],
+    [PermitType.HEIGHT]: [
+      'All personnel safely descended to ground level',
+      'Fall arrest equipment inspected and stored',
+      'Elevated work platform or scaffolding secured',
+      'Work area below cleared of dropped objects',
+    ],
+    [PermitType.ELECTRICAL]: [
+      'Electrical equipment re-energised safely',
+      'LOTO locks removed by authorised persons',
+      'Insulation and covers replaced',
+      'All temporary grounding removed',
+      'Electrical isolation register updated',
+    ],
+    [PermitType.EXCAVATION]: [
+      'Excavation backfilled or securely barricaded',
+      'Shoring / supports removed safely',
+      'Underground services verified undamaged',
+      'Site reinstated to original condition',
+    ],
+    [PermitType.LIFTING]: [
+      'Load safely landed and secured',
+      'Rigging and lifting gear removed and inspected',
+      'Crane / lifting equipment de-rigged',
+      'Exclusion zone removed',
+    ],
+    [PermitType.COLD_WORK]: [
+      'Work area cleaned and restored',
+      'All tools and materials removed',
+      'Waste disposed of safely',
+      'Site handover completed',
+    ],
+  };
+
+  const handleClose = () => {
+    setCloseChecklist({});
+    setShowCloseModal(true);
+  };
+
+  const handleConfirmClose = async () => {
+    const items = closeChecklistItems[formData.type] ?? closeChecklistItems[PermitType.COLD_WORK] ?? [];
+    const allChecked = items.every((_: string, i: number) => closeChecklist[`item-${i}`]);
+    if (!allChecked) {
+      toast.error('Complete all close-out checklist items before closing.');
+      return;
+    }
     setIsSaving(true);
     try {
       const updated: Permit = { ...formData, status: PermitStatus.CLOSED };
       await savePermit(updated);
       setFormData(updated);
-      toast.success('Permit closed. Work completion recorded.');
-    } catch (err: any) { toast.error(err?.message || 'Failed to close permit.'); }
+      setShowCloseModal(false);
+      toast.success('Permit closed. Work completion confirmed and recorded.');
+    } catch (err: unknown) { toast.error((err as any)?.message || 'Failed to close permit.'); }
     finally { setIsSaving(false); }
   };
 
   const handleToggleActionStatus = async (action: ActionItem) => {
-    const nextStatus = ACTION_STATUS_CYCLE[action.status] || 'Open';
+    const nextStatus = ACTION_STATUS_CYCLE[action.status];
+    if (!nextStatus) {
+      // Done/Verified: require explicit confirmation before reopening
+      const reopen = window.confirm(`This action is "${action.status}". Do you want to reopen it?`);
+      if (!reopen) return;
+    }
+    const finalStatus = (nextStatus || "Open") as ActionItemStatus;
     setUpdatingActionId(action.id);
     try {
-      await apiUpdateAction(action.id, { status: nextStatus });
-      setLinkedActions(prev => prev.map(a => a.id === action.id ? { ...a, status: nextStatus } : a));
-      toast.success(`Action marked as ${nextStatus}.`);
-    } catch { toast.error('Failed to update action status.'); }
+      await apiUpdateAction(action.id, { status: finalStatus });
+      setLinkedActions(prev => prev.map(a => a.id === action.id ? { ...a, status: finalStatus } : a));
+      toast.success(`Action marked as ${finalStatus}.`);
+    } catch { toast.error("Failed to update action status."); }
     finally { setUpdatingActionId(null); }
   };
 
@@ -420,7 +495,34 @@ export const PermitForm: React.FC = () => {
         </div>
       </div>
 
-      {/* Workflow progress bar */}
+            {/* Auto-expiry banner for Active permits past validUntil */}
+            {formData.status === PermitStatus.APPROVED && isExpired && (
+              <div className="bg-orange-50 border border-orange-300 rounded-xl p-4 flex items-center gap-3">
+                <AlertTriangle size={20} className="text-orange-500 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-semibold text-orange-800 text-sm">This permit has expired</p>
+                  <p className="text-orange-700 text-xs mt-0.5">The permit validity period has passed. Please close this permit to confirm all work has been completed safely.</p>
+                </div>
+                {(isCreator || canApprove) && (
+                  <button onClick={handleClose} disabled={isSaving} className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-700 shrink-0">
+                    Close Now
+                  </button>
+                )}
+              </div>
+            )}
+      
+            {/* All actions resolved banner — show on Rejected permits with 0 open actions */}
+            {formData.status === PermitStatus.REJECTED && linkedActions.length > 0 && linkedActions.every(a => a.status === "Done" || a.status === "Verified") && (
+              <div className="bg-green-50 border border-green-300 rounded-xl p-4 flex items-center gap-3">
+                <CheckCircle size={20} className="text-green-600 shrink-0" />
+                <div>
+                  <p className="font-semibold text-green-800 text-sm">All required actions are resolved</p>
+                  <p className="text-green-700 text-xs mt-0.5">All linked action items are Done or Verified. You can now resubmit this permit for approval.</p>
+                </div>
+              </div>
+            )}
+      
+            {/* Workflow progress bar */}
       {!isNew && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
           <div className="flex items-center justify-between relative">
@@ -782,6 +884,43 @@ export const PermitForm: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* ---- Close-out Checklist Modal ---- */}
+      {showCloseModal && (() => {
+        const items = closeChecklistItems[formData.type] ?? closeChecklistItems[PermitType.COLD_WORK] ?? [];
+        const allChecked = items.every((_: string, i: number) => closeChecklist[`item-${i}`]);
+        return (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center"><CheckSquare size={20} className="text-slate-600" /></div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">Close-Out Checklist</h2>
+                  <p className="text-sm text-slate-500">{formData.type} — {formData.location}</p>
+                </div>
+              </div>
+              <p className="text-sm text-slate-600">Confirm all close-out requirements are met before closing this permit:</p>
+              <div className="space-y-2">
+                {items.map((item, i) => (
+                  <label key={i} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer ${closeChecklist[`item-${i}`] ? "bg-green-50 border-green-200" : "bg-slate-50 border-slate-200 hover:bg-slate-100"}`}>
+                    <input type="checkbox" checked={!!closeChecklist[`item-${i}`]} onChange={(e) => setCloseChecklist(prev => ({ ...prev, [`item-${i}`]: e.target.checked }))}
+                      className="w-4 h-4 accent-green-600" />
+                    <span className={`text-sm ${closeChecklist[`item-${i}`] ? "text-green-800 font-medium" : "text-slate-700"}`}>{item}</span>
+                  </label>
+                ))}
+              </div>
+              {!allChecked && <p className="text-xs text-red-500">Complete all items above to enable close-out.</p>}
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => setShowCloseModal(false)} className="flex-1 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 font-medium text-sm">Cancel</button>
+                <button onClick={handleConfirmClose} disabled={isSaving || !allChecked}
+                  className="flex-1 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+                  {isSaving ? <Loader2 size={16} className="animate-spin" /> : <CheckSquare size={16} />} Confirm Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
