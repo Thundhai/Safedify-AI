@@ -86,6 +86,8 @@ export const PermitForm: React.FC = () => {
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closeChecklist, setCloseChecklist] = useState<Record<string, boolean>>({});
+  const [editingAction, setEditingAction] = useState<ActionItem | null>(null);
+  const [isSavingAction, setIsSavingAction] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [approverComment, setApproverComment] = useState('');
   const [rejectReason, setRejectReason] = useState('');
@@ -381,6 +383,29 @@ export const PermitForm: React.FC = () => {
       toast.success('Permit closed. Work completion confirmed and recorded.');
     } catch (err: unknown) { toast.error((err as any)?.message || 'Failed to close permit.'); }
     finally { setIsSaving(false); }
+  };
+
+  const handleSaveEditedAction = async () => {
+    if (!editingAction) return;
+    setIsSavingAction(true);
+    try {
+      await apiUpdateAction(editingAction.id, {
+        title: editingAction.title,
+        description: editingAction.description,
+        assignee: editingAction.assignee,
+        due_date: editingAction.dueDate,
+        priority: editingAction.priority,
+        status: editingAction.status,
+        completed_date: (editingAction.status === 'Done' || editingAction.status === 'Verified')
+          ? (editingAction.completedDate || new Date().toISOString().split('T')[0])
+          : undefined,
+      });
+      setLinkedActions(prev => prev.map(a => a.id === editingAction.id ? editingAction : a));
+      setEditingAction(null);
+      toast.success('Action item updated.');
+    } catch (err: unknown) {
+      toast.error((err as any)?.message || 'Failed to update action item.');
+    } finally { setIsSavingAction(false); }
   };
 
   const handleToggleActionStatus = async (action: ActionItem) => {
@@ -702,43 +727,55 @@ export const PermitForm: React.FC = () => {
                   {isEditable && <p className="text-xs text-slate-400 mt-1">Run a compliance scan to generate action items.</p>}
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {linkedActions.map(action => (
-                    <div key={action.id} className="flex items-start justify-between gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-800 truncate">{action.title}</p>
-                        {action.description && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{action.description}</p>}
-                        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                          {action.assignee && (
-                            <span className="flex items-center gap-1 text-xs text-slate-500"><User size={10} /> {action.assignee}</span>
-                          )}
-                          {action.dueDate && (
-                            <span className="flex items-center gap-1 text-xs text-slate-500"><Calendar size={10} /> {new Date(action.dueDate).toLocaleDateString()}</span>
-                          )}
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${
-                            action.priority === 'High' ? 'bg-red-50 text-red-700 border-red-200' :
-                            action.priority === 'Medium' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
-                            'bg-slate-50 text-slate-600 border-slate-200'
-                          }`}>{action.priority}</span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-2 shrink-0">
-                        <button
-                          onClick={() => handleToggleActionStatus(action)}
-                          disabled={updatingActionId === action.id}
-                          title={`Click to mark as ${ACTION_STATUS_CYCLE[action.status] || 'Open'}`}
-                          className={`text-xs px-2.5 py-1 rounded-full font-medium border transition-all hover:opacity-80 ${ACTION_STATUS_COLOR[action.status] || 'bg-slate-100 text-slate-700 border-slate-200'}`}
-                        >
-                          {updatingActionId === action.id ? <Loader2 size={10} className="animate-spin inline" /> : action.status}
-                        </button>
-                        <button onClick={() => navigate(`/actions/${action.id}`)}
-                          className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-0.5">
-                          View <ExternalLink size={10} />
-                        </button>
+                <>
+                  {/* Blocked banner — shown when open actions exist */}
+                  {linkedActions.some(a => a.status !== 'Done' && a.status !== 'Verified') && (
+                    <div className="mb-3 flex items-start gap-2 bg-amber-50 border border-amber-300 rounded-lg p-3">
+                      <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-semibold text-amber-800">
+                          {linkedActions.filter(a => a.status !== 'Done' && a.status !== 'Verified').length} action{linkedActions.filter(a => a.status !== 'Done' && a.status !== 'Verified').length !== 1 ? 's' : ''} must be resolved before this permit can be submitted.
+                        </p>
+                        <p className="text-xs text-amber-700 mt-0.5">Click <strong>Edit</strong> on each action below to update its status to <strong>Done</strong> once the work is complete.</p>
                       </div>
                     </div>
-                  ))}
-                </div>
+                  )}
+                  <div className="space-y-3">
+                    {linkedActions.map(action => {
+                      const isResolved = action.status === 'Done' || action.status === 'Verified';
+                      return (
+                        <div key={action.id} className={`p-3 rounded-lg border transition-colors ${isResolved ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'}`}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold border ${ACTION_STATUS_COLOR[action.status] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                                  {isResolved ? <CheckCircle size={10} /> : <AlertTriangle size={10} />}
+                                  {action.status}
+                                </span>
+                                <p className="text-sm font-medium text-slate-800 truncate">{action.title}</p>
+                              </div>
+                              {action.description && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{action.description}</p>}
+                              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                {action.assignee && <span className="flex items-center gap-1 text-xs text-slate-500"><User size={10} /> {action.assignee}</span>}
+                                {action.dueDate && <span className="flex items-center gap-1 text-xs text-slate-500"><Calendar size={10} /> Due {new Date(action.dueDate).toLocaleDateString()}</span>}
+                                <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${action.priority === 'High' || action.priority === 'Critical' ? 'bg-red-100 text-red-700' : action.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{action.priority}</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-1.5 shrink-0">
+                              <button onClick={() => setEditingAction({ ...action })}
+                                className="text-xs px-2.5 py-1 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center gap-1">
+                                ✏️ Edit
+                              </button>
+                            </div>
+                          </div>
+                          {!isResolved && (
+                            <p className="text-xs text-amber-700 mt-2 font-medium">⚠ Must be marked Done before permit can be submitted</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -879,6 +916,92 @@ export const PermitForm: React.FC = () => {
               <button onClick={handleReject} disabled={isSaving || !rejectReason.trim()}
                 className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-60">
                 {isSaving ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />} Confirm Rejection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---- Inline Action Edit Modal ---- */}
+      {editingAction && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-800">Edit Action Item</h2>
+              <button onClick={() => setEditingAction(null)} className="text-slate-400 hover:text-slate-600"><XCircle size={20} /></button>
+            </div>
+
+            {/* Status — most important, at top */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Status</label>
+              <div className="flex flex-wrap gap-2">
+                {(['Open', 'In Progress', 'Done', 'Verified'] as const).map(s => (
+                  <button key={s} onClick={() => setEditingAction(prev => prev ? { ...prev, status: s } : prev)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${editingAction.status === s
+                      ? s === 'Done' || s === 'Verified' ? 'bg-green-600 text-white border-green-600' : s === 'In Progress' ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-600 text-white border-slate-600'
+                      : 'bg-white text-slate-500 border-slate-300 hover:border-slate-400'}`}>
+                    {s === 'Done' && '✓ '}{s === 'Verified' && '✓✓ '}{s}
+                  </button>
+                ))}
+              </div>
+              {(editingAction.status === 'Done' || editingAction.status === 'Verified') && (
+                <p className="text-xs text-green-700 mt-1.5 font-medium">✓ This action is resolved — permit submission will be unblocked once all actions are Done or Verified.</p>
+              )}
+            </div>
+
+            {/* Title */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">Title</label>
+              <input value={editingAction.title} onChange={e => setEditingAction(prev => prev ? { ...prev, title: e.target.value } : prev)}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" />
+            </div>
+
+            {/* Description / completion notes */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">
+                {editingAction.status === 'Done' || editingAction.status === 'Verified' ? 'Completion Notes' : 'Description'}
+              </label>
+              <textarea value={editingAction.description || ''} rows={3}
+                onChange={e => setEditingAction(prev => prev ? { ...prev, description: e.target.value } : prev)}
+                placeholder={editingAction.status === 'Done' || editingAction.status === 'Verified' ? 'Describe what was done to resolve this action...' : 'Describe what needs to be done...'}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none resize-none" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {/* Assignee */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">Assigned To</label>
+                <input value={editingAction.assignee || ''} onChange={e => setEditingAction(prev => prev ? { ...prev, assignee: e.target.value } : prev)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" />
+              </div>
+              {/* Due Date */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">Due Date</label>
+                <input type="date" value={editingAction.dueDate || ''} onChange={e => setEditingAction(prev => prev ? { ...prev, dueDate: e.target.value } : prev)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" />
+              </div>
+            </div>
+
+            {/* Priority */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Priority</label>
+              <div className="flex gap-2">
+                {(['Low', 'Medium', 'High', 'Critical'] as const).map(p => (
+                  <button key={p} onClick={() => setEditingAction(prev => prev ? { ...prev, priority: p } : prev)}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border transition-all ${editingAction.priority === p
+                      ? p === 'Critical' || p === 'High' ? 'bg-red-600 text-white border-red-600' : p === 'Medium' ? 'bg-amber-500 text-white border-amber-500' : 'bg-slate-500 text-white border-slate-500'
+                      : 'bg-white text-slate-500 border-slate-300 hover:border-slate-400'}`}>
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setEditingAction(null)} className="flex-1 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 font-medium text-sm">Cancel</button>
+              <button onClick={handleSaveEditedAction} disabled={isSavingAction}
+                className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+                {isSavingAction ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />} Save Action
               </button>
             </div>
           </div>
