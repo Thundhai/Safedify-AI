@@ -2,6 +2,7 @@
   "name": "safedify-ai-platform",
   "private": true,
   "version": "1.0.0",
+  "license": "UNLICENSED",
   "type": "module",
   "scripts": {
     "dev": "vite",

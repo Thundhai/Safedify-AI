@@ -262,4 +262,5 @@ See `server/postgres-schema.sql` for the full schema.
 
 ## License
 
-MIT
+This project is provided with no open-source license.
+You may view the source on GitHub, but no right to use, copy, modify, or redistribute this code is granted without explicit written permission from the owner.
