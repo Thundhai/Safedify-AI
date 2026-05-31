@@ -92,17 +92,24 @@ router.get('/members', async (req: AuthRequest, res: Response) => {
   const orgId = req.user?.org_id;
   if (!orgId) { res.status(404).json({ error: 'No organization found' }); return; }
 
-  const result = await pool.query(
-    `SELECT id, name, email, role, avatar, created_at 
-     FROM users WHERE org_id = $1 ORDER BY created_at ASC`,
-    [orgId]
-  );
+  const assignableOnly = String(req.query.assignable_only || '').toLowerCase() === 'true';
+  const query = assignableOnly
+    ? `SELECT id, name, email, role, avatar, created_at
+       FROM users
+       WHERE org_id = $1 AND role != 'Worker'
+       ORDER BY created_at ASC`
+    : `SELECT id, name, email, role, avatar, created_at
+       FROM users
+       WHERE org_id = $1
+       ORDER BY created_at ASC`;
+
+  const result = await pool.query(query, [orgId]);
 
   // Get owner_id to mark on response
   const orgResult = await pool.query('SELECT owner_id FROM organizations WHERE id = $1', [orgId]);
   const ownerId = orgResult.rows[0]?.owner_id;
 
-  res.json(result.rows.map(m => ({
+  res.json(result.rows.map((m: any) => ({
     ...m,
     isOwner: m.id === ownerId,
   })));

@@ -11,12 +11,19 @@ import { auditPermitAI, complianceGapAnalysisAI } from '../services/geminiServic
 import { SmartTextInput, SmartTextArea } from './SmartTextInput';
 import { Permit, PermitType, PermitStatus, RiskAssessment, ComplianceGap, ActionItem } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { apiCreateAction, apiUpdateAction } from '../services/apiService';
+import { apiCreateAction, apiGetOrgMembers, apiUpdateAction } from '../services/apiService';
 import { CompliancePanel } from './CompliancePanel';
 import toast from 'react-hot-toast';
 
 // Roles that can approve / reject permits (UI-level check; server enforces too)
 const APPROVER_ROLES = ['Admin', 'HSE Manager', 'HSE Supervisor', 'Construction Manager', 'Operations Manager'];
+
+interface OrgMemberSummary {
+  id: string;
+  name: string;
+  role: string;
+  avatar?: string;
+}
 
 type ActionItemStatus = ActionItem['status'];
 
@@ -33,6 +40,59 @@ const ACTION_STATUS_COLOR: Record<string, string> = {
   'Done': 'bg-green-100 text-green-800 border-green-200',
   'Overdue': 'bg-red-100 text-red-800 border-red-200',
   'Verified': 'bg-purple-100 text-purple-800 border-purple-200',
+};
+
+const isResolvedAction = (action: ActionItem) => action.status === 'Done' || action.status === 'Verified';
+
+const getActionDueState = (action: ActionItem) => {
+  if (!action.dueDate || isResolvedAction(action)) {
+    return null;
+  }
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const dueDate = new Date(action.dueDate);
+  dueDate.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.round((dueDate.getTime() - startOfToday.getTime()) / 86400000);
+
+  if (diffDays < 0) {
+    return {
+      tone: 'overdue' as const,
+      label: `${Math.abs(diffDays)}d overdue`,
+      classes: 'bg-red-100 text-red-700 border-red-200',
+    };
+  }
+
+  if (diffDays === 0) {
+    return {
+      tone: 'today' as const,
+      label: 'Due today',
+      classes: 'bg-amber-100 text-amber-800 border-amber-200',
+    };
+  }
+
+  if (diffDays <= 2) {
+    return {
+      tone: 'soon' as const,
+      label: `Due in ${diffDays}d`,
+      classes: 'bg-orange-100 text-orange-800 border-orange-200',
+    };
+  }
+
+  return null;
+};
+
+const getActionCardTone = (action: ActionItem) => {
+  if (action.status === 'Overdue') return 'bg-red-50 border-red-200';
+  if (isResolvedAction(action)) return 'bg-green-50 border-green-200';
+  return 'bg-slate-50 border-slate-200';
+};
+
+const isDueSoonAction = (action: ActionItem) => {
+  const dueState = getActionDueState(action);
+  return dueState?.tone === 'today' || dueState?.tone === 'soon';
 };
 
 function useCountdown(validUntil: string, active: boolean) {
@@ -86,12 +146,16 @@ export const PermitForm: React.FC = () => {
   const [complianceGaps, setComplianceGaps] = useState<ComplianceGap[]>([]);
   const [complianceLoading, setComplianceLoading] = useState(false);
   const [linkedActions, setLinkedActions] = useState<ActionItem[]>([]);
+  const [orgMembers, setOrgMembers] = useState<OrgMemberSummary[]>([]);
+  const [loadingOrgMembers, setLoadingOrgMembers] = useState(false);
   const [loadingActions, setLoadingActions] = useState(false);
   const [updatingActionId, setUpdatingActionId] = useState<string | null>(null);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closeChecklist, setCloseChecklist] = useState<Record<string, boolean>>({});
   const [editingAction, setEditingAction] = useState<ActionItem | null>(null);
+  const [assigneeSearch, setAssigneeSearch] = useState('');
+  const [showAssigneeSuggestions, setShowAssigneeSuggestions] = useState(false);
   const [isSavingAction, setIsSavingAction] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [approverComment, setApproverComment] = useState('');
@@ -120,6 +184,15 @@ export const PermitForm: React.FC = () => {
   useEffect(() => {
     const load = async () => {
       setRiskAssessments(await getRiskAssessments());
+      setLoadingOrgMembers(true);
+      try {
+        const members = await apiGetOrgMembers(true);
+        setOrgMembers(Array.isArray(members) ? members : []);
+      } catch (err) {
+        console.error('Failed to load assignable org members', err);
+      } finally {
+        setLoadingOrgMembers(false);
+      }
       if (!isNew && id) {
         const existing = await getPermitById(id);
         if (existing) {
@@ -137,6 +210,27 @@ export const PermitForm: React.FC = () => {
     load();
   }, [id, isNew]);
 
+  const resolveAssigneeDisplayName = useCallback((assignee?: string) => {
+    if (!assignee) return '';
+    return orgMembers.find(member => member.id === assignee)?.name || assignee;
+  }, [orgMembers]);
+
+  const getSupervisorAssigneeValue = useCallback(() => {
+    const supervisorName = formData.supervisorName?.trim();
+    if (!supervisorName) return '';
+    return orgMembers.find(member => member.name === supervisorName)?.id || supervisorName;
+  }, [formData.supervisorName, orgMembers]);
+
+  useEffect(() => {
+    if (!editingAction) {
+      setAssigneeSearch('');
+      setShowAssigneeSuggestions(false);
+      return;
+    }
+
+    setAssigneeSearch(resolveAssigneeDisplayName(editingAction.assignee));
+  }, [editingAction, resolveAssigneeDisplayName]);
+
   const isCreator = formData.requestor === user?.name || user?.role === 'Admin';
   const isEditable = isNew || ((formData.status === PermitStatus.DRAFT || formData.status === PermitStatus.REJECTED) && isCreator);
 
@@ -144,6 +238,18 @@ export const PermitForm: React.FC = () => {
 
   const validityRangeInvalid = !!formData.validFrom && !!formData.validUntil
     && new Date(formData.validUntil).getTime() <= new Date(formData.validFrom).getTime();
+  const unresolvedLinkedActions = linkedActions.filter(action => !isResolvedAction(action));
+  const missingOwnerActions = unresolvedLinkedActions.filter(action => !action.assignee?.trim());
+  const missingDueDateActions = unresolvedLinkedActions.filter(action => !action.dueDate);
+  const overdueLinkedActions = unresolvedLinkedActions.filter(action => action.status === 'Overdue' || getActionDueState(action)?.tone === 'overdue');
+  const dueSoonLinkedActions = unresolvedLinkedActions.filter(isDueSoonAction);
+  const blockingPermitActions = unresolvedLinkedActions.filter(action => !isDueSoonAction(action));
+  const resolvedLinkedActions = linkedActions.filter(isResolvedAction);
+  const assigneeSuggestions = orgMembers.filter(member => {
+    const search = assigneeSearch.trim().toLowerCase();
+    if (!search) return true;
+    return member.name.toLowerCase().includes(search) || member.role.toLowerCase().includes(search);
+  }).slice(0, 8);
 
   const handleTypeChange = (newType: PermitType) => {
     setFormData(prev => ({
@@ -225,7 +331,7 @@ export const PermitForm: React.FC = () => {
       title: gap.actionItemTitle || gap.description,
       description: `[Permit: ${formData.id}] Compliance gap identified during ${formData.type} permit audit: ${gap.description}`,
       priority: 'High', status: 'Open', action_type: 'Corrective',
-      category: 'Permit Compliance', indicator: 'Lagging', related_permit_id: formData.id,
+      category: 'Regulatory Compliance', indicator: 'Lagging', related_permit_id: formData.id,
     });
     setComplianceGaps(prev => prev.map(g => g.id === gap.id ? { ...g, applied: true, actionItemId: result?.id } : g));
     if (!isNew && id) {
@@ -239,7 +345,7 @@ export const PermitForm: React.FC = () => {
         priority: 'High',
         status: 'Open',
         actionType: 'Corrective',
-        category: 'Permit Compliance',
+        category: 'Regulatory Compliance',
         indicator: 'Lagging',
         relatedPermitId: id,
         effectiveness: 'Not Assessed',
@@ -452,6 +558,39 @@ export const PermitForm: React.FC = () => {
     } finally { setIsSavingAction(false); }
   };
 
+  const handleQuickActionUpdate = async (
+    action: ActionItem,
+    changes: Partial<ActionItem>,
+    successMessage: string,
+    errorMessage: string,
+  ) => {
+    const previousAction = { ...action };
+    const nextAction = { ...action, ...changes };
+
+    setUpdatingActionId(action.id);
+    setLinkedActions(prev => prev.map(item => item.id === action.id ? nextAction : item));
+
+    try {
+      await apiUpdateAction(action.id, {
+        title: nextAction.title,
+        description: nextAction.description,
+        assignee: nextAction.assignee,
+        due_date: nextAction.dueDate,
+        priority: nextAction.priority,
+        status: nextAction.status,
+        completed_date: (nextAction.status === 'Done' || nextAction.status === 'Verified')
+          ? (nextAction.completedDate || new Date().toISOString().split('T')[0])
+          : undefined,
+      });
+      toast.success(successMessage);
+    } catch (err: unknown) {
+      setLinkedActions(prev => prev.map(item => item.id === action.id ? previousAction : item));
+      toast.error((err as any)?.message || errorMessage);
+    } finally {
+      setUpdatingActionId(null);
+    }
+  };
+
   const handleToggleActionStatus = async (action: ActionItem) => {
     const nextStatus = ACTION_STATUS_CYCLE[action.status];
     if (!nextStatus) {
@@ -460,13 +599,17 @@ export const PermitForm: React.FC = () => {
       if (!reopen) return;
     }
     const finalStatus = (nextStatus || "Open") as ActionItemStatus;
-    setUpdatingActionId(action.id);
-    try {
-      await apiUpdateAction(action.id, { status: finalStatus });
-      setLinkedActions(prev => prev.map(a => a.id === action.id ? { ...a, status: finalStatus } : a));
-      toast.success(`Action marked as ${finalStatus}.`);
-    } catch { toast.error("Failed to update action status."); }
-    finally { setUpdatingActionId(null); }
+    await handleQuickActionUpdate(
+      action,
+      {
+        status: finalStatus,
+        completedDate: finalStatus === 'Done' || finalStatus === 'Verified'
+          ? (action.completedDate || new Date().toISOString().split('T')[0])
+          : undefined,
+      },
+      `Action marked as ${finalStatus}.`,
+      'Failed to update action status.',
+    );
   };
 
   const statusConfig: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
@@ -844,54 +987,153 @@ export const PermitForm: React.FC = () => {
                 </div>
               ) : (
                 <>
+                  <div className="mb-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Open blockers</p>
+                      <p className="mt-1 text-2xl font-bold text-slate-900">{unresolvedLinkedActions.length}</p>
+                      <p className="text-xs text-slate-500">Need Done or Verified</p>
+                    </div>
+                    <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-red-600">Overdue</p>
+                      <p className="mt-1 text-2xl font-bold text-red-700">{overdueLinkedActions.length}</p>
+                      <p className="text-xs text-red-600">Past due date</p>
+                    </div>
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Missing owner</p>
+                      <p className="mt-1 text-2xl font-bold text-amber-800">{missingOwnerActions.length}</p>
+                      <p className="text-xs text-amber-700">No assignee yet</p>
+                    </div>
+                    <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Due soon</p>
+                      <p className="mt-1 text-2xl font-bold text-blue-800">{dueSoonLinkedActions.length}</p>
+                      <p className="text-xs text-blue-700">Today or next 2 days</p>
+                    </div>
+                  </div>
+
                   {/* Blocked banner — shown when open actions exist */}
-                  {linkedActions.some(a => a.status !== 'Done' && a.status !== 'Verified') && (
+                  {unresolvedLinkedActions.length > 0 && (
                     <div className="mb-3 flex items-start gap-2 bg-amber-50 border border-amber-300 rounded-lg p-3">
                       <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
                       <div>
                         <p className="text-xs font-semibold text-amber-800">
-                          {linkedActions.filter(a => a.status !== 'Done' && a.status !== 'Verified').length} action{linkedActions.filter(a => a.status !== 'Done' && a.status !== 'Verified').length !== 1 ? 's' : ''} must be resolved before this permit can be submitted.
+                          {unresolvedLinkedActions.length} action{unresolvedLinkedActions.length !== 1 ? 's' : ''} must be resolved before this permit can be submitted.
                         </p>
-                        <p className="text-xs text-amber-700 mt-0.5">Use <strong>Advance Status</strong> for quick progress updates, or <strong>Edit</strong> to assign ownership, due dates, and completion notes.</p>
+                        <p className="text-xs text-amber-700 mt-0.5">{missingOwnerActions.length > 0 ? `${missingOwnerActions.length} without owners. ` : ''}{missingDueDateActions.length > 0 ? `${missingDueDateActions.length} without due dates. ` : ''}{overdueLinkedActions.length > 0 ? `${overdueLinkedActions.length} already overdue. ` : ''}Use <strong>Advance Status</strong> for quick progress updates, or <strong>Edit</strong> to assign ownership, due dates, and completion notes.</p>
                       </div>
                     </div>
                   )}
-                  <div className="space-y-3">
-                    {linkedActions.map(action => {
-                      const isResolved = action.status === 'Done' || action.status === 'Verified';
+                  <div className="space-y-5">
+                    {[
+                      { key: 'due-soon', title: 'Due Soon', tone: 'text-blue-800', description: 'Open actions with due dates in the next 48 hours.', actions: dueSoonLinkedActions },
+                      { key: 'blocking', title: 'Blocking Permit', tone: 'text-amber-800', description: 'Open actions still preventing permit submission.', actions: blockingPermitActions },
+                      { key: 'resolved', title: 'Resolved', tone: 'text-green-800', description: 'Completed or verified actions already cleared.', actions: resolvedLinkedActions },
+                    ].map(section => {
+                      if (section.actions.length === 0) return null;
+
                       return (
-                        <div key={action.id} className={`p-3 rounded-lg border transition-colors ${isResolved ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'}`}>
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold border ${ACTION_STATUS_COLOR[action.status] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
-                                  {isResolved ? <CheckCircle size={10} /> : <AlertTriangle size={10} />}
-                                  {action.status}
-                                </span>
-                                <p className="text-sm font-medium text-slate-800 truncate">{action.title}</p>
-                              </div>
-                              {action.description && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{action.description}</p>}
-                              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                                {action.assignee && <span className="flex items-center gap-1 text-xs text-slate-500"><User size={10} /> {action.assignee}</span>}
-                                {action.dueDate && <span className="flex items-center gap-1 text-xs text-slate-500"><Calendar size={10} /> Due {new Date(action.dueDate).toLocaleDateString()}</span>}
-                                <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${action.priority === 'High' || action.priority === 'Critical' ? 'bg-red-100 text-red-700' : action.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{action.priority}</span>
-                              </div>
+                        <div key={section.key} className="space-y-3">
+                          <div className="flex items-end justify-between gap-3 border-b border-slate-100 pb-2">
+                            <div>
+                              <h4 className={`text-sm font-bold ${section.tone}`}>{section.title}</h4>
+                              <p className="text-xs text-slate-500 mt-0.5">{section.description}</p>
                             </div>
-                            <div className="flex flex-col gap-1.5 shrink-0">
-                              <button onClick={() => handleToggleActionStatus(action)} disabled={updatingActionId === action.id}
-                                className="text-xs px-2.5 py-1 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 disabled:opacity-60 flex items-center gap-1 justify-center">
-                                {updatingActionId === action.id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-                                {action.status === 'Done' || action.status === 'Verified' ? 'Reopen' : 'Advance Status'}
-                              </button>
-                              <button onClick={() => setEditingAction({ ...action })}
-                                className="text-xs px-2.5 py-1 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center gap-1">
-                                ✏️ Edit
-                              </button>
-                            </div>
+                            <span className="text-xs font-semibold text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">{section.actions.length}</span>
                           </div>
-                          {!isResolved && (
-                            <p className="text-xs text-amber-700 mt-2 font-medium">⚠ Must be marked Done before permit can be submitted</p>
-                          )}
+
+                          <div className="space-y-3">
+                            {section.actions.map(action => {
+                              const isResolved = isResolvedAction(action);
+                              const dueState = getActionDueState(action);
+                              const missingOwner = !action.assignee?.trim();
+                              const missingDueDate = !action.dueDate;
+                              const isUpdating = updatingActionId === action.id;
+
+                              return (
+                                <div key={action.id} className={`p-4 rounded-xl border transition-colors ${getActionCardTone(action)}`}>
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold border ${ACTION_STATUS_COLOR[action.status] || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                                          {isResolved ? <CheckCircle size={10} /> : <AlertTriangle size={10} />}
+                                          {action.status}
+                                        </span>
+                                        {dueState && (
+                                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold border ${dueState.classes}`}>
+                                            <Clock size={10} />
+                                            {dueState.label}
+                                          </span>
+                                        )}
+                                        {missingOwner && (
+                                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold border bg-amber-100 text-amber-800 border-amber-200">
+                                            <User size={10} />
+                                            Owner needed
+                                          </span>
+                                        )}
+                                        {missingDueDate && !isResolved && (
+                                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold border bg-slate-100 text-slate-700 border-slate-200">
+                                            <Calendar size={10} />
+                                            Due date needed
+                                          </span>
+                                        )}
+                                        <p className="text-sm font-medium text-slate-800 truncate">{action.title}</p>
+                                      </div>
+                                      {action.description && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{action.description}</p>}
+                                      <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                        {action.assignee && <span className="flex items-center gap-1 text-xs text-slate-500"><User size={10} /> {resolveAssigneeDisplayName(action.assignee)}</span>}
+                                        {action.dueDate && <span className="flex items-center gap-1 text-xs text-slate-500"><Calendar size={10} /> Due {new Date(action.dueDate).toLocaleDateString()}</span>}
+                                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${action.priority === 'High' || action.priority === 'Critical' ? 'bg-red-100 text-red-700' : action.priority === 'Medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{action.priority}</span>
+                                      </div>
+                                      {!isResolved && (
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                          {missingOwner && formData.supervisorName && (
+                                            <button onClick={() => handleQuickActionUpdate(action, { assignee: getSupervisorAssigneeValue() }, 'Assigned to permit supervisor.', 'Failed to assign permit supervisor.')}
+                                              disabled={isUpdating}
+                                              className="text-xs px-2.5 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 disabled:opacity-60">
+                                              {isUpdating ? 'Saving...' : 'Assign to supervisor'}
+                                            </button>
+                                          )}
+                                          {missingDueDate && (
+                                            <button onClick={() => handleQuickActionUpdate(action, { dueDate: new Date().toISOString().split('T')[0] }, 'Due date set to today.', 'Failed to set due date.')}
+                                              disabled={isUpdating}
+                                              className="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 font-medium hover:bg-slate-100 disabled:opacity-60">
+                                              {isUpdating ? 'Saving...' : 'Set due today'}
+                                            </button>
+                                          )}
+                                          {action.status === 'Open' && (
+                                            <button onClick={() => handleToggleActionStatus(action)} disabled={isUpdating}
+                                              className="text-xs px-2.5 py-1.5 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 font-medium hover:bg-amber-100 disabled:opacity-60">
+                                              {isUpdating ? 'Saving...' : 'Start work'}
+                                            </button>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex flex-col gap-1.5 shrink-0">
+                                      <button onClick={() => handleToggleActionStatus(action)} disabled={isUpdating}
+                                        className="text-xs px-2.5 py-1 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 disabled:opacity-60 flex items-center gap-1 justify-center">
+                                        {isUpdating ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                                        {action.status === 'Done' || action.status === 'Verified' ? 'Reopen' : 'Advance Status'}
+                                      </button>
+                                      <button onClick={() => setEditingAction({ ...action })}
+                                        className="text-xs px-2.5 py-1 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center gap-1">
+                                        ✏️ Edit
+                                      </button>
+                                    </div>
+                                  </div>
+                                  {!isResolved && (
+                                    <div className="mt-3 rounded-lg border border-amber-200 bg-white/70 px-3 py-2">
+                                      <p className="text-xs text-amber-800 font-semibold">Permit blocker</p>
+                                      <p className="text-xs text-amber-700 mt-1">
+                                        {missingOwner || missingDueDate
+                                          ? `This action still needs ${[missingOwner ? 'an owner' : null, missingDueDate ? 'a due date' : null].filter(Boolean).join(' and ')} before close-out is defensible.`
+                                          : 'This action must be marked Done or Verified before permit submission.'}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       );
                     })}
@@ -1048,9 +1290,25 @@ export const PermitForm: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-slate-800">Edit Action Item</h2>
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">Edit Action Item</h2>
+                <p className="text-sm text-slate-500">Use this to clear blockers before permit submission.</p>
+              </div>
               <button onClick={() => setEditingAction(null)} title="Close action editor" aria-label="Close action editor" className="text-slate-400 hover:text-slate-600"><XCircle size={20} /></button>
             </div>
+
+            {(!editingAction.assignee?.trim() || !editingAction.dueDate) && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Action setup needed</p>
+                <p className="mt-1 text-sm text-amber-700">
+                  {!editingAction.assignee?.trim() && !editingAction.dueDate
+                    ? 'Assign an owner and due date so this action can be tracked properly.'
+                    : !editingAction.assignee?.trim()
+                      ? 'Assign an owner so this action has clear accountability.'
+                      : 'Add a due date so the permit team can track urgency.'}
+                </p>
+              </div>
+            )}
 
             {/* Status — most important, at top */}
             <div>
@@ -1092,14 +1350,60 @@ export const PermitForm: React.FC = () => {
               {/* Assignee */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">Assigned To</label>
-                <input value={editingAction.assignee || ''} title="Action Assignee" aria-label="Action Assignee" onChange={e => setEditingAction(prev => prev ? { ...prev, assignee: e.target.value } : prev)}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" />
+                <div className="relative">
+                  <input value={assigneeSearch} title="Action Assignee" aria-label="Action Assignee" onFocus={() => setShowAssigneeSuggestions(true)}
+                    onChange={e => {
+                      setAssigneeSearch(e.target.value);
+                      setShowAssigneeSuggestions(true);
+                    }}
+                    placeholder={loadingOrgMembers ? 'Loading team members...' : 'Search org members by name or role'}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none"
+                    disabled={loadingOrgMembers} />
+                  {showAssigneeSuggestions && (
+                    <div className="mt-2 rounded-xl border border-slate-200 bg-white shadow-sm max-h-44 overflow-y-auto">
+                      {assigneeSuggestions.length > 0 ? assigneeSuggestions.map(member => (
+                        <button key={member.id} type="button"
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            setEditingAction(prev => prev ? { ...prev, assignee: member.id } : prev);
+                            setAssigneeSearch(member.name);
+                            setShowAssigneeSuggestions(false);
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-b-0">
+                          <p className="text-sm font-medium text-slate-800">{member.name}</p>
+                          <p className="text-xs text-slate-500">{member.role}</p>
+                        </button>
+                      )) : (
+                        <div className="px-3 py-2 text-xs text-slate-500">No matching assignable team members.</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {editingAction.assignee && (
+                  <p className="mt-2 text-xs text-slate-500">Stored assignee value: {editingAction.assignee}</p>
+                )}
+                {formData.supervisorName && resolveAssigneeDisplayName(editingAction.assignee) !== formData.supervisorName && (
+                  <button onClick={() => {
+                    setEditingAction(prev => prev ? { ...prev, assignee: getSupervisorAssigneeValue() } : prev);
+                    setAssigneeSearch(formData.supervisorName);
+                    setShowAssigneeSuggestions(false);
+                  }}
+                    className="mt-2 text-xs font-medium text-blue-700 hover:text-blue-800">
+                    Use permit supervisor: {formData.supervisorName}
+                  </button>
+                )}
               </div>
               {/* Due Date */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">Due Date</label>
                 <input type="date" title="Action Due Date" aria-label="Action Due Date" value={editingAction.dueDate || ''} onChange={e => setEditingAction(prev => prev ? { ...prev, dueDate: e.target.value } : prev)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" />
+                {!editingAction.dueDate && (
+                  <button onClick={() => setEditingAction(prev => prev ? { ...prev, dueDate: new Date().toISOString().split('T')[0] } : prev)}
+                    className="mt-2 text-xs font-medium text-slate-600 hover:text-slate-800">
+                    Set to today
+                  </button>
+                )}
               </div>
             </div>
 

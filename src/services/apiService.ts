@@ -145,6 +145,8 @@ export const apiCreatePermit = (data: any) => apiFetch('/permits', { method: 'PO
 export const apiUpdatePermit = (id: string, data: any) => apiFetch(`/permits/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const apiDeletePermit = (id: string) => apiFetch(`/permits/${id}`, { method: 'DELETE' });
 export const apiGetPermitActions = (permitId: string) => apiFetch(`/permits/${permitId}/actions`);
+export const apiGetOrgMembers = (assignableOnly = false) =>
+  apiFetch(`/org/members${assignableOnly ? '?assignable_only=true' : ''}`);
 
 export const apiGetWorkers = () => apiFetch('/workers');
 export const apiGetWorker = (id: string) => apiFetch(`/workers/${id}`);
