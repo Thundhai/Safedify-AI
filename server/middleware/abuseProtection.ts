@@ -270,6 +270,7 @@ export function loginRateLimiter() {
     if (tracker?.blocked && tracker.blockedUntil && tracker.blockedUntil > now) {
       const remainingMs = tracker.blockedUntil - now;
       const remainingMin = Math.ceil(remainingMs / 60000);
+      const retryAfterSeconds = Math.ceil(remainingMs / 1000);
       
       logSecurityEvent({
         type: 'rate_limit_hit',
@@ -281,6 +282,7 @@ export function loginRateLimiter() {
         details: `Login blocked for ${remainingMin}min due to too many attempts`,
       });
       
+      res.set('Retry-After', String(retryAfterSeconds));
       res.status(429).json({
         error: `Too many login attempts. Try again in ${remainingMin} minute(s).`,
         retryAfter: remainingMs,
@@ -309,6 +311,7 @@ export function loginRateLimiter() {
       // Progressive backoff: double the block time for each additional attempt
       const multiplier = Math.min(4, Math.pow(2, tracker.count - ABUSE_CONFIG.login.maxAttempts - 1));
       tracker.blockedUntil = now + ABUSE_CONFIG.login.blockDurationMs * multiplier;
+      const retryAfterSeconds = Math.ceil((ABUSE_CONFIG.login.blockDurationMs * multiplier) / 1000);
       
       logSecurityEvent({
         type: 'auth_lockout',
@@ -320,6 +323,7 @@ export function loginRateLimiter() {
         details: `IP blocked after ${tracker.count} login attempts (${Math.ceil(ABUSE_CONFIG.login.blockDurationMs * multiplier / 60000)}min block)`,
       });
       
+      res.set('Retry-After', String(retryAfterSeconds));
       res.status(429).json({
         error: 'Too many login attempts. Your IP has been temporarily blocked.',
         code: 'LOGIN_RATE_LIMITED',

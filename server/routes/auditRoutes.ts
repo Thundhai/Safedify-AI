@@ -129,7 +129,8 @@ router.use(requireRole('Admin'));
 // GET /api/audit-logs — paginated list
 router.get('/', async (req: AuthRequest, res: Response) => {
   const page = Math.max(1, parseInt(req.query.page as string) || 1);
-  const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string) || 50));
+  const requestedLimit = parseInt((req.query.limit as string) || (req.query.per_page as string) || '50');
+  const limit = Math.min(200, Math.max(1, Number.isFinite(requestedLimit) ? requestedLimit : 50));
   const offset = (page - 1) * limit;
 
   const where: string[] = [];

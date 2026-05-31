@@ -63,7 +63,12 @@ app.use(helmet({
       scriptSrc: ["'self'", "'unsafe-inline'"],  // React production builds don't need unsafe-eval
       styleSrc: ["'self'", "'unsafe-inline'"],  // Tailwind uses inline styles
       imgSrc: ["'self'", "data:", "blob:", "https:"],
-      connectSrc: ["'self'", "https://generativelanguage.googleapis.com"],
+        connectSrc: [
+          "'self'",
+          "https://generativelanguage.googleapis.com",
+          "https://api.qrserver.com",
+          "https://api.openweathermap.org",
+        ],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
@@ -171,7 +176,8 @@ app.use(cors({
 }));
 
 // ---------- Body Parsing ----------
-app.use(express.json({ limit: '10mb' }));
+app.use('/api/uploads', express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '100kb' }));
 
 // ---------- Input Sanitization ----------
 app.use(sanitizeBody({ stripTags: true, maxLength: 50000 }));
@@ -215,8 +221,6 @@ app.get('/api/health', async (_req, res) => {
   
   res.status(isHealthy ? 200 : 503).json({
     status: isHealthy ? 'ok' : 'degraded',
-    server: 'Safedify AI Backend',
-    version: '1.0.0',
     timestamp: new Date().toISOString(),
     database: {
       status: dbStatus,

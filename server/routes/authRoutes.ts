@@ -139,10 +139,13 @@ router.post('/login', loginRateLimiter(), validate(loginSchema), async (req: Aut
     const lockStatus = await isAccountLocked(row.id);
     if (lockStatus.locked) {
       const minutesRemaining = Math.ceil((lockStatus.remainingMs || 0) / 60000);
+      const retryAfterSeconds = Math.ceil((lockStatus.remainingMs || 0) / 1000);
       logAudit(req, { action: 'login_blocked_locked', entityType: 'user', entityId: row.id, details: `Login attempt on locked account: ${email}` });
+      res.set('Retry-After', String(retryAfterSeconds));
       res.status(423).json({ 
         error: `Account temporarily locked. Try again in ${minutesRemaining} minute(s).`,
-        lockedUntil: new Date(Date.now() + (lockStatus.remainingMs || 0)).toISOString()
+        lockedUntil: new Date(Date.now() + (lockStatus.remainingMs || 0)).toISOString(),
+        retryAfter: retryAfterSeconds,
       });
       return;
     }
@@ -164,8 +167,11 @@ router.post('/login', loginRateLimiter(), validate(loginSchema), async (req: Aut
           method: req.method,
           details: `Account locked after ${LOCKOUT_CONFIG.maxAttempts} failed attempts`,
         });
+        const retryAfterSeconds = Math.ceil(LOCKOUT_CONFIG.lockoutDurationMs / 1000);
+        res.set('Retry-After', String(retryAfterSeconds));
         res.status(423).json({ 
-          error: `Account locked due to too many failed attempts. Try again in ${Math.ceil(LOCKOUT_CONFIG.lockoutDurationMs / 60000)} minutes.`
+          error: `Account locked due to too many failed attempts. Try again in ${Math.ceil(LOCKOUT_CONFIG.lockoutDurationMs / 60000)} minutes.`,
+          retryAfter: retryAfterSeconds,
         });
       } else {
         res.status(401).json({ 

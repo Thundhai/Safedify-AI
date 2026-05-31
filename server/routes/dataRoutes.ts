@@ -70,6 +70,23 @@ const actionSchema: ValidationSchema = {
   verified_by: { type: 'string', required: false, maxLength: 200, trim: true },
 };
 
+const actionUpdateSchema: ValidationSchema = {
+  title: { type: 'string', required: false, maxLength: 500, trim: true, allowInjection: true },
+  description: { type: 'string', required: false, maxLength: 5000, trim: true, allowInjection: true },
+  assignee: { type: 'string', required: false, maxLength: 200, trim: true },
+  due_date: { type: 'date', required: false },
+  completed_date: { type: 'date', required: false },
+  priority: { type: 'string', required: false, maxLength: 50, enum: ['Low', 'Medium', 'High', 'Critical'] },
+  status: { type: 'string', required: false, maxLength: 50, enum: ['Open', 'In Progress', 'Done', 'Overdue', 'Verified', 'Cancelled'] },
+  action_type: { type: 'string', required: false, maxLength: 100, enum: ['Corrective', 'Preventive', 'Improvement'] },
+  category: { type: 'string', required: false, maxLength: 100, trim: true },
+  indicator: { type: 'string', required: false, maxLength: 50, enum: ['Leading', 'Lagging'] },
+  related_incident_id: { type: 'uuid', required: false },
+  related_permit_id: { type: 'string', required: false, maxLength: 200, trim: true },
+  effectiveness: { type: 'string', required: false, maxLength: 100, enum: ['Not Assessed', 'Effective', 'Partially Effective', 'Not Effective'] },
+  verified_by: { type: 'string', required: false, maxLength: 200, trim: true },
+};
+
 const observationSchema: ValidationSchema = {
   type: { type: 'string', required: true, maxLength: 100, trim: true, enum: ['Unsafe Act', 'Unsafe Condition', 'Safe Behavior', 'Near Miss'] },
   category: { type: 'string', required: false, maxLength: 100, trim: true, allowInjection: true },
@@ -101,10 +118,23 @@ const permitSchema: ValidationSchema = {
   valid_from: { type: 'date', required: false },
   valid_until: { type: 'date', required: false },
   requestor: { type: 'string', required: false, maxLength: 200, trim: true, allowInjection: true },
+  supervisor_name: { type: 'string', required: false, maxLength: 200, trim: true, allowInjection: true },
+  contractor: { type: 'string', required: false, maxLength: 200, trim: true, allowInjection: true },
+  assigned_workers: { type: 'array', required: false, maxLength: 100 },
+  isolation_certificate_ref: { type: 'string', required: false, maxLength: 200, trim: true, allowInjection: true },
+  gas_test_results: { type: 'string', required: false, maxLength: 5000, trim: true, allowInjection: true },
   status: { type: 'string', required: false, maxLength: 50, enum: ['Draft', 'Pending', 'Pending Approval', 'Active', 'Expired', 'Rejected', 'Cancelled', 'Closed'] },
   approver: { type: 'string', required: false, maxLength: 200, trim: true, allowInjection: true },
   approver_comments: { type: 'string', required: false, maxLength: 2000, trim: true, allowInjection: true },
+  risk_assessment_id: { type: 'uuid', required: false },
   controls: { type: 'array', required: false, maxLength: 100 },
+  ai_compliance_gaps: { type: 'array', required: false, maxLength: 100 },
+};
+
+const permitListQuerySchema: ValidationSchema = {
+  page: { type: 'number', min: 1, max: 10000 },
+  limit: { type: 'number', min: 1, max: 200 },
+  status: { type: 'string', required: false, maxLength: 50, enum: ['Draft', 'Pending', 'Pending Approval', 'Active', 'Expired', 'Rejected', 'Cancelled', 'Closed'] },
 };
 
 const workerSchema: ValidationSchema = {
@@ -172,6 +202,12 @@ function requireOwnership(
     const orgId = req.user?.org_id;
 
     try {
+      const identifiers = [table, ownerColumn, altColumn].filter((value): value is string => !!value);
+      const hasUnsafeIdentifier = identifiers.some(value => !/^[A-Za-z0-9_]+$/.test(value));
+      if (hasUnsafeIdentifier) {
+        throw new Error('Invalid identifier in requireOwnership');
+      }
+
       const selectColumns = altColumn ? `${ownerColumn}, ${altColumn}, org_id` : `${ownerColumn}, org_id`;
       const result = await pool.query(
         `SELECT ${selectColumns} FROM ${table} WHERE id = $1`,
@@ -218,6 +254,64 @@ function requireOwnership(
     }
   };
 }
+
+const ACTION_CREATE_PERMISSIONS = ['create_action', 'create_incident', 'create_permit', 'approve_permit'];
+
+const requireActionCreatePermission = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+
+  if (req.user.role === 'Admin') {
+    next();
+    return;
+  }
+
+  const result = await pool.query('SELECT permissions FROM roles WHERE name = $1', [req.user.role]);
+  const roleRow = result.rows[0];
+  if (!roleRow) {
+    res.status(403).json({ error: 'Role not found' });
+    return;
+  }
+
+  const permissions: string[] = JSON.parse(roleRow.permissions || '[]');
+  if (!ACTION_CREATE_PERMISSIONS.some((permission) => permissions.includes(permission))) {
+    res.status(403).json({ error: 'Insufficient permissions for this action' });
+    return;
+  }
+
+  next();
+};
+
+const refreshOverdueActions = async (orgId?: string, actionId?: string, relatedPermitId?: string) => {
+  if (!orgId) return;
+
+  const clauses = [
+    'org_id = $1',
+    'due_date IS NOT NULL',
+    'due_date < CURRENT_DATE',
+    `status IN ('Open', 'In Progress')`,
+  ];
+  const params: string[] = [orgId];
+
+  if (actionId) {
+    params.push(actionId);
+    clauses.push(`id = $${params.length}`);
+  }
+
+  if (relatedPermitId) {
+    params.push(relatedPermitId);
+    clauses.push(`related_permit_id = $${params.length}`);
+  }
+
+  await pool.query(
+    `UPDATE actions
+     SET status = 'Overdue'
+     WHERE ${clauses.join(' AND ')}`,
+    params
+  );
+};
 
 // ---------- PAGINATION HELPER ----------
 async function paginate(req: AuthRequest, res: Response, table: string, orderBy = 'created_at DESC', where = '', whereParams: any[] = []) {
@@ -472,10 +566,21 @@ router.delete('/incidents/:id', validateParams(uuidParamSchema), requireOwnershi
 // ---------- ACTIONS ----------
 
 router.get('/actions', validateQuery(paginationQuerySchema), async (req: AuthRequest, res: Response) => {
+  await refreshOverdueActions(req.user?.org_id);
   await paginate(req, res, 'actions');
 });
 
-router.post('/actions', validate(actionSchema), requirePermission('create_incident'), async (req: AuthRequest, res: Response) => {
+router.get('/actions/:id', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
+  await refreshOverdueActions(req.user?.org_id, req.params.id as string);
+  const result = await pool.query('SELECT * FROM actions WHERE id = $1 AND org_id = $2', [req.params.id, req.user?.org_id]);
+  if (result.rows.length === 0) {
+    res.status(404).json({ error: 'Action not found' });
+    return;
+  }
+  res.json(result.rows[0]);
+});
+
+router.post('/actions', validate(actionSchema), requireActionCreatePermission, async (req: AuthRequest, res: Response) => {
   const { title, description, assignee, due_date, priority, status, action_type, category, indicator, related_incident_id, related_permit_id, effectiveness } = req.body;
   const id = uuid();
   try {
@@ -534,14 +639,14 @@ router.post('/actions', validate(actionSchema), requirePermission('create_incide
   }
 });
 
-router.put('/actions/:id', validateParams(uuidParamSchema), validate(actionSchema), requireOwnership('actions', 'created_by', false, 'assignee'), async (req: AuthRequest, res: Response) => {
-  const { title, description, assignee, due_date, completed_date, priority, status, action_type, category, indicator, verified_by, effectiveness } = req.body;
+router.put('/actions/:id', validateParams(uuidParamSchema), validate(actionUpdateSchema), requireOwnership('actions', 'created_by', false, 'assignee'), async (req: AuthRequest, res: Response) => {
+  const { title, description, assignee, due_date, completed_date, priority, status, action_type, category, indicator, related_permit_id, verified_by, effectiveness } = req.body;
   await pool.query(
     `UPDATE actions SET title=COALESCE($1,title), description=COALESCE($2,description), assignee=COALESCE($3,assignee),
      due_date=COALESCE($4,due_date), completed_date=COALESCE($5,completed_date), priority=COALESCE($6,priority),
      status=COALESCE($7,status), action_type=COALESCE($8,action_type), category=COALESCE($9,category),
-     indicator=COALESCE($10,indicator), verified_by=COALESCE($11,verified_by), effectiveness=COALESCE($12,effectiveness) WHERE id=$13 AND org_id=$14`,
-    [title, description, assignee, due_date, completed_date, priority, status, action_type, category, indicator, verified_by, effectiveness, req.params.id, req.user?.org_id]
+     indicator=COALESCE($10,indicator), related_permit_id=COALESCE($11,related_permit_id), verified_by=COALESCE($12,verified_by), effectiveness=COALESCE($13,effectiveness) WHERE id=$14 AND org_id=$15`,
+    [title, description, assignee, due_date, completed_date, priority, status, action_type, category, indicator, related_permit_id, verified_by, effectiveness, req.params.id, req.user?.org_id]
   );
   res.json({ message: 'Updated' });
 
@@ -656,31 +761,142 @@ router.post('/inspections', validate(inspectionSchema), requirePermission('perfo
 // ---------- PERMITS ----------
 
 router.get('/permits', validateQuery(paginationQuerySchema), async (req: AuthRequest, res: Response) => {
+  if (req.user?.org_id) {
+    await pool.query(
+      `UPDATE permits
+       SET status = 'Expired', updated_at = CURRENT_TIMESTAMP
+       WHERE org_id = $1 AND status = 'Active' AND valid_until IS NOT NULL AND valid_until < CURRENT_TIMESTAMP`,
+      [req.user.org_id]
+    );
+  }
+
+  const status = req.query.status as string | undefined;
+  if (status) {
+    await paginate(req, res, 'permits', 'created_at DESC', 'status = $1', [status]);
+    return;
+  }
+
   await paginate(req, res, 'permits');
 });
 
 router.post('/permits', validate(permitSchema), requirePermission('create_permit'), async (req: AuthRequest, res: Response) => {
-  const { type, location, description, valid_from, valid_until, requestor, status, controls } = req.body;
+  const {
+    type, location, description, valid_from, valid_until, requestor, supervisor_name,
+    contractor, assigned_workers, isolation_certificate_ref, gas_test_results,
+    status, risk_assessment_id, controls, ai_compliance_gaps,
+  } = req.body;
   const id = uuid();
+  const orgId = req.user?.org_id;
 
-  const doInsert = () => pool.query(
-    'INSERT INTO permits (id, type, location, description, valid_from, valid_until, requestor, status, controls, created_by, org_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',
-    [id, type, location, description, valid_from, valid_until, requestor ?? null, status || 'Draft', JSON.stringify(controls || []), req.user?.id ?? null, req.user?.org_id ?? null]
-  );
+  if (valid_from && valid_until && new Date(valid_until).getTime() <= new Date(valid_from).getTime()) {
+    res.status(400).json({ error: 'valid_until must be later than valid_from' });
+    return;
+  }
+
+  if (!orgId) {
+    res.status(400).json({ error: 'Permit creation requires an organization context.' });
+    return;
+  }
+
+  if (status && status !== 'Draft') {
+    if (!valid_from || !valid_until) {
+      res.status(400).json({ error: 'valid_from and valid_until are required before submitting a permit.' });
+      return;
+    }
+    if (!supervisor_name?.trim()) {
+      res.status(400).json({ error: 'supervisor_name is required before submitting a permit.' });
+      return;
+    }
+    if (!Array.isArray(assigned_workers) || assigned_workers.length === 0) {
+      res.status(400).json({ error: 'assigned_workers must include at least one worker before submitting a permit.' });
+      return;
+    }
+    if (type === 'Electrical Isolation' && !isolation_certificate_ref?.trim()) {
+      res.status(400).json({ error: 'Electrical permits require isolation_certificate_ref.' });
+      return;
+    }
+    if (type === 'Confined Space' && !gas_test_results?.trim()) {
+      res.status(400).json({ error: 'Confined space permits require gas_test_results.' });
+      return;
+    }
+  }
+
+  const createPermitWithSequence = async () => {
+    const currentYear = new Date().getUTCFullYear();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO ptw_sequences (org_id, sequence_year, last_value)
+         VALUES ($1, $2, 0)
+         ON CONFLICT (org_id, sequence_year) DO NOTHING`,
+        [orgId, currentYear]
+      );
+
+      const sequenceResult = await client.query(
+        `SELECT last_value
+         FROM ptw_sequences
+         WHERE org_id = $1 AND sequence_year = $2
+         FOR UPDATE`,
+        [orgId, currentYear]
+      );
+
+      const nextValue = Number(sequenceResult.rows[0]?.last_value || 0) + 1;
+      const permitNumber = `PTW-${currentYear}-${String(nextValue).padStart(4, '0')}`;
+
+      await client.query(
+        `UPDATE ptw_sequences
+         SET last_value = $3, updated_at = CURRENT_TIMESTAMP
+         WHERE org_id = $1 AND sequence_year = $2`,
+        [orgId, currentYear, nextValue]
+      );
+
+      await client.query(
+        `INSERT INTO permits (
+          id, permit_number, type, location, description, valid_from, valid_until, requestor,
+          supervisor_name, contractor, assigned_workers, isolation_certificate_ref, gas_test_results,
+          approver, status, risk_assessment_id, controls, ai_compliance_gaps, created_by, org_id
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)`,
+        [
+          id, permitNumber, type, location, description, valid_from, valid_until, requestor ?? null,
+          supervisor_name ?? null, contractor ?? null, JSON.stringify(assigned_workers || []), isolation_certificate_ref ?? null, gas_test_results ?? null,
+          null, status || 'Draft', risk_assessment_id ?? null, JSON.stringify(controls || []), JSON.stringify(ai_compliance_gaps || []), req.user?.id ?? null, orgId,
+        ]
+      );
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      throw err;
+    } finally {
+      client.release();
+    }
+  };
 
   try {
-    await doInsert();
+    await createPermitWithSequence();
   } catch (err: any) {
     // Log the actual DB error so it appears in Vercel function logs
     console.error('[POST /permits] DB error, attempting self-heal. Error:', err.message);
     // Run ALL known schema fixes for permits in parallel, then retry once
     await Promise.allSettled([
+      pool.query(`CREATE TABLE IF NOT EXISTS ptw_sequences (org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, sequence_year INTEGER NOT NULL, last_value INTEGER NOT NULL DEFAULT 0, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (org_id, sequence_year))`),
       pool.query(`ALTER TABLE permits ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES users(id) ON DELETE SET NULL`),
+      pool.query(`ALTER TABLE permits ADD COLUMN IF NOT EXISTS permit_number TEXT`),
+      pool.query(`ALTER TABLE permits ADD COLUMN IF NOT EXISTS supervisor_name TEXT`),
+      pool.query(`ALTER TABLE permits ADD COLUMN IF NOT EXISTS contractor TEXT`),
+      pool.query(`ALTER TABLE permits ADD COLUMN IF NOT EXISTS assigned_workers TEXT DEFAULT '[]'`),
+      pool.query(`ALTER TABLE permits ADD COLUMN IF NOT EXISTS isolation_certificate_ref TEXT`),
+      pool.query(`ALTER TABLE permits ADD COLUMN IF NOT EXISTS gas_test_results TEXT`),
+      pool.query(`ALTER TABLE permits ADD COLUMN IF NOT EXISTS risk_assessment_id UUID REFERENCES risk_assessments(id) ON DELETE SET NULL`),
+      pool.query(`ALTER TABLE permits ADD COLUMN IF NOT EXISTS ai_compliance_gaps TEXT`),
+      pool.query(`ALTER TABLE permits ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`),
+      pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_permits_permit_number_unique ON permits(permit_number) WHERE permit_number IS NOT NULL`),
       pool.query(`ALTER TABLE permits ALTER COLUMN requestor TYPE TEXT USING requestor::TEXT`),
       pool.query(`ALTER TABLE permits ALTER COLUMN approver TYPE TEXT USING approver::TEXT`),
     ]);
     try {
-      await doInsert();
+      await createPermitWithSequence();
     } catch (retryErr: any) {
       console.error('[POST /permits] retry after self-heal failed:', retryErr.message);
       res.status(500).json({ error: `Failed to create permit: ${retryErr.message}` });
@@ -721,7 +937,42 @@ router.put('/permits/:id', validateParams(uuidParamSchema), async (req: AuthRequ
       } catch { /* if roles lookup fails, canApprove stays false */ }
     }
 
-    const { status, approver, approver_comments, type, location, description, valid_from, valid_until, requestor, controls } = req.body;
+    const {
+      status, approver, approver_comments, type, location, description, valid_from, valid_until, requestor,
+      supervisor_name, contractor, assigned_workers, isolation_certificate_ref, gas_test_results,
+      risk_assessment_id, controls, ai_compliance_gaps,
+    } = req.body;
+
+    if (valid_from && valid_until && new Date(valid_until).getTime() <= new Date(valid_from).getTime()) {
+      res.status(400).json({ error: 'valid_until must be later than valid_from' });
+      return;
+    }
+
+    if (status && status !== 'Draft' && status !== 'Closed') {
+      const effectiveValidFrom = valid_from ?? currentPermit.valid_from;
+      const effectiveValidUntil = valid_until ?? currentPermit.valid_until;
+      if (!effectiveValidFrom || !effectiveValidUntil) {
+        res.status(400).json({ error: 'valid_from and valid_until are required before submitting a permit.' });
+        return;
+      }
+      if (!supervisor_name?.trim() && !currentPermit.supervisor_name) {
+        res.status(400).json({ error: 'supervisor_name is required before submitting a permit.' });
+        return;
+      }
+      if ((!Array.isArray(assigned_workers) || assigned_workers.length === 0) && !(currentPermit.assigned_workers && JSON.parse(currentPermit.assigned_workers).length > 0)) {
+        res.status(400).json({ error: 'assigned_workers must include at least one worker before submitting a permit.' });
+        return;
+      }
+      const effectiveType = type || currentPermit.type;
+      if (effectiveType === 'Electrical Isolation' && !(isolation_certificate_ref?.trim() || currentPermit.isolation_certificate_ref)) {
+        res.status(400).json({ error: 'Electrical permits require isolation_certificate_ref.' });
+        return;
+      }
+      if (effectiveType === 'Confined Space' && !(gas_test_results?.trim() || currentPermit.gas_test_results)) {
+        res.status(400).json({ error: 'Confined space permits require gas_test_results.' });
+        return;
+      }
+    }
 
     // APPROVAL or REJECTION (Pending → Active or Rejected)
     if (status === 'Active' || status === 'Rejected') {
@@ -730,14 +981,14 @@ router.put('/permits/:id', validateParams(uuidParamSchema), async (req: AuthRequ
         return;
       }
       await pool.query(
-        'UPDATE permits SET status=$1, approver=$2, approver_comments=$3 WHERE id=$4 AND org_id=$5',
-        [status, approver || req.user?.name, approver_comments ?? null, req.params.id, req.user?.org_id]
+        'UPDATE permits SET status=$1, approver=$2, approver_comments=$3, ai_compliance_gaps=COALESCE($4, ai_compliance_gaps), updated_at=CURRENT_TIMESTAMP WHERE id=$5 AND org_id=$6',
+        [status, approver || req.user?.name, approver_comments ?? null, ai_compliance_gaps != null ? JSON.stringify(ai_compliance_gaps) : null, req.params.id, req.user?.org_id]
       );
       res.json({ message: 'Updated' });
       // Notify requestor
       if (currentPermit.requestor) {
         pool.query('SELECT id FROM users WHERE name = $1 OR id::text = $1', [currentPermit.requestor])
-          .then(r => {
+          .then((r: any) => {
             const requestorUser = r.rows[0];
             if (requestorUser) {
               notify({
@@ -769,8 +1020,8 @@ router.put('/permits/:id', validateParams(uuidParamSchema), async (req: AuthRequ
         return;
       }
       await pool.query(
-        'UPDATE permits SET status=$1 WHERE id=$2 AND org_id=$3',
-        ['Closed', req.params.id, req.user?.org_id]
+        'UPDATE permits SET status=$1, ai_compliance_gaps=COALESCE($2, ai_compliance_gaps), updated_at=CURRENT_TIMESTAMP WHERE id=$3 AND org_id=$4',
+        ['Closed', ai_compliance_gaps != null ? JSON.stringify(ai_compliance_gaps) : null, req.params.id, req.user?.org_id]
       );
       res.json({ message: 'Permit closed' });
       return;
@@ -787,14 +1038,22 @@ router.put('/permits/:id', validateParams(uuidParamSchema), async (req: AuthRequ
         `UPDATE permits SET
           type=COALESCE($1,type), location=COALESCE($2,location), description=COALESCE($3,description),
           valid_from=COALESCE($4,valid_from), valid_until=COALESCE($5,valid_until),
-          requestor=COALESCE($6,requestor), status=$7,
-          controls=COALESCE($8,controls)
-         WHERE id=$9 AND org_id=$10`,
+          requestor=COALESCE($6,requestor), supervisor_name=COALESCE($7,supervisor_name), contractor=COALESCE($8,contractor),
+          assigned_workers=COALESCE($9,assigned_workers), isolation_certificate_ref=COALESCE($10,isolation_certificate_ref),
+          gas_test_results=COALESCE($11,gas_test_results), status=$12,
+          risk_assessment_id=COALESCE($13,risk_assessment_id), controls=COALESCE($14,controls),
+          ai_compliance_gaps=COALESCE($15,ai_compliance_gaps), updated_at=CURRENT_TIMESTAMP
+         WHERE id=$16 AND org_id=$17`,
         [
           type ?? null, location ?? null, description ?? null,
           valid_from ?? null, valid_until ?? null, requestor ?? null,
+          supervisor_name ?? null, contractor ?? null,
+          assigned_workers != null ? JSON.stringify(assigned_workers) : null,
+          isolation_certificate_ref ?? null, gas_test_results ?? null,
           newStatus,
+          risk_assessment_id ?? null,
           controls != null ? JSON.stringify(controls) : null,
+          ai_compliance_gaps != null ? JSON.stringify(ai_compliance_gaps) : null,
           req.params.id, req.user?.org_id
         ]
       );
@@ -812,6 +1071,7 @@ router.put('/permits/:id', validateParams(uuidParamSchema), async (req: AuthRequ
 // Get actions linked to a specific permit
 router.get('/permits/:id/actions', validateParams(uuidParamSchema), async (req: AuthRequest, res: Response) => {
   try {
+    await refreshOverdueActions(req.user?.org_id, undefined, req.params.id as string);
     const result = await pool.query(
       'SELECT * FROM actions WHERE related_permit_id = $1 AND org_id = $2 ORDER BY created_at DESC',
       [req.params.id, req.user?.org_id]
@@ -1504,11 +1764,11 @@ router.post('/actions/bulk-complete', requirePermission('EditActions'), async (r
   }
   if (isPrivilegedRole(req.user?.role)) {
     const params = ids.map((_: any, i: number) => `$${i + 2}`).join(',');
-    const result = await pool.query(`UPDATE actions SET status = 'Completed', completed_date = NOW() WHERE id IN (${params}) AND status != 'Completed' AND org_id = $1`, [req.user?.org_id, ...ids]);
+    const result = await pool.query(`UPDATE actions SET status = 'Done', completed_date = NOW() WHERE id IN (${params}) AND status != 'Done' AND org_id = $1`, [req.user?.org_id, ...ids]);
     res.json({ updated: result.rowCount, message: `${result.rowCount} action(s) completed` });
   } else {
     const params = ids.map((_: any, i: number) => `$${i + 3}`).join(',');
-    const result = await pool.query(`UPDATE actions SET status = 'Completed', completed_date = NOW() WHERE id IN (${params}) AND status != 'Completed' AND (created_by = $1 OR assignee = $1) AND org_id = $2`, [req.user?.id, req.user?.org_id, ...ids]);
+    const result = await pool.query(`UPDATE actions SET status = 'Done', completed_date = NOW() WHERE id IN (${params}) AND status != 'Done' AND (created_by = $1 OR assignee = $1) AND org_id = $2`, [req.user?.id, req.user?.org_id, ...ids]);
     res.json({ updated: result.rowCount, message: `${result.rowCount} action(s) completed` });
   }
 });

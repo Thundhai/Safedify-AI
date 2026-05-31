@@ -5,7 +5,8 @@
  *   RESEND_API_KEY=re_xxxxxxxx
  *   EMAIL_FROM=Safedify <noreply@yourdomain.com>   (must be verified in Resend)
  * 
- * If RESEND_API_KEY is not set, emails are logged to console instead.
+ * If RESEND_API_KEY is not set, emails are logged to console instead and
+ * reported as not delivered so notification state does not claim success.
  */
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
@@ -56,10 +57,11 @@ export const sendEmail = async (payload: EmailPayload): Promise<boolean> => {
       console.log(`[Email] Sent to ${payload.to}: ${payload.subject}`);
       return true;
     } else {
-      // Log email for development
+      // Preview email locally without claiming delivery.
       console.log(`[Email Preview] To: ${payload.to} | Subject: ${payload.subject}`);
       console.log(`[Email Preview] ${payload.text}`);
-      return true; // Treat as success for dev
+      console.warn('[Email] Delivery skipped because RESEND_API_KEY is not configured');
+      return false;
     }
   } catch (err: any) {
     console.error(`[Email] Failed to send to ${payload.to}:`, err.message);

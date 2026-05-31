@@ -108,6 +108,9 @@ const _totpDerivedKey: Buffer | null = TOTP_ENCRYPTION_KEY
   : null;
 
 if (!TOTP_ENCRYPTION_KEY) {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('FATAL: TOTP_ENCRYPTION_KEY environment variable must be set in production');
+  }
   console.warn('\x1b[33m[SECURITY] TOTP_ENCRYPTION_KEY not set — TOTP secrets will be stored unencrypted\x1b[0m');
 }
 

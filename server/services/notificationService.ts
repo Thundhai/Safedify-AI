@@ -48,6 +48,8 @@ export const notify = async (params: NotifyParams): Promise<string> => {
       });
       if (emailSent) {
         await pool.query('UPDATE notifications SET email_sent = TRUE WHERE id = $1', [id]);
+      } else {
+        console.warn(`[Notify] Email not delivered for user ${userId}; notification remains in-app only`);
       }
     }
   } catch (err: any) {
