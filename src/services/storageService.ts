@@ -164,17 +164,27 @@ const mapInspection = (row: any): Inspection => ({
 
 const mapPermit = (row: any): Permit => ({
   id: row.id,
+  permitNumber: row.permit_number,
   type: row.type as PermitType,
   location: row.location || '',
   description: row.description,
   validFrom: row.valid_from || '',
   validUntil: row.valid_until || '',
   requestor: row.requestor || '',
+  supervisorName: row.supervisor_name || '',
+  contractor: row.contractor || '',
+  assignedWorkers: row.assigned_workers ? (typeof row.assigned_workers === 'string' ? JSON.parse(row.assigned_workers) : row.assigned_workers) : [],
+  isolationCertificateRef: row.isolation_certificate_ref || '',
+  gasTestResults: row.gas_test_results || '',
   approver: row.approver,
   status: row.status as PermitStatus,
   controls: row.controls ? (typeof row.controls === 'string' ? JSON.parse(row.controls) : row.controls) : [],
   approverComments: row.approver_comments,
   aiAuditIssues: row.ai_audit_issues ? (typeof row.ai_audit_issues === 'string' ? JSON.parse(row.ai_audit_issues) : row.ai_audit_issues) : undefined,
+  aiComplianceGaps: row.ai_compliance_gaps ? (typeof row.ai_compliance_gaps === 'string' ? JSON.parse(row.ai_compliance_gaps) : row.ai_compliance_gaps) : undefined,
+  createdBy: row.created_by,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
 });
 
 const mapWorker = (row: any): WorkerProfile => ({

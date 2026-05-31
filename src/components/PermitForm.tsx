@@ -1385,7 +1385,7 @@ export const PermitForm: React.FC = () => {
                 {formData.supervisorName && resolveAssigneeDisplayName(editingAction.assignee) !== formData.supervisorName && (
                   <button onClick={() => {
                     setEditingAction(prev => prev ? { ...prev, assignee: getSupervisorAssigneeValue() } : prev);
-                    setAssigneeSearch(formData.supervisorName);
+                    setAssigneeSearch(formData.supervisorName ?? '');
                     setShowAssigneeSuggestions(false);
                   }}
                     className="mt-2 text-xs font-medium text-blue-700 hover:text-blue-800">
@@ -1399,7 +1399,7 @@ export const PermitForm: React.FC = () => {
                 <input type="date" title="Action Due Date" aria-label="Action Due Date" value={editingAction.dueDate || ''} onChange={e => setEditingAction(prev => prev ? { ...prev, dueDate: e.target.value } : prev)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" />
                 {!editingAction.dueDate && (
-                  <button onClick={() => setEditingAction(prev => prev ? { ...prev, dueDate: new Date().toISOString().split('T')[0] } : prev)}
+                  <button onClick={() => setEditingAction(prev => prev ? { ...prev, dueDate: new Date().toISOString().split('T')[0] ?? '' } : prev)}
                     className="mt-2 text-xs font-medium text-slate-600 hover:text-slate-800">
                     Set to today
                   </button>
