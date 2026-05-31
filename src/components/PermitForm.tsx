@@ -71,6 +71,11 @@ export const PermitForm: React.FC = () => {
     validFrom: new Date().toISOString(),
     validUntil: new Date(Date.now() + 8 * 3600 * 1000).toISOString(),
     requestor: user?.name || 'Unknown',
+    supervisorName: '',
+    contractor: '',
+    assignedWorkers: [],
+    isolationCertificateRef: '',
+    gasTestResults: '',
     status: PermitStatus.DRAFT,
     controls: [],
   });
@@ -92,14 +97,6 @@ export const PermitForm: React.FC = () => {
   const [approverComment, setApproverComment] = useState('');
   const [rejectReason, setRejectReason] = useState('');
 
-  const gapsStorageKey = `safedify_compliance_gaps_${formData.id}`;
-
-  useEffect(() => {
-    if (complianceGaps.length > 0) {
-      try { localStorage.setItem(gapsStorageKey, JSON.stringify(complianceGaps)); } catch { /* quota */ }
-    }
-  }, [complianceGaps, gapsStorageKey]);
-
   const checklistTemplates: Record<PermitType, string[]> = {
     [PermitType.HOT_WORK]: ['Fire Extinguisher on site', 'Fire Watch assigned', 'Combustibles removed (10m radius)', 'Welding equipment inspected'],
     [PermitType.CONFINED_SPACE]: ['Gas Test completed', 'Standby Man present', 'Rescue Plan available', 'Ventilation established', 'Communication system tested'],
@@ -112,7 +109,11 @@ export const PermitForm: React.FC = () => {
 
   const loadLinkedActions = useCallback(async (permitId: string) => {
     setLoadingActions(true);
-    try { setLinkedActions(await getPermitActions(permitId)); }
+    try {
+      const actions = await getPermitActions(permitId);
+      setLinkedActions(actions);
+      return actions;
+    }
     finally { setLoadingActions(false); }
   }, []);
 
@@ -123,10 +124,7 @@ export const PermitForm: React.FC = () => {
         const existing = await getPermitById(id);
         if (existing) {
           setFormData(existing);
-          try {
-            const saved = localStorage.getItem(`safedify_compliance_gaps_${existing.id}`);
-            if (saved) setComplianceGaps(JSON.parse(saved));
-          } catch { /* ignore */ }
+          setComplianceGaps(existing.aiComplianceGaps || []);
           await loadLinkedActions(id);
         }
       } else {
@@ -134,10 +132,6 @@ export const PermitForm: React.FC = () => {
           ...prev,
           controls: checklistTemplates[PermitType.HOT_WORK].map((l, i) => ({ id: `c-${i}`, label: l, checked: false })),
         }));
-        try {
-          const saved = localStorage.getItem(gapsStorageKey);
-          if (saved) setComplianceGaps(JSON.parse(saved));
-        } catch { /* ignore */ }
       }
     };
     load();
@@ -147,6 +141,9 @@ export const PermitForm: React.FC = () => {
   const isEditable = isNew || ((formData.status === PermitStatus.DRAFT || formData.status === PermitStatus.REJECTED) && isCreator);
 
   const { remaining: countdown, isExpired } = useCountdown(formData.validUntil, formData.status === PermitStatus.APPROVED);
+
+  const validityRangeInvalid = !!formData.validFrom && !!formData.validUntil
+    && new Date(formData.validUntil).getTime() <= new Date(formData.validFrom).getTime();
 
   const handleTypeChange = (newType: PermitType) => {
     setFormData(prev => ({
@@ -220,14 +217,36 @@ export const PermitForm: React.FC = () => {
   };
 
   const handleCreateActionItem = async (gap: ComplianceGap) => {
+    if (isNew || formData.id.startsWith('ptw-')) {
+      throw new Error('Save this permit as a draft before creating action items so the action can be linked to a real permit record.');
+    }
+
     const result = await apiCreateAction({
       title: gap.actionItemTitle || gap.description,
       description: `[Permit: ${formData.id}] Compliance gap identified during ${formData.type} permit audit: ${gap.description}`,
       priority: 'High', status: 'Open', action_type: 'Corrective',
-      category: 'Permit Compliance', related_permit_id: formData.id,
+      category: 'Permit Compliance', indicator: 'Lagging', related_permit_id: formData.id,
     });
     setComplianceGaps(prev => prev.map(g => g.id === gap.id ? { ...g, applied: true, actionItemId: result?.id } : g));
-    if (!isNew && id) await loadLinkedActions(id);
+    if (!isNew && id) {
+      const actions = await loadLinkedActions(id);
+      const createdAction = actions.find((action) => action.id === result?.id) || {
+        id: result?.id || `action-${Date.now()}`,
+        title: gap.actionItemTitle || gap.description,
+        description: `[Permit: ${formData.id}] Compliance gap identified during ${formData.type} permit audit: ${gap.description}`,
+        assignee: '',
+        dueDate: '',
+        priority: 'High',
+        status: 'Open',
+        actionType: 'Corrective',
+        category: 'Permit Compliance',
+        indicator: 'Lagging',
+        relatedPermitId: id,
+        effectiveness: 'Not Assessed',
+      } as ActionItem;
+      setEditingAction(createdAction);
+      toast.success('Action item created. Assign an owner and due date before closing the editor.');
+    }
   };
 
   const performAudit = async (): Promise<boolean> => {
@@ -252,6 +271,32 @@ export const PermitForm: React.FC = () => {
   };
 
   const handleSave = async (status: PermitStatus) => {
+    if (validityRangeInvalid) {
+      toast.error('Valid until must be later than valid from.');
+      return;
+    }
+    if (status !== PermitStatus.DRAFT) {
+      if (!formData.validFrom || !formData.validUntil) {
+        toast.error('Please set both valid from and valid until before submitting this permit.');
+        return;
+      }
+      if (!formData.supervisorName?.trim()) {
+        toast.error('Please name the responsible supervisor before submitting this permit.');
+        return;
+      }
+      if (!formData.assignedWorkers?.length) {
+        toast.error('Add at least one assigned worker before submitting this permit.');
+        return;
+      }
+      if (formData.type === PermitType.ELECTRICAL && !formData.isolationCertificateRef?.trim()) {
+        toast.error('Electrical permits require an isolation certificate reference.');
+        return;
+      }
+      if (formData.type === PermitType.CONFINED_SPACE && !formData.gasTestResults?.trim()) {
+        toast.error('Confined space permits require gas test results.');
+        return;
+      }
+    }
     if (status === PermitStatus.PENDING && !formData.description) {
       toast.error('Please enter a work description before submitting for approval.');
       return;
@@ -278,8 +323,7 @@ export const PermitForm: React.FC = () => {
     }
     setIsSaving(true);
     try {
-      await savePermit({ ...formData, status });
-      try { localStorage.removeItem(gapsStorageKey); } catch { /* ignore */ }
+      await savePermit({ ...formData, aiComplianceGaps: complianceGaps, status });
       toast.success(status === PermitStatus.PENDING ? 'Permit submitted for approval.' : 'Permit saved as draft.');
       navigate('/permits');
     } catch (err) {
@@ -290,7 +334,7 @@ export const PermitForm: React.FC = () => {
   const handleApprove = async () => {
     setIsSaving(true);
     try {
-      const updated: Permit = { ...formData, status: PermitStatus.APPROVED, approver: user?.name || 'Unknown', approverComments: approverComment.trim() || undefined };
+      const updated: Permit = { ...formData, aiComplianceGaps: complianceGaps, status: PermitStatus.APPROVED, approver: user?.name || 'Unknown', approverComments: approverComment.trim() || undefined };
       await savePermit(updated);
       setFormData(updated);
       setShowApproveModal(false);
@@ -304,7 +348,7 @@ export const PermitForm: React.FC = () => {
     if (!rejectReason.trim()) { toast.error('Please provide a rejection reason.'); return; }
     setIsSaving(true);
     try {
-      const updated: Permit = { ...formData, status: PermitStatus.REJECTED, approver: user?.name || 'Unknown', approverComments: rejectReason.trim() };
+      const updated: Permit = { ...formData, aiComplianceGaps: complianceGaps, status: PermitStatus.REJECTED, approver: user?.name || 'Unknown', approverComments: rejectReason.trim() };
       await savePermit(updated);
       setFormData(updated);
       setShowRejectModal(false);
@@ -376,7 +420,7 @@ export const PermitForm: React.FC = () => {
     }
     setIsSaving(true);
     try {
-      const updated: Permit = { ...formData, status: PermitStatus.CLOSED };
+      const updated: Permit = { ...formData, aiComplianceGaps: complianceGaps, status: PermitStatus.CLOSED };
       await savePermit(updated);
       setFormData(updated);
       setShowCloseModal(false);
@@ -451,13 +495,16 @@ export const PermitForm: React.FC = () => {
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/permits')} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+          <button onClick={() => navigate('/permits')} title="Back to permits" aria-label="Back to permits" className="p-2 hover:bg-slate-200 rounded-full transition-colors">
             <ArrowLeft size={20} className="text-slate-600" />
           </button>
           <div>
             <h1 className="text-2xl font-bold text-slate-800">
-              {isNew ? 'New Permit to Work' : `Permit #${formData.id.slice(0, 8).toUpperCase()}`}
+              {isNew ? 'New Permit to Work' : `Permit ${formData.permitNumber || `#${formData.id.slice(0, 8).toUpperCase()}`}`}
             </h1>
+            <p className="text-xs text-slate-500 mt-1">
+              {isNew ? 'A permit reference will be assigned when you save.' : `Reference: ${formData.permitNumber || formData.id}`}
+            </p>
             {!isNew && (
               <span className={`inline-flex items-center gap-1.5 text-xs font-bold uppercase px-2.5 py-1 rounded-full border mt-1 ${currentStatus.color}`}>
                 {currentStatus.icon} {currentStatus.label}
@@ -535,6 +582,16 @@ export const PermitForm: React.FC = () => {
                 )}
               </div>
             )}
+
+            {formData.status === PermitStatus.APPROVED && !!formData.approverComments && (
+              <div className="bg-amber-50 border border-amber-300 rounded-xl p-4 flex gap-3">
+                <AlertTriangle size={20} className="text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-900 text-sm">Permit conditions from approver</p>
+                  <p className="text-amber-800 text-sm mt-0.5">{formData.approverComments}</p>
+                </div>
+              </div>
+            )}
       
             {/* All actions resolved banner — show on Rejected permits with 0 open actions */}
             {formData.status === PermitStatus.REJECTED && linkedActions.length > 0 && linkedActions.every(a => a.status === "Done" || a.status === "Verified") && (
@@ -596,15 +653,29 @@ export const PermitForm: React.FC = () => {
             <h3 className="font-bold text-slate-800 border-b border-slate-100 pb-2">Work Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Requestor</label>
+                <input value={formData.requestor} title="Requestor" aria-label="Requestor" disabled className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-slate-50 text-slate-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">
+                  Responsible Supervisor <span className="text-red-600">*</span>
+                </label>
+                <SmartTextInput disabled={!isEditable} value={formData.supervisorName || ''}
+                  onChange={(e) => setFormData({ ...formData, supervisorName: e.target.value })}
+                  onValueChange={(v) => setFormData(d => ({ ...d, supervisorName: v }))}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" placeholder="Supervisor in charge on site" />
+                <p className="mt-1 text-xs text-slate-500">Required before you can submit the permit for approval.</p>
+              </div>
+              <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Permit Type</label>
-                <select disabled={!isEditable} value={formData.type} onChange={(e) => handleTypeChange(e.target.value as PermitType)}
+                <select title="Permit Type" aria-label="Permit Type" disabled={!isEditable} value={formData.type} onChange={(e) => handleTypeChange(e.target.value as PermitType)}
                   className="w-full border border-slate-300 rounded-lg p-2.5 text-sm disabled:bg-slate-50 disabled:text-slate-500">
                   {Object.values(PermitType).map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Risk Assessment Ref</label>
-                <select disabled={!isEditable} value={formData.riskAssessmentId || ''} onChange={(e) => handleRiskAssessmentChange(e.target.value)}
+                <select title="Risk Assessment Reference" aria-label="Risk Assessment Reference" disabled={!isEditable} value={formData.riskAssessmentId || ''} onChange={(e) => handleRiskAssessmentChange(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg p-2.5 text-sm disabled:bg-slate-50 disabled:text-slate-500">
                   <option value="">-- None Linked --</option>
                   {riskAssessments.map(ra => <option key={ra.id} value={ra.id}>{ra.title} ({ra.status})</option>)}
@@ -637,18 +708,61 @@ export const PermitForm: React.FC = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Contractor</label>
+                <SmartTextInput disabled={!isEditable} value={formData.contractor || ''}
+                  onChange={(e) => setFormData({ ...formData, contractor: e.target.value })}
+                  onValueChange={(v) => setFormData(d => ({ ...d, contractor: v }))}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" placeholder="Contractor or employer performing the work" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Assigned Workers</label>
+                <SmartTextArea rows={2} disabled={!isEditable} value={formData.assignedWorkers.join(', ')}
+                  onChange={(e) => setFormData({
+                    ...formData,
+                    assignedWorkers: e.target.value.split(/[\n,]+/).map(value => value.trim()).filter(Boolean),
+                  })}
+                  onValueChange={(v) => setFormData(d => ({
+                    ...d,
+                    assignedWorkers: v.split(/[\n,]+/).map(value => value.trim()).filter(Boolean),
+                  }))}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" placeholder="List worker names, separated by commas" />
+              </div>
+            </div>
+            {formData.type === PermitType.ELECTRICAL && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Isolation Certificate Reference</label>
+                <SmartTextInput disabled={!isEditable} value={formData.isolationCertificateRef || ''}
+                  onChange={(e) => setFormData({ ...formData, isolationCertificateRef: e.target.value })}
+                  onValueChange={(v) => setFormData(d => ({ ...d, isolationCertificateRef: v }))}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" placeholder="e.g. LOTO-2026-0142" />
+              </div>
+            )}
+            {formData.type === PermitType.CONFINED_SPACE && (
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Gas Test Results</label>
+                <SmartTextArea rows={3} disabled={!isEditable} value={formData.gasTestResults || ''}
+                  onChange={(e) => setFormData({ ...formData, gasTestResults: e.target.value })}
+                  onValueChange={(v) => setFormData(d => ({ ...d, gasTestResults: v }))}
+                  className="w-full border border-slate-300 rounded-lg p-2.5 text-sm" placeholder="Record atmospheric testing results and timing" />
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Valid From</label>
-                <input type="datetime-local" disabled={!isEditable} value={formData.validFrom.slice(0, 16)}
+                <input type="datetime-local" title="Valid From" aria-label="Valid From" disabled={!isEditable} value={formData.validFrom.slice(0, 16)}
                   onChange={(e) => setFormData({ ...formData, validFrom: e.target.value })}
                   className="w-full border border-slate-300 rounded-lg p-2.5 text-sm disabled:bg-slate-50" />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Valid Until</label>
-                <input type="datetime-local" disabled={!isEditable} value={formData.validUntil.slice(0, 16)}
+                <input type="datetime-local" title="Valid Until" aria-label="Valid Until" disabled={!isEditable} value={formData.validUntil.slice(0, 16)}
                   onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
                   className="w-full border border-slate-300 rounded-lg p-2.5 text-sm disabled:bg-slate-50" />
               </div>
             </div>
+            {validityRangeInvalid && (
+              <p className="text-sm text-red-600">Valid until must be later than valid from.</p>
+            )}
           </div>
 
           {/* Safety Controls */}
@@ -699,6 +813,8 @@ export const PermitForm: React.FC = () => {
               onApplyAll={handleApplyAll}
               onCreateActionItem={handleCreateActionItem}
               disabled={false}
+              disableActionCreation={isNew || formData.id.startsWith('ptw-')}
+              actionCreationDisabledReason="Save this permit as a draft first so action items link to the real permit record."
             />
           )}
 
@@ -736,7 +852,7 @@ export const PermitForm: React.FC = () => {
                         <p className="text-xs font-semibold text-amber-800">
                           {linkedActions.filter(a => a.status !== 'Done' && a.status !== 'Verified').length} action{linkedActions.filter(a => a.status !== 'Done' && a.status !== 'Verified').length !== 1 ? 's' : ''} must be resolved before this permit can be submitted.
                         </p>
-                        <p className="text-xs text-amber-700 mt-0.5">Click <strong>Edit</strong> on each action below to update its status to <strong>Done</strong> once the work is complete.</p>
+                        <p className="text-xs text-amber-700 mt-0.5">Use <strong>Advance Status</strong> for quick progress updates, or <strong>Edit</strong> to assign ownership, due dates, and completion notes.</p>
                       </div>
                     </div>
                   )}
@@ -762,6 +878,11 @@ export const PermitForm: React.FC = () => {
                               </div>
                             </div>
                             <div className="flex flex-col gap-1.5 shrink-0">
+                              <button onClick={() => handleToggleActionStatus(action)} disabled={updatingActionId === action.id}
+                                className="text-xs px-2.5 py-1 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 disabled:opacity-60 flex items-center gap-1 justify-center">
+                                {updatingActionId === action.id ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+                                {action.status === 'Done' || action.status === 'Verified' ? 'Reopen' : 'Advance Status'}
+                              </button>
                               <button onClick={() => setEditingAction({ ...action })}
                                 className="text-xs px-2.5 py-1 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center gap-1">
                                 ✏️ Edit
@@ -928,7 +1049,7 @@ export const PermitForm: React.FC = () => {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-slate-800">Edit Action Item</h2>
-              <button onClick={() => setEditingAction(null)} className="text-slate-400 hover:text-slate-600"><XCircle size={20} /></button>
+              <button onClick={() => setEditingAction(null)} title="Close action editor" aria-label="Close action editor" className="text-slate-400 hover:text-slate-600"><XCircle size={20} /></button>
             </div>
 
             {/* Status — most important, at top */}
@@ -952,7 +1073,7 @@ export const PermitForm: React.FC = () => {
             {/* Title */}
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">Title</label>
-              <input value={editingAction.title} onChange={e => setEditingAction(prev => prev ? { ...prev, title: e.target.value } : prev)}
+              <input value={editingAction.title} title="Action Title" aria-label="Action Title" onChange={e => setEditingAction(prev => prev ? { ...prev, title: e.target.value } : prev)}
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" />
             </div>
 
@@ -971,13 +1092,13 @@ export const PermitForm: React.FC = () => {
               {/* Assignee */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">Assigned To</label>
-                <input value={editingAction.assignee || ''} onChange={e => setEditingAction(prev => prev ? { ...prev, assignee: e.target.value } : prev)}
+                <input value={editingAction.assignee || ''} title="Action Assignee" aria-label="Action Assignee" onChange={e => setEditingAction(prev => prev ? { ...prev, assignee: e.target.value } : prev)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" />
               </div>
               {/* Due Date */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wide">Due Date</label>
-                <input type="date" value={editingAction.dueDate || ''} onChange={e => setEditingAction(prev => prev ? { ...prev, dueDate: e.target.value } : prev)}
+                <input type="date" title="Action Due Date" aria-label="Action Due Date" value={editingAction.dueDate || ''} onChange={e => setEditingAction(prev => prev ? { ...prev, dueDate: e.target.value } : prev)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 outline-none" />
               </div>
             </div>
