@@ -25,6 +25,8 @@ interface CompliancePanelProps {
   onApplyAll: () => void;
   onCreateActionItem: (gap: ComplianceGap) => Promise<void>;
   disabled?: boolean; // true when permit is read-only
+  disableActionCreation?: boolean;
+  actionCreationDisabledReason?: string;
 }
 
 export const CompliancePanel: React.FC<CompliancePanelProps> = ({
@@ -35,6 +37,8 @@ export const CompliancePanel: React.FC<CompliancePanelProps> = ({
   onApplyAll,
   onCreateActionItem,
   disabled = false,
+  disableActionCreation = false,
+  actionCreationDisabledReason,
 }) => {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});

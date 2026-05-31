@@ -577,12 +577,18 @@ export enum PermitStatus {
 
 export interface Permit {
   id: string;
+  permitNumber?: string;
   type: PermitType;
   location: string;
   description: string;
   validFrom: string; // ISO Date
   validUntil: string; // ISO Date
   requestor: string;
+  supervisorName?: string;
+  contractor?: string;
+  assignedWorkers: string[];
+  isolationCertificateRef?: string;
+  gasTestResults?: string;
   approver?: string;
   status: PermitStatus;
   riskAssessmentId?: string; // Link to a JHA/Risk Assessment
@@ -593,6 +599,10 @@ export interface Permit {
   }[];
   approverComments?: string;
   aiAuditIssues?: string[]; // AI detected issues
+  aiComplianceGaps?: ComplianceGap[];
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // --- Compliance Gap (Permit Compliance Scan) ---
