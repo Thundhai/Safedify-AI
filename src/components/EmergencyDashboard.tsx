@@ -7,7 +7,7 @@ import {
     Phone, MapPin, Users, History, AlertTriangle, Shield, Navigation, 
     Ambulance, Flame, UserCheck, Loader2, CheckCircle, Clock, X, FileText, Upload, List,
     Globe, Plus, Trash2, Search
-} from 'lucide-react';
+} from '../utils/icons';
 
 // Comprehensive Global Emergency Numbers
 const GLOBAL_EMERGENCY_DATA: Record<string, EmergencyContact[]> = {
@@ -399,15 +399,15 @@ export const EmergencyDashboard: React.FC = () => {
                                 <form onSubmit={handleAddContact} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
                                     <div>
                                         <label className="text-xs font-bold text-blue-800">Name</label>
-                                        <input required type="text" className="w-full rounded border-slate-300 p-2 text-sm" placeholder="John Doe" value={newContact.name} onChange={e => setNewContact({...newContact, name: e.target.value})} />
+                                        <input required type="text" className="w-full rounded border-slate-300 p-2 text-sm" placeholder="John Doe" value={newContact.name} onChange={e => setNewContact({...newContact, name: e.target.value})} aria-label="Contact name" />
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-blue-800">Role</label>
-                                        <input required type="text" className="w-full rounded border-slate-300 p-2 text-sm" placeholder="e.g. Site Medic" value={newContact.role} onChange={e => setNewContact({...newContact, role: e.target.value})} />
+                                        <input required type="text" className="w-full rounded border-slate-300 p-2 text-sm" placeholder="e.g. Site Medic" value={newContact.role} onChange={e => setNewContact({...newContact, role: e.target.value})} aria-label="Contact role" />
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-blue-800">Phone</label>
-                                        <input required type="text" className="w-full rounded border-slate-300 p-2 text-sm" placeholder="+1 555..." value={newContact.phone} onChange={e => setNewContact({...newContact, phone: e.target.value})} />
+                                        <input required type="text" className="w-full rounded border-slate-300 p-2 text-sm" placeholder="+1 555..." value={newContact.phone} onChange={e => setNewContact({...newContact, phone: e.target.value})} aria-label="Contact phone number" />
                                     </div>
                                     <div className="flex gap-2">
                                         <select className="w-full rounded border-slate-300 p-2 text-sm" value={newContact.type} onChange={e => setNewContact({...newContact, type: e.target.value as any})}>
@@ -563,7 +563,7 @@ export const EmergencyDashboard: React.FC = () => {
                     <div className="bg-white rounded-xl shadow-lg max-w-lg w-full p-6 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-bold text-slate-800">Log Emergency Drill</h3>
-                            <button onClick={() => setShowDrillModal(false)} className="text-slate-400 hover:text-slate-600">
+                            <button onClick={() => setShowDrillModal(false)} className="text-slate-400 hover:text-slate-600" aria-label="Close drill modal">
                                 <X size={20} />
                             </button>
                         </div>
@@ -574,6 +574,7 @@ export const EmergencyDashboard: React.FC = () => {
                                     value={newDrill.type}
                                     onChange={(e) => setNewDrill({...newDrill, type: e.target.value as any})}
                                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
+                                    aria-label="Drill type"
                                 >
                                     <option value="Fire Evacuation">Fire Evacuation</option>
                                     <option value="Medical Emergency">Medical Emergency</option>
@@ -590,6 +591,7 @@ export const EmergencyDashboard: React.FC = () => {
                                         value={newDrill.date}
                                         onChange={(e) => setNewDrill({...newDrill, date: e.target.value})}
                                         className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
+                                        aria-label="Drill date"
                                     />
                                 </div>
                                 <div>
@@ -601,6 +603,7 @@ export const EmergencyDashboard: React.FC = () => {
                                         value={newDrill.durationMinutes}
                                         onChange={(e) => setNewDrill({...newDrill, durationMinutes: parseInt(e.target.value)})}
                                         className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
+                                        aria-label="Drill duration in minutes"
                                     />
                                 </div>
                             </div>
@@ -613,6 +616,7 @@ export const EmergencyDashboard: React.FC = () => {
                                     onChange={(e) => setNewDrill({...newDrill, location: e.target.value})}
                                     placeholder="e.g. Warehouse Zone B"
                                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
+                                    aria-label="Drill location"
                                 />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
@@ -650,6 +654,7 @@ export const EmergencyDashboard: React.FC = () => {
                                         type="button" 
                                         onClick={() => setAttendanceMode('digital')}
                                         className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-colors ${attendanceMode === 'digital' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}
+                                        aria-label="Switch to digital attendance list"
                                     >
                                         <List size={14} /> Digital List
                                     </button>
@@ -657,6 +662,7 @@ export const EmergencyDashboard: React.FC = () => {
                                         type="button" 
                                         onClick={() => setAttendanceMode('upload')}
                                         className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-colors ${attendanceMode === 'upload' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}
+                                        aria-label="Switch to upload attendance sheet"
                                     >
                                         <Upload size={14} /> Upload Sheet
                                     </button>
@@ -668,6 +674,7 @@ export const EmergencyDashboard: React.FC = () => {
                                         placeholder="Enter participant names (one per line)..."
                                         value={attendanceNames}
                                         onChange={(e) => setAttendanceNames(e.target.value)}
+                                        aria-label="Participant names list"
                                     />
                                 ) : (
                                     <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center cursor-pointer hover:bg-slate-50 relative">
@@ -696,6 +703,7 @@ export const EmergencyDashboard: React.FC = () => {
                                     onChange={(e) => setNewDrill({...newDrill, notes: e.target.value})}
                                     placeholder="What went well? What needs improvement?"
                                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm h-20 resize-none"
+                                    aria-label="Drill observations and notes"
                                 />
                             </div>
                             <div className="flex justify-end gap-2 pt-2">

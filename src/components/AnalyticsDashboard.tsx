@@ -6,10 +6,13 @@ import {
 } from 'recharts';
 import { 
     AlertTriangle, TrendingUp, Activity, CheckSquare, Sparkles, Loader2, 
-    FileText, Calendar, Users, MapPin, Plus, X, Calculator, Lock
-} from 'lucide-react';
+    FileText, Calendar, Users, MapPin, Plus, X, Calculator, Lock, Download
+} from '../utils/icons';
 import { calculateHSEMetrics, getIncidents, saveStatsLog } from '../services/storageService';
 import { generateExecutiveReportAI } from '../services/geminiService';
+import { AdvancedAnalyticsService } from '../services/advancedAnalyticsService';
+import { ExportService, ExportData } from '../services/exportService';
+import { RealTimeDashboard } from './RealTimeDashboard';
 import { HSEMetrics, Incident, IncidentType, HSEStatsLog, SubscriptionTier } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -19,7 +22,7 @@ export const AnalyticsDashboard: React.FC = () => {
     const navigate = useNavigate();
     const [metrics, setMetrics] = useState<HSEMetrics | null>(null);
     const [incidents, setIncidents] = useState<Incident[]>([]);
-    const [activeTab, setActiveTab] = useState<'kpi' | 'trends' | 'ai'>('kpi');
+    const [activeTab, setActiveTab] = useState<'realtime' | 'kpi' | 'trends' | 'ai' | 'export'>('realtime');
     
     // AI State
     const [aiReport, setAiReport] = useState<any>(null);
@@ -27,6 +30,9 @@ export const AnalyticsDashboard: React.FC = () => {
 
     // Stats Input Modal State
     const [showInputModal, setShowInputModal] = useState(false);
+    
+    // Export State
+    const [exporting, setExporting] = useState(false);
     
     // Calculation State
     const [hoursPerDay, setHoursPerDay] = useState(10);
@@ -113,6 +119,46 @@ export const AnalyticsDashboard: React.FC = () => {
         }
     };
 
+    const handleExport = async (format: 'pdf' | 'excel' | 'json') => {
+        if (!metrics) return;
+        
+        setExporting(true);
+        try {
+            // Get advanced KPIs for export
+            const advancedKPIs = await AdvancedAnalyticsService.calculateAdvancedKPIs();
+            
+            const exportData: ExportData = {
+                metrics: advancedKPIs,
+                incidents,
+                period: 'Year-to-Date',
+                generatedAt: new Date(),
+                organizationName: user?.organizationName || 'Your Organization'
+            };
+
+            const timestamp = new Date().toISOString().split('T')[0];
+            
+            switch (format) {
+                case 'pdf':
+                    ExportService.downloadPDFReport(exportData, `safety-report-${timestamp}.pdf`);
+                    break;
+                case 'excel':
+                    ExportService.downloadCSV(exportData, `safety-report-${timestamp}.csv`);
+                    break;
+                case 'json':
+                    ExportService.downloadJSONReport(exportData, `safety-report-${timestamp}.json`);
+                    break;
+            }
+            
+            // Show success message
+            alert(`${format.toUpperCase()} report generated successfully!`);
+        } catch (error) {
+            console.error('Export failed:', error);
+            alert('Failed to generate report. Please try again.');
+        } finally {
+            setExporting(false);
+        }
+    };
+
     if (!metrics) return <div className="p-8"><Loader2 className="animate-spin" /></div>;
 
     // --- Incident Trend Data (Based on Current Data Only) ---
@@ -154,6 +200,7 @@ export const AnalyticsDashboard: React.FC = () => {
                     <button 
                         onClick={() => setShowInputModal(true)}
                         className="flex items-center gap-1 text-xs bg-slate-900 text-white px-3 py-1.5 rounded hover:bg-slate-800 transition-colors"
+                        aria-label="Open modal to log man-hours data"
                     >
                         <Plus size={14} /> Log Data
                     </button>
@@ -168,7 +215,7 @@ export const AnalyticsDashboard: React.FC = () => {
                             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                                 <Calculator size={20} className="text-blue-600"/> Log Safe Man-Hours
                             </h3>
-                            <button onClick={() => setShowInputModal(false)} className="text-slate-400 hover:text-slate-600">
+                            <button onClick={() => setShowInputModal(false)} className="text-slate-400 hover:text-slate-600" aria-label="Close modal">
                                 <X size={20} />
                             </button>
                         </div>
@@ -275,6 +322,7 @@ export const AnalyticsDashboard: React.FC = () => {
                                 <button 
                                     type="submit"
                                     className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm"
+                                    aria-label="Save man-hours entry"
                                 >
                                     Save Entry
                                 </button>
@@ -287,24 +335,43 @@ export const AnalyticsDashboard: React.FC = () => {
             {/* Tabs */}
             <div className="flex border-b border-slate-200 overflow-x-auto">
                 <button 
-                    onClick={() => setActiveTab('kpi')}
-                    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'kpi' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    onClick={() => setActiveTab('realtime')}
+                    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'realtime' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                 >
-                    <Activity size={16} /> Key Performance Indicators
+                    <Activity size={16} /> Real-Time Metrics
+                </button>
+                <button 
+                    onClick={() => setActiveTab('kpi')}
+                    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'kpi' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    <CheckSquare size={16} /> KPI Dashboard
                 </button>
                 <button 
                     onClick={() => setActiveTab('trends')}
-                    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'trends' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'trends' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                 >
-                    <TrendingUp size={16} /> Trends & Heatmaps
+                    <TrendingUp size={16} /> Trends & Charts
                 </button>
                 <button 
                     onClick={() => setActiveTab('ai')}
-                    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'ai' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'ai' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
                 >
-                    <Sparkles size={16} /> AI Executive Report
+                    <Sparkles size={16} /> AI Reports
+                </button>
+                <button 
+                    onClick={() => setActiveTab('export')}
+                    className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'export' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+                >
+                    <Download size={16} /> Export Reports
                 </button>
             </div>
+
+            {/* REAL-TIME METRICS VIEW */}
+            {activeTab === 'realtime' && (
+                <div className="animate-in fade-in">
+                    <RealTimeDashboard />
+                </div>
+            )}
 
             {/* KPI VIEW */}
             {activeTab === 'kpi' && (
@@ -418,7 +485,7 @@ export const AnalyticsDashboard: React.FC = () => {
                             <h3 className="font-bold text-slate-800 mb-2">Rolling 6-Month TRIR Trend</h3>
                             <p className="text-xs text-slate-400 mb-6">Total Recordable Incident Rate over time</p>
                             <div className="h-72">
-                                <ResponsiveContainer width="100%" height="100%">
+                                <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
                                     <AreaChart data={incidentTrendData}>
                                         <defs>
                                             <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
@@ -440,7 +507,7 @@ export const AnalyticsDashboard: React.FC = () => {
                             <h3 className="font-bold text-slate-800 mb-2">Location Risk Heatmap</h3>
                             <p className="text-xs text-slate-400 mb-6">Frequency of incidents by site zone</p>
                             <div className="h-72">
-                                <ResponsiveContainer width="100%" height="100%">
+                                <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={200}>
                                     <BarChart layout="vertical" data={locationChartData}>
                                         <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                         <XAxis type="number" allowDecimals={false} />
@@ -526,6 +593,111 @@ export const AnalyticsDashboard: React.FC = () => {
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* EXPORT REPORTS VIEW */}
+            {activeTab === 'export' && (
+                <div className="space-y-6 animate-in fade-in">
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                        <h3 className="text-xl font-semibold text-slate-800 mb-4">Export Safety Reports</h3>
+                        <p className="text-slate-600 mb-6">
+                            Generate comprehensive safety reports in various formats for stakeholders, audits, and compliance requirements.
+                        </p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {/* PDF Export */}
+                            <div className="border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-12 h-12 bg-red-50 rounded-lg flex items-center justify-center">
+                                        <FileText className="text-red-600" size={24} />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-slate-800">PDF Report</h4>
+                                        <p className="text-sm text-slate-600">Executive summary</p>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-slate-600 mb-4">
+                                    Comprehensive report with KPIs, charts, and analysis. Perfect for presentations and management reviews.
+                                </p>
+                                <button
+                                    onClick={() => handleExport('pdf')}
+                                    disabled={exporting || !metrics}
+                                    className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    {exporting ? 'Generating...' : 'Generate PDF'}
+                                </button>
+                            </div>
+
+                            {/* Excel Export */}
+                            <div className="border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
+                                        <Download className="text-green-600" size={24} />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-slate-800">Excel Report</h4>
+                                        <p className="text-sm text-slate-600">Data analysis</p>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-slate-600 mb-4">
+                                    Detailed CSV/Excel format with raw data, metrics, and incident details. Ideal for further analysis.
+                                </p>
+                                <button
+                                    onClick={() => handleExport('excel')}
+                                    disabled={exporting || !metrics}
+                                    className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    {exporting ? 'Generating...' : 'Download Excel'}
+                                </button>
+                            </div>
+
+                            {/* JSON Export */}
+                            <div className="border border-slate-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
+                                        <Calculator className="text-blue-600" size={24} />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-slate-800">JSON Data</h4>
+                                        <p className="text-sm text-slate-600">API integration</p>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-slate-600 mb-4">
+                                    Machine-readable JSON format with structured data. Perfect for system integrations and APIs.
+                                </p>
+                                <button
+                                    onClick={() => handleExport('json')}
+                                    disabled={exporting || !metrics}
+                                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    {exporting ? 'Generating...' : 'Export JSON'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Export Options */}
+                        <div className="mt-6 p-4 bg-slate-50 rounded-lg">
+                            <h5 className="font-medium text-slate-800 mb-2">Export Options</h5>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-slate-600">
+                                <div>
+                                    <span className="font-medium">Included Data:</span>
+                                    <ul className="list-disc list-inside mt-1 space-y-1">
+                                        <li>Key Performance Indicators</li>
+                                        <li>Incident details and trends</li>
+                                        <li>Safety metrics and benchmarks</li>
+                                        <li>Compliance status</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <span className="font-medium">Report Period:</span>
+                                    <p className="mt-1">Current YTD data with monthly breakdowns</p>
+                                    <span className="font-medium mt-2 block">Last Updated:</span>
+                                    <p>{new Date().toLocaleString()}</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

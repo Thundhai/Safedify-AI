@@ -1,12 +1,19 @@
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
-  ArrowLeft, Save, Sparkles, Loader2, AlertCircle, CheckCircle, Clock, ShieldAlert, CheckSquare, X, QrCode
+  ArrowLeft, Save, Sparkles, Loader2, CheckCircle, Clock, ShieldAlert, CheckSquare, QrCode
 } from 'lucide-react';
-import { getPermitById, savePermit, getRiskAssessments } from '../services/storageService';
+import { getPermitById, savePermit, getRiskAssessments, getLiftingPlans } from '../services/storageService';
 import { auditPermitAI } from '../services/geminiService';
-import { Permit, PermitType, PermitStatus, RiskAssessment } from '../types';
+import {
+  Permit,
+  PermitType,
+  PermitStatus,
+  RiskAssessment,
+  LiftingPlanRecord,
+  LiftingPlanStatus
+} from '../types';
 
 export const PermitForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -34,20 +41,32 @@ export const PermitForm: React.FC = () => {
     [PermitType.HEIGHT]: ['Harness inspected', 'Anchor points verified', 'Scaffolding tagged Green', 'Drop zone barricaded'],
     [PermitType.ELECTRICAL]: ['LOTO applied', 'Zero energy verified', 'Tools insulated', 'Arc flash PPE worn'],
     [PermitType.EXCAVATION]: ['Underground services scanned', 'Shoring/Benching in place', 'Access/Egress ladders provided'],
-    [PermitType.LIFTING]: ['Load calculated', 'Rigging gear inspected', 'Crane operator certified', 'Wind speed checked'],
+    [PermitType.LIFTING]: ['Load calculated', 'Rigging gear inspected', 'Crane operator certified', 'Wind speed checked', 'HSE-approved lifting plan attached'],
     [PermitType.COLD_WORK]: ['Area hazard assessment', 'PPE compliance check', 'Tools inspection']
   };
 
   const [riskAssessments, setRiskAssessments] = useState<RiskAssessment[]>([]);
+  const [liftingPlans, setLiftingPlans] = useState<LiftingPlanRecord[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
+  const approvedLiftingPlans = useMemo(
+    () => liftingPlans.filter(plan => plan.plan.status === LiftingPlanStatus.APPROVED),
+    [liftingPlans]
+  );
+  const selectedLiftingPlan = useMemo(
+    () => liftingPlans.find(plan => plan.id === formData.liftingPlanId),
+    [liftingPlans, formData.liftingPlanId]
+  );
   
   useEffect(() => {
     // Load Risks
     setRiskAssessments(getRiskAssessments());
+    setLiftingPlans(getLiftingPlans());
 
     if (!isNew && id) {
       const existing = getPermitById(id);
-      if (existing) setFormData(existing);
+      if (existing) {
+        setFormData(existing);
+      }
     } else {
         // Initialize default checklist for new
         setFormData(prev => ({
@@ -154,6 +173,24 @@ export const PermitForm: React.FC = () => {
 
       // If submitting for approval, run mandatory audit
       if (status === PermitStatus.PENDING) {
+          if (formData.type === PermitType.LIFTING) {
+             if (!formData.liftingPlanId) {
+                 alert("Please reference an approved lifting plan before submitting this lifting permit.");
+                 return;
+             }
+
+             const selectedPlan = liftingPlans.find(plan => plan.id === formData.liftingPlanId);
+             if (!selectedPlan) {
+                 alert("Selected lifting plan was not found.");
+                 return;
+             }
+
+             if (selectedPlan.plan.status !== LiftingPlanStatus.APPROVED) {
+                 alert("Referenced lifting plan must be approved by HSE before permit submission.");
+                 return;
+             }
+          }
+
           const passed = await performAudit();
           if (!passed) {
               alert("Compliance Check Failed. Please address the critical control gaps highlighted below before submitting.");
@@ -315,6 +352,61 @@ export const PermitForm: React.FC = () => {
                           />
                       </div>
                   </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+                <h3 className="font-bold text-slate-800 border-b border-slate-100 pb-2">Lifting Plan Reference (Optional)</h3>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1">Approved Lifting Plan</label>
+                  <select
+                    disabled={isReadOnly || approvedLiftingPlans.length === 0}
+                    value={formData.liftingPlanId || ''}
+                    onChange={(e) => setFormData({ ...formData, liftingPlanId: e.target.value || undefined })}
+                    className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
+                  >
+                    <option value="">-- Select approved lifting plan (if applicable) --</option>
+                    {approvedLiftingPlans.map(plan => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.title} - {plan.plan.status}
+                      </option>
+                    ))}
+                  </select>
+                  {approvedLiftingPlans.length === 0 && (
+                    <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                      <p className="font-semibold">No approved lifting plans found.</p>
+                      <p className="text-xs mt-1">Create and approve a lifting plan first, then reference it in this permit.</p>
+                      <Link
+                        to="/lifting-plans/new"
+                        className="inline-flex items-center mt-2 text-xs font-semibold text-blue-700 hover:text-blue-800 hover:underline"
+                      >
+                        Create Lifting Plan
+                      </Link>
+                    </div>
+                  )}
+                  {formData.liftingPlanId && (
+                    <div className="mt-2 text-xs text-slate-500 bg-slate-50 p-2 rounded border border-slate-100">
+                      {!selectedLiftingPlan ? (
+                        <span>Selected lifting plan not found.</span>
+                      ) : (
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <p><span className="font-semibold text-slate-700">Ref:</span> {selectedLiftingPlan.id}</p>
+                            {selectedLiftingPlan.plan.status === LiftingPlanStatus.APPROVED && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-green-100 text-green-700">
+                                Approved
+                              </span>
+                            )}
+                          </div>
+                          <p><span className="font-semibold text-slate-700">Equipment:</span> {selectedLiftingPlan.plan.equipmentType}</p>
+                          <p><span className="font-semibold text-slate-700">Status:</span> {selectedLiftingPlan.plan.status}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500">
+                  Apply only when required for the selected work scope. For Lifting permits, an approved plan is mandatory.
+                </p>
               </div>
 
               {/* Checklists */}

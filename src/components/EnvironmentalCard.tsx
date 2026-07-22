@@ -11,6 +11,9 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 export const EnvironmentalCard: React.FC = () => {
+    // TESTING MODE: Temporarily disable subscription checks
+    const TESTING_MODE = true; // Set to false to re-enable subscription checks
+    
     const { user } = useAuth();
     const navigate = useNavigate();
     const [weather, setWeather] = useState<EnvironmentalData | null>(null);
@@ -183,7 +186,7 @@ export const EnvironmentalCard: React.FC = () => {
                         <h4 className="text-sm font-bold text-slate-800">AI Safety Advisory</h4>
                     </div>
 
-                    {user?.tier === SubscriptionTier.FREE ? (
+                    {!TESTING_MODE && user?.tier === SubscriptionTier.FREE ? (
                         <div className="flex-1 flex flex-col items-center justify-center text-center p-2">
                             <Lock size={32} className="text-slate-300 mb-2" />
                             <p className="text-xs text-slate-500 mb-3">Real-time risk analysis is available on Pro.</p>
@@ -214,7 +217,7 @@ export const EnvironmentalCard: React.FC = () => {
                             </div>
                             
                             <div className="space-y-2">
-                                {riskAnalysis.recommendations.slice(0, 3).map((rec, idx) => (
+                                {riskAnalysis.recommendations && riskAnalysis.recommendations.slice(0, 3).map((rec, idx) => (
                                     <div key={idx} className="flex items-start gap-2 text-xs text-slate-700 bg-white p-2 rounded border border-slate-100 shadow-sm">
                                         {riskAnalysis.riskLevel === 'High' ? <AlertTriangle size={12} className="text-red-500 mt-0.5 shrink-0" /> : <CheckCircle2 size={12} className="text-blue-500 mt-0.5 shrink-0" />}
                                         <span className="leading-snug">{rec}</span>
@@ -222,7 +225,7 @@ export const EnvironmentalCard: React.FC = () => {
                                 ))}
                             </div>
 
-                            {riskAnalysis.affectedActivities.length > 0 && (
+                            {riskAnalysis.affectedActivities && riskAnalysis.affectedActivities.length > 0 && (
                                 <div className="text-[10px] text-slate-500 mt-auto pt-2">
                                     <span className="font-bold">Impacted:</span> {riskAnalysis.affectedActivities.slice(0, 2).join(', ')}
                                 </div>

@@ -7,6 +7,9 @@ import { User, Shield, CreditCard, HardDrive, AlertTriangle, Trash2 } from 'luci
 import { useNavigate } from 'react-router-dom';
 
 export const ProfileSettings: React.FC = () => {
+    // TESTING MODE: Temporarily disable subscription checks
+    const TESTING_MODE = true; // Set to false to re-enable subscription checks
+    
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [usage, setUsage] = useState(0);
@@ -18,7 +21,7 @@ export const ProfileSettings: React.FC = () => {
     useEffect(() => {
         const bytes = getStorageUsage();
         setUsage(bytes);
-        const limit = user?.tier === SubscriptionTier.FREE ? LIMIT_FREE : LIMIT_PRO;
+        const limit = !TESTING_MODE && user?.tier === SubscriptionTier.FREE ? LIMIT_FREE : LIMIT_PRO;
         setUsagePercent(Math.min(100, (bytes / limit) * 100));
     }, [user]);
 
@@ -65,10 +68,10 @@ export const ProfileSettings: React.FC = () => {
                             <div>
                                 <p className="font-bold text-slate-700">{user?.tier} Plan</p>
                                 <p className="text-xs text-slate-500">
-                                    {user?.tier === SubscriptionTier.FREE ? 'Basic features active' : 'All features unlocked'}
+                                    {!TESTING_MODE && user?.tier === SubscriptionTier.FREE ? 'Basic features active' : 'All features unlocked'}
                                 </p>
                             </div>
-                            {user?.tier === SubscriptionTier.FREE && (
+                            {!TESTING_MODE && user?.tier === SubscriptionTier.FREE && (
                                 <button 
                                     onClick={() => navigate('/pricing')}
                                     className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded font-bold hover:bg-blue-700"
@@ -89,7 +92,7 @@ export const ProfileSettings: React.FC = () => {
                         
                         <div className="mb-2 flex justify-between text-xs text-slate-600 font-medium">
                             <span>{formatBytes(usage)} used</span>
-                            <span>{user?.tier === SubscriptionTier.FREE ? '5 MB Limit' : '100 MB Limit'}</span>
+                            <span>{!TESTING_MODE && user?.tier === SubscriptionTier.FREE ? '5 MB Limit' : '100 MB Limit'}</span>
                         </div>
                         <div className="w-full bg-slate-100 rounded-full h-2.5 mb-4">
                             <div 

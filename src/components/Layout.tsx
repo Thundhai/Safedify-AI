@@ -38,14 +38,18 @@ import {
   Plus,
   Download,
   Globe,
-  Users
-} from 'lucide-react';
+  Users,
+  Truck
+} from '../utils/icons';
 import { getSyncQueue, processSyncQueue } from '../services/offlineService';
 import { AIChatAssistant } from './AIChatAssistant';
 import { useAuth } from '../context/AuthContext';
 import { SubscriptionTier } from '../types';
 
 export const Layout: React.FC = () => {
+  // TESTING MODE: Temporarily disable subscription checks
+  const TESTING_MODE = true; // Set to false to re-enable subscription checks
+  
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [syncing, setSyncing] = useState(false);
@@ -174,6 +178,7 @@ export const Layout: React.FC = () => {
       title: 'Risk & Compliance',
       items: [
         { to: '/risk-assessments', icon: ShieldAlert, label: 'Risk Assessment' },
+        { to: '/lifting-plans', icon: Truck, label: 'Lifting Plans' },
         { to: '/permits', icon: FileSignature, label: 'Permit to Work' },
         { to: '/inspections', icon: ClipboardCheck, label: 'Inspections' },
         { to: '/geo-fencing', icon: Map, label: 'Geo-Fencing' },
@@ -193,7 +198,7 @@ export const Layout: React.FC = () => {
     {
       title: 'General',
       items: [
-        { to: '/actions', icon: CheckSquare, label: 'Action Items' },
+        { to: '/actions', icon: CheckSquare, label: 'CAPA' },
         { to: '/documents', icon: FileText, label: 'Documents' },
         { to: '/gamification', icon: Trophy, label: 'Safety Champions' },
       ]
@@ -287,7 +292,7 @@ export const Layout: React.FC = () => {
         </nav>
         
         {/* Subscription Upgrade Box */}
-        {user?.tier === SubscriptionTier.FREE && (
+        {!TESTING_MODE && user?.tier === SubscriptionTier.FREE && (
             <div className="px-4 pb-4">
                 <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-4 shadow-lg">
                     <div className="flex items-center gap-2 mb-2 text-white font-bold text-sm">
@@ -516,9 +521,6 @@ export const Layout: React.FC = () => {
 
           {/* AI Chatbot Overlay */}
           <AIChatAssistant />
-          
-          {/* MetaMask Floating Prompt */}
-          <MetaMaskFloatingPrompt />
         </main>
       </div>
     </div>

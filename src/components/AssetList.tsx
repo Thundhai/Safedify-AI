@@ -250,12 +250,14 @@ export const AssetList: React.FC = () => {
                                     type="button" 
                                     onClick={() => setShowModal(false)}
                                     className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
+                                    aria-label="Cancel adding asset"
                                 >
                                     Cancel
                                 </button>
                                 <button 
                                     type="submit"
                                     className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-sm"
+                                    aria-label="Save new asset"
                                 >
                                     Save Asset
                                 </button>

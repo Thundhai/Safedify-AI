@@ -1,47 +1,60 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, Suspense } from 'react';
 import { HashRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 
-// Providers & Layout
+// Providers & Layout (keep these as regular imports for immediate loading)
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Layout } from './components/Layout';
+import { LoadingFallback } from './components/LoadingFallback';
 
-// Pages & Components
+// Critical pages that need immediate loading
 import { Login } from './components/Login';
 import { Register } from './components/Register';
 import { LandingPage } from './components/LandingPage';
 import { PublicPricing } from './components/PublicPricing';
 import { Dashboard } from './components/Dashboard';
-import { AnalyticsDashboard } from './components/AnalyticsDashboard';
-import { IncidentReport } from './components/IncidentReport';
-import { IncidentDetail } from './components/IncidentDetail';
-import { InspectionForm } from './components/InspectionForm';
-import { AITools } from './components/AITools';
-import { SmartCamera } from './components/SmartCamera';
-import { GeoFencing } from './components/GeoFencing';
-import { Gamification } from './components/Gamification';
-import { RiskAssessmentList } from './components/RiskAssessmentList';
-import { RiskAssessmentForm } from './components/RiskAssessmentForm';
-import { ObservationList } from './components/ObservationList';
-import { ObservationForm } from './components/ObservationForm';
-import { TrainingDashboard } from './components/TrainingDashboard';
-import { WorkerDetail } from './components/WorkerDetail';
-import { WorkersList } from './components/WorkersList';
-import { WorkerForm } from './components/WorkerForm';
-import { PPEDashboard } from './components/PPEDashboard';
-import { PermitList } from './components/PermitList';
-import { PermitForm } from './components/PermitForm';
-import { AssetList } from './components/AssetList';
-import { AssetDetail } from './components/AssetDetail';
-import { ContractorList } from './components/ContractorList';
-import { ContractorDetail } from './components/ContractorDetail';
-import { DocumentList } from './components/DocumentList';
-import { DocumentForm } from './components/DocumentForm';
-import { EmergencyDashboard } from './components/EmergencyDashboard';
-import { RegulatoryNews } from './components/RegulatoryNews';
-import { PricingPlans } from './components/PricingPlans';
-import { RoleManagement } from './components/RoleManagement';
-import { ProfileSettings } from './components/ProfileSettings';
+
+// Lazy load all other pages for code splitting
+const AnalyticsDashboard = React.lazy(() => import('./components/AnalyticsDashboard').then(module => ({default: module.AnalyticsDashboard})));
+const IncidentReport = React.lazy(() => import('./components/IncidentReport').then(module => ({default: module.IncidentReport})));
+const IncidentDetail = React.lazy(() => import('./components/IncidentDetail').then(module => ({default: module.IncidentDetail})));
+const InspectionForm = React.lazy(() => import('./components/InspectionForm').then(module => ({default: module.InspectionForm})));
+const AITools = React.lazy(() => import('./components/AITools').then(module => ({default: module.AITools})));
+const SmartCamera = React.lazy(() => import('./components/SmartCamera').then(module => ({default: module.SmartCamera})));
+const GeoFencing = React.lazy(() => import('./components/GeoFencing').then(module => ({default: module.GeoFencing})));
+const Gamification = React.lazy(() => import('./components/Gamification').then(module => ({default: module.Gamification})));
+const RiskAssessmentList = React.lazy(() => import('./components/RiskAssessmentList').then(module => ({default: module.RiskAssessmentList})));
+const RiskAssessmentForm = React.lazy(() => import('./components/RiskAssessmentForm').then(module => ({default: module.RiskAssessmentForm})));
+const LiftingPlanList = React.lazy(() => import('./components/LiftingPlanList').then(module => ({default: module.LiftingPlanList})));
+const LiftingPlanForm = React.lazy(() => import('./components/LiftingPlanForm').then(module => ({default: module.LiftingPlanForm})));
+const ObservationList = React.lazy(() => import('./components/ObservationList').then(module => ({default: module.ObservationList})));
+const ObservationForm = React.lazy(() => import('./components/ObservationForm').then(module => ({default: module.ObservationForm})));
+const TrainingDashboard = React.lazy(() => import('./components/TrainingDashboard').then(module => ({default: module.TrainingDashboard})));
+const WorkerDetail = React.lazy(() => import('./components/WorkerDetail').then(module => ({default: module.WorkerDetail})));
+const WorkersList = React.lazy(() => import('./components/WorkersList').then(module => ({default: module.WorkersList})));
+const WorkerForm = React.lazy(() => import('./components/WorkerForm').then(module => ({default: module.WorkerForm})));
+const PPEDashboard = React.lazy(() => import('./components/PPEDashboard').then(module => ({default: module.PPEDashboard})));
+const PermitList = React.lazy(() => import('./components/PermitList').then(module => ({default: module.PermitList})));
+const PermitForm = React.lazy(() => import('./components/PermitForm').then(module => ({default: module.PermitForm})));
+const AssetList = React.lazy(() => import('./components/AssetList').then(module => ({default: module.AssetList})));
+const AssetDetail = React.lazy(() => import('./components/AssetDetail').then(module => ({default: module.AssetDetail})));
+const ContractorList = React.lazy(() => import('./components/ContractorList').then(module => ({default: module.ContractorList})));
+const ContractorDetail = React.lazy(() => import('./components/ContractorDetail').then(module => ({default: module.ContractorDetail})));
+const DocumentList = React.lazy(() => import('./components/DocumentList').then(module => ({default: module.DocumentList})));
+const DocumentForm = React.lazy(() => import('./components/DocumentForm').then(module => ({default: module.DocumentForm})));
+const EmergencyDashboard = React.lazy(() => import('./components/EmergencyDashboard').then(module => ({default: module.EmergencyDashboard})));
+const RegulatoryNews = React.lazy(() => import('./components/RegulatoryNews').then(module => ({default: module.RegulatoryNews})));
+const PricingPlans = React.lazy(() => import('./components/PricingPlans').then(module => ({default: module.PricingPlans})));
+const RoleManagement = React.lazy(() => import('./components/RoleManagement').then(module => ({default: module.RoleManagement})));
+const ProfileSettings = React.lazy(() => import('./components/ProfileSettings').then(module => ({default: module.ProfileSettings})));
+const CAPAModule = React.lazy(() => import('./components/CAPAModule').then(module => ({default: module.CAPAModule})));
+
+// PWA and Mobile Components
+import MobileNavigation from './components/MobileNavigation';
+import MobileDashboard from './components/MobileDashboard';
+import MobileIncidentForm from './components/MobileIncidentForm';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
+import pushNotificationService from './services/pushNotificationService';
 
 // Services & Types
 import { getActions, getIncidents, saveAction } from './services/storageService';
@@ -302,6 +315,27 @@ const IncidentList: React.FC = () => {
 
 /* --- MAIN APP --- */
 function App() {
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(() => {
+    const userAgent = navigator.userAgent;
+    return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent) || 
+           window.innerWidth <= 768;
+  });
+
+  // PWA functionality
+  useEffect(() => {
+    // Initialize push notifications
+    pushNotificationService.init();
+
+    // Handle mobile responsiveness
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Initialize wallet service on app startup
   useEffect(() => {
     try {
@@ -311,58 +345,114 @@ function App() {
     }
   }, []);
 
+  // Mobile quick action handler
+  const handleMobileQuickAction = (actionId: string) => {
+    switch (actionId) {
+      case 'incident':
+        window.location.hash = '/incidents/mobile-new';
+        break;
+      case 'observation':
+        window.location.hash = '/observations/new';
+        break;
+      case 'photo':
+        // Trigger camera capture
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.capture = 'environment';
+        input.click();
+        break;
+      case 'voice':
+        // Show voice recording interface
+        alert('Voice recording feature coming soon!');
+        break;
+      default:
+        console.log('Unknown action:', actionId);
+    }
+  };
+
   return (
     <AuthProvider>
       <HashRouter>
-        <Routes>
-          <Route path="/welcome" element={<LandingPage />} />
-          <Route path="/plans" element={<PublicPricing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-
-          <Route path="/" element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }>
-            <Route index element={<Dashboard />} />
-            <Route path="analytics" element={<AnalyticsDashboard />} />
-            <Route path="smart-camera" element={<SmartCamera />} />
-            <Route path="geo-fencing" element={<GeoFencing />} />
-            <Route path="gamification" element={<Gamification />} />
-            <Route path="incidents" element={<IncidentList />} />
-            <Route path="incidents/new" element={<IncidentReport />} />
-            <Route path="incidents/:id" element={<IncidentDetail />} />
-            <Route path="emergency" element={<EmergencyDashboard />} />
-            <Route path="permits" element={<PermitList />} />
-            <Route path="permits/:id" element={<PermitForm />} />
-            <Route path="observations" element={<ObservationList />} />
-            <Route path="observations/new" element={<ObservationForm />} />
-            <Route path="inspections" element={<InspectionForm />} />
-            <Route path="risk-assessments" element={<RiskAssessmentList />} />
-            <Route path="risk-assessments/:id" element={<RiskAssessmentForm />} />
-            <Route path="contractors" element={<ContractorList />} />
-            <Route path="contractors/:id" element={<ContractorDetail />} />
-            <Route path="workers" element={<WorkersList />} />
-            <Route path="workers/new" element={<WorkerForm />} />
-            <Route path="workers/:id/edit" element={<WorkerForm />} />
-            <Route path="training" element={<TrainingDashboard />} />
-            <Route path="training/worker/:id" element={<WorkerDetail />} />
-            <Route path="ppe" element={<PPEDashboard />} />
-            <Route path="assets" element={<AssetList />} />
-            <Route path="assets/:id" element={<AssetDetail />} />
-            <Route path="actions" element={<ActionList />} />
-            <Route path="ai-tools" element={<AITools />} />
-            <Route path="documents" element={<DocumentList />} />
-            <Route path="documents/:id" element={<DocumentForm />} />
-            <Route path="pricing" element={<PricingPlans />} />
-            <Route path="roles" element={<RoleManagement />} />
-            <Route path="profile" element={<ProfileSettings />} />
-            <Route path="regulatory-news" element={<RegulatoryNews />} />
-          </Route>
+        <Suspense fallback={<LoadingFallback />}>
+          {/* PWA Install Prompt */}
+          <PWAInstallPrompt />
           
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+          {/* Mobile Navigation for PWA */}
+          {isMobile && <MobileNavigation onQuickAction={handleMobileQuickAction} />}
+          
+          <Routes>
+            <Route path="/welcome" element={<LandingPage />} />
+            <Route path="/plans" element={<PublicPricing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+
+            {/* Mobile-optimized routes */}
+            <Route path="/mobile-dashboard" element={
+              <ProtectedRoute>
+                <MobileDashboard />
+              </ProtectedRoute>
+            } />
+            
+            <Route path="/incidents/mobile-new" element={
+              <ProtectedRoute>
+                <MobileIncidentForm 
+                  onSubmit={() => window.location.hash = '/mobile-dashboard'} 
+                  onCancel={() => window.location.hash = '/mobile-dashboard'} 
+                />
+              </ProtectedRoute>
+            } />
+
+            <Route path="/" element={
+              <ProtectedRoute>
+                {isMobile ? <MobileDashboard /> : <Layout />}
+              </ProtectedRoute>
+            }>
+              {!isMobile && (
+                <>
+                  <Route index element={<Dashboard />} />
+                  <Route path="analytics" element={<AnalyticsDashboard />} />
+                  <Route path="smart-camera" element={<SmartCamera />} />
+                  <Route path="geo-fencing" element={<GeoFencing />} />
+                  <Route path="gamification" element={<Gamification />} />
+                  <Route path="incidents" element={<IncidentList />} />
+                  <Route path="incidents/new" element={<IncidentReport />} />
+                  <Route path="incidents/:id" element={<IncidentDetail />} />
+                  <Route path="emergency" element={<EmergencyDashboard />} />
+                  <Route path="permits" element={<PermitList />} />
+                  <Route path="permits/:id" element={<PermitForm />} />
+                  <Route path="observations" element={<ObservationList />} />
+                  <Route path="observations/new" element={<ObservationForm />} />
+                  <Route path="inspections" element={<InspectionForm />} />
+                  <Route path="risk-assessments" element={<RiskAssessmentList />} />
+                  <Route path="risk-assessments/:id" element={<RiskAssessmentForm />} />
+                  <Route path="lifting-plans" element={<LiftingPlanList />} />
+                  <Route path="lifting-plans/:id" element={<LiftingPlanForm />} />
+                  <Route path="contractors" element={<ContractorList />} />
+                  <Route path="contractors/:id" element={<ContractorDetail />} />
+                  <Route path="workers" element={<WorkersList />} />
+                  <Route path="workers/new" element={<WorkerForm />} />
+                  <Route path="workers/:id/edit" element={<WorkerForm />} />
+                  <Route path="training" element={<TrainingDashboard />} />
+                  <Route path="training/worker/:id" element={<WorkerDetail />} />
+                  <Route path="ppe" element={<PPEDashboard />} />
+                  <Route path="assets" element={<AssetList />} />
+                  <Route path="assets/:id" element={<AssetDetail />} />
+                  <Route path="actions" element={<CAPAModule />} />
+                  <Route path="ai-tools" element={<AITools />} />
+                  <Route path="documents" element={<DocumentList />} />
+                  <Route path="documents/:id" element={<DocumentForm />} />
+                  <Route path="pricing" element={<PricingPlans />} />
+                  <Route path="roles" element={<RoleManagement />} />
+                  <Route path="profile" element={<ProfileSettings />} />
+                  <Route path="regulatory-news" element={<RegulatoryNews />} />
+                </>
+              )}
+            </Route>
+            
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </HashRouter>
     </AuthProvider>
   );

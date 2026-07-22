@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Loader2, ShieldCheck, Lock, Mail, AlertCircle, ArrowRight, ArrowLeft, HardHat } from 'lucide-react';
+import { Loader2, ShieldCheck, Lock, Mail, AlertCircle, ArrowRight, ArrowLeft, HardHat } from '../utils/icons';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -102,10 +102,24 @@ export const Login: React.FC = () => {
                 {isSubmitting ? <Loader2 className="animate-spin" /> : 'Sign In'}
             </button>
 
-            <div className="text-center">
-                <p className="text-xs text-slate-400 mt-4">
-                    Demo Credentials: admin@safedify.com / password
-                </p>
+            <div className="border border-slate-200 rounded-xl p-3 bg-slate-50">
+                <p className="text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">Demo Accounts</p>
+                <div className="space-y-1.5">
+                  {[
+                    { label: 'Admin / Manager', email: 'admin@safedify.com' },
+                    { label: 'Supervisor', email: 'supervisor@safedify.com' },
+                    { label: 'Worker', email: 'worker@safedify.com' },
+                  ].map(({ label, email: demoEmail }) => (
+                    <button
+                      key={demoEmail}
+                      type="button"
+                      onClick={() => { setEmail(demoEmail); setPassword('password'); setError(''); }}
+                      className="w-full text-left text-xs px-3 py-2 rounded-lg bg-white border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-all text-slate-600 font-medium"
+                    >
+                      <span className="font-bold text-slate-800">{label}</span> — {demoEmail}
+                    </button>
+                  ))}
+                </div>
             </div>
             </form>
         </div>

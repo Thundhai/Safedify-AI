@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { AlertTriangle, CheckCircle, Clock, TrendingUp, ClipboardCheck, Sparkles, Loader2, Gauge, BarChart2, Zap, ShieldCheck, Plus, X, ChevronRight, PlayCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock, TrendingUp, ClipboardCheck, Sparkles, Loader2, Gauge, BarChart2, Zap, ShieldCheck, Plus, X, ChevronRight, PlayCircle } from '../utils/icons';
 import { getIncidents, getActions, calculateSiteSafetyScore, calculateHSEMetrics, getInspections, getRiskAssessments } from '../services/storageService';
 import { predictiveSafetyAlertsAI } from '../services/geminiService';
 import { Incident, ActionItem, IncidentSeverity, SiteSafetyScore, SubscriptionTier } from '../types';
@@ -10,9 +10,13 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { WelcomeScreen } from './WelcomeScreen';
 import { EmptyState } from './EmptyState';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export const Dashboard: React.FC = () => {
-  const { user } = useAuth();
+  // TESTING MODE: Temporarily disable subscription checks
+  const TESTING_MODE = true; // Set to false to re-enable subscription checks
+  
+  const { user, checkPermission } = useAuth();
   const navigate = useNavigate();
   
   // Check if user has completed onboarding
@@ -248,7 +252,7 @@ export const Dashboard: React.FC = () => {
       )}
 
       {/* COMMERCIAL UPSELL BANNER FOR FREE USERS */}
-      {user?.tier === SubscriptionTier.FREE && (
+      {!TESTING_MODE && user?.tier === SubscriptionTier.FREE && (
         <div className="bg-gradient-to-r from-slate-900 to-indigo-900 rounded-xl p-6 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-xl border border-indigo-500/30 relative overflow-hidden">
             {/* Background sparkle effect */}
             <div className="absolute top-0 right-0 p-8 opacity-10">
@@ -510,12 +514,19 @@ export const Dashboard: React.FC = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Environmental Card */}
-            <EnvironmentalCard />
+            <ErrorBoundary fallback={
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-center">
+                    <AlertTriangle size={32} className="text-yellow-600 mx-auto mb-2" />
+                    <p className="text-sm text-yellow-700">Environmental monitoring unavailable</p>
+                </div>
+            }>
+                <EnvironmentalCard />
+            </ErrorBoundary>
 
             {/* Predictive Risk Forecast */}
             <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-xl shadow-md border border-slate-700 relative overflow-hidden flex flex-col h-full min-h-[300px]">
                 {/* Overlay for Free Users */}
-                {user?.tier === SubscriptionTier.FREE && (
+                {!TESTING_MODE && user?.tier === SubscriptionTier.FREE && (
                     <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center p-6 text-center">
                         <Sparkles size={48} className="text-yellow-400 mb-4" />
                         <h3 className="text-xl font-bold text-white mb-2">Predictive AI Analytics</h3>

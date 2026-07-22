@@ -4,11 +4,11 @@ import {
   Camera, MapPin, Mic, Loader2, Sparkles, AlertTriangle, 
   CheckSquare, StopCircle, ArrowLeft, BrainCircuit, Target, 
   GitBranch, RefreshCw, Lock 
-} from 'lucide-react';
+} from '../utils/icons';
 import { classifyIncidentAI, getCorrectiveActionsAI } from '../services/geminiService';
-import { saveIncident } from '../services/storageService';
+import { saveIncident, saveAction } from '../services/storageService';
 import { compressImage, addToSyncQueue } from '../services/offlineService';
-import { IncidentSeverity, IncidentType, Incident, SubscriptionTier } from '../types';
+import { IncidentSeverity, IncidentType, Incident, SubscriptionTier, ActionItem } from '../types';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -169,8 +169,26 @@ export const IncidentReport: React.FC = () => {
 
     saveIncident(newIncident);
     addToSyncQueue('SAVE_INCIDENT', `New Incident: ${finalType} at ${location}`);
-    
-    alert("Incident Reported Successfully! (Saved locally & queued)");
+
+    // Auto-create CAPA for Critical or High severity incidents
+    if (finalSeverity === IncidentSeverity.CRITICAL || finalSeverity === IncidentSeverity.HIGH) {
+      const autoCapa: ActionItem = {
+        id: `capa-${Date.now()}`,
+        type: 'Corrective',
+        source: 'Incident',
+        title: `Investigate & correct: ${finalType} at ${location}`,
+        description: description,
+        assignee: user?.name || 'HSE Team',
+        priority: finalSeverity === IncidentSeverity.CRITICAL ? 'High' : 'Medium',
+        dueDate: new Date(Date.now() + (finalSeverity === IncidentSeverity.CRITICAL ? 7 : 14) * 86400000).toISOString().split('T')[0],
+        status: 'Open',
+        relatedIncidentId: newIncident.id,
+        createdAt: new Date().toISOString(),
+      };
+      saveAction(autoCapa);
+      addToSyncQueue('SAVE_ACTION', `Auto-CAPA for ${finalSeverity} incident`);
+    }
+
     navigate('/incidents');
   };
 

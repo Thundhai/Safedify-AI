@@ -186,7 +186,7 @@ export const SmartCamera: React.FC = () => {
                 <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-6 zoom-in-95">
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-bold text-slate-800">Verify Observation</h3>
-                        <button onClick={() => setLoggingHazard(null)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                        <button onClick={() => setLoggingHazard(null)} className="text-slate-400 hover:text-slate-600" aria-label="Close hazard verification modal"><X size={20}/></button>
                     </div>
                     
                     <div className="space-y-4">

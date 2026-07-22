@@ -1,11 +1,13 @@
 
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { getRiskAssessments } from '../services/storageService';
 import { RiskAssessment } from '../types';
 import { ShieldAlert, Plus, Calendar, FileText, Search, Filter, Printer } from 'lucide-react';
 
+
 export const RiskAssessmentList: React.FC = () => {
+    const navigate = useNavigate();
     const [assessments] = useState<RiskAssessment[]>(getRiskAssessments());
     const [searchTerm, setSearchTerm] = useState('');
     const [typeFilter, setTypeFilter] = useState<string>('All');
@@ -123,6 +125,12 @@ export const RiskAssessmentList: React.FC = () => {
                                 <Calendar size={12} /> {new Date(item.date).toLocaleDateString()}
                             </span>
                         </div>
+                        <button
+                          onClick={(e) => { e.preventDefault(); navigate('/actions', { state: { prefill: { source: 'Risk Assessment', type: 'Corrective', relatedRiskAssessmentId: item.id, title: `CAPA: High risk in ${item.title}` } } }); }}
+                          className="mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 text-xs font-bold text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 rounded-lg transition-colors"
+                        >
+                          <ShieldAlert size={12} /> Raise CAPA
+                        </button>
                     </Link>
                 ))}
 

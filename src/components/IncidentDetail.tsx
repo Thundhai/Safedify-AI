@@ -289,6 +289,7 @@ export const IncidentDetail: React.FC = () => {
         <button 
           onClick={() => setActiveTab('overview')}
           className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap ${activeTab === 'overview' ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700'}`}
+          aria-label="View incident overview tab"
         >
           <ClipboardList size={16} /> Overview
         </button>
@@ -656,11 +657,12 @@ export const IncidentDetail: React.FC = () => {
                                 value={newAction.dueDate}
                                 onChange={e => setNewAction({...newAction, dueDate: e.target.value})}
                                 className="w-full border border-slate-300 rounded p-2 text-sm"
+                                aria-label="Action item due date"
                             />
                         </div>
                     </div>
                     <div className="flex justify-end gap-2">
-                        <button type="button" onClick={() => setShowActionForm(false)} className="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700">Cancel</button>
+                        <button type="button" onClick={() => setShowActionForm(false)} className="px-3 py-1.5 text-sm text-slate-500 hover:text-slate-700" aria-label="Cancel adding action item">Cancel</button>
                         <button type="submit" className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">Save Action</button>
                     </div>
                  </form>

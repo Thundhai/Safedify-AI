@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, MapPin, Send, UserX, User, AlertOctagon, ShieldCheck, AlertTriangle, Sparkles, Loader2, ArrowLeft } from 'lucide-react';
-import { saveObservation } from '../services/storageService';
+import { Camera, MapPin, Send, UserX, User, AlertOctagon, ShieldCheck, AlertTriangle, Sparkles, Loader2, ArrowLeft } from '../utils/icons';
+import { saveObservation, saveAction } from '../services/storageService';
 import { analyzeObservationAI } from '../services/geminiService';
 import { compressImage, addToSyncQueue } from '../services/offlineService';
-import { Observation, ObservationType } from '../types';
+import { Observation, ObservationType, ActionItem } from '../types';
 
 export const ObservationForm: React.FC = () => {
   const navigate = useNavigate();
@@ -80,8 +80,26 @@ export const ObservationForm: React.FC = () => {
 
     saveObservation(newObs);
     addToSyncQueue('SAVE_OBSERVATION', `Observation: ${newObs.type}`);
-    
-    alert("Observation Submitted! (Saved Offline & Queued)");
+
+    // Auto-create CAPA for Unsafe Act, Unsafe Condition, or Near Miss
+    if (type === 'Unsafe Act' || type === 'Unsafe Condition' || type === 'Near Miss') {
+      const autoCapa: ActionItem = {
+        id: `capa-${Date.now()}`,
+        type: 'Corrective',
+        source: 'Observation',
+        title: `CAPA: ${type} — ${description.slice(0, 60)}`,
+        description: description,
+        assignee: isAnonymous ? 'HSE Team' : (observerName || 'HSE Team'),
+        priority: type === 'Near Miss' ? 'High' : 'Medium',
+        dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+        status: 'Open',
+        relatedObservationId: newObs.id,
+        createdAt: new Date().toISOString(),
+      };
+      saveAction(autoCapa);
+      addToSyncQueue('SAVE_ACTION', `Auto-CAPA for ${type}`);
+    }
+
     navigate('/observations');
   };
 
@@ -105,6 +123,7 @@ export const ObservationForm: React.FC = () => {
           <button 
             type="button"
             onClick={() => setType('Unsafe Act')}
+            aria-label="Select Unsafe Act observation type"
             className={`p-3 rounded-lg border flex flex-col items-center gap-2 text-sm font-medium transition-all ${
               type === 'Unsafe Act' ? 'bg-red-50 border-red-200 text-red-700 ring-1 ring-red-300' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
             }`}
@@ -115,6 +134,7 @@ export const ObservationForm: React.FC = () => {
           <button 
             type="button"
             onClick={() => setType('Unsafe Condition')}
+            aria-label="Select Unsafe Condition observation type"
             className={`p-3 rounded-lg border flex flex-col items-center gap-2 text-sm font-medium transition-all ${
               type === 'Unsafe Condition' ? 'bg-orange-50 border-orange-200 text-orange-700 ring-1 ring-orange-300' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
             }`}
@@ -125,6 +145,7 @@ export const ObservationForm: React.FC = () => {
           <button 
             type="button"
             onClick={() => setType('Safe Behavior')}
+            aria-label="Select Safe Behavior observation type"
             className={`p-3 rounded-lg border flex flex-col items-center gap-2 text-sm font-medium transition-all ${
               type === 'Safe Behavior' ? 'bg-green-50 border-green-200 text-green-700 ring-1 ring-green-300' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
             }`}
@@ -141,6 +162,7 @@ export const ObservationForm: React.FC = () => {
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            aria-label="Observation category"
           >
             {categories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
@@ -172,6 +194,8 @@ export const ObservationForm: React.FC = () => {
              rows={3}
              className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
              required
+             aria-required="true"
+             aria-label="Observation description"
            />
            <div className="flex justify-end mt-2">
                 <button
@@ -179,6 +203,7 @@ export const ObservationForm: React.FC = () => {
                     onClick={handleAIAnalysis}
                     disabled={isAnalyzing || description.length < 5}
                     className="flex items-center gap-2 text-xs font-bold text-purple-600 bg-purple-50 px-3 py-1.5 rounded-lg hover:bg-purple-100 transition-colors disabled:opacity-50"
+                    aria-label="Auto-categorize observation and suggest action using AI"
                 >
                     {isAnalyzing ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                     Auto-Categorize & Suggest Action
@@ -212,7 +237,7 @@ export const ObservationForm: React.FC = () => {
                 {isCompressing ? (
                     <Loader2 size={24} className="animate-spin text-blue-500" />
                 ) : image ? (
-                    <img src={image} alt="Evidence" className="h-32 object-contain rounded" />
+                    <img src={image} alt="Evidence photo for safety observation" className="h-32 object-contain rounded" />
                 ) : (
                     <>
                         <Camera size={24} className="text-slate-400" />
@@ -229,8 +254,15 @@ export const ObservationForm: React.FC = () => {
              <span className="text-sm font-medium text-slate-700">Submit Anonymously</span>
            </div>
            <label className="relative inline-flex items-center cursor-pointer">
-              <input type="checkbox" checked={isAnonymous} onChange={() => setIsAnonymous(!isAnonymous)} className="sr-only peer" />
+              <input 
+                type="checkbox" 
+                checked={isAnonymous} 
+                onChange={() => setIsAnonymous(!isAnonymous)} 
+                className="sr-only peer" 
+                aria-describedby="anonymous-help"
+              />
               <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              <span className="sr-only">Toggle anonymous submission</span>
            </label>
         </div>
 

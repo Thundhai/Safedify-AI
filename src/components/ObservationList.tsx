@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Plus, Eye, CheckCircle, Sparkles, Loader2, Camera, Trash2, Edit2, X, Save, MapPin, Tag, FileText, Printer, Filter } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Plus, Eye, CheckCircle, Sparkles, Loader2, Camera, Trash2, Edit2, X, Save, MapPin, Tag, FileText, Printer, Filter, ShieldAlert } from '../utils/icons';
 import { getObservations, deleteObservation, updateObservation } from '../services/storageService';
 import { analyzeObservationTrendsAI } from '../services/geminiService';
 import { addToSyncQueue } from '../services/offlineService';
 import { Observation, ObservationType } from '../types';
 
 export const ObservationList: React.FC = () => {
+    const navigate = useNavigate();
     const [observations, setObservations] = useState<Observation[]>([]);
     const [trends, setTrends] = useState<any[]>([]);
     const [loadingTrends, setLoadingTrends] = useState(false);
@@ -310,6 +311,15 @@ export const ObservationList: React.FC = () => {
                                          >
                                              <Trash2 size={16} />
                                          </button>
+                                         {(obs.type === 'Unsafe Act' || obs.type === 'Unsafe Condition' || obs.type === 'Near Miss') && (
+                                           <button
+                                             onClick={() => navigate('/actions', { state: { prefill: { source: 'Observation', type: 'Corrective', relatedObservationId: obs.id, title: `CAPA: ${obs.type} — ${obs.description.slice(0, 60)}` } } })}
+                                             className="flex items-center gap-1 px-2 py-1 text-xs font-bold text-orange-700 bg-orange-50 border border-orange-200 hover:bg-orange-100 rounded-lg transition-colors whitespace-nowrap"
+                                             title="Raise a Corrective Action"
+                                           >
+                                             <ShieldAlert size={12} /> Raise CAPA
+                                           </button>
+                                         )}
                                      </div>
                                 </div>
                             </div>
@@ -421,6 +431,7 @@ export const ObservationList: React.FC = () => {
                                         className="w-full border border-slate-300 rounded-lg p-2 text-sm"
                                         value={editForm.immediateActionTaken}
                                         onChange={(e) => setEditForm({...editForm, immediateActionTaken: e.target.value})}
+                                        aria-label="Immediate action taken"
                                     />
                                 </div>
 
@@ -430,6 +441,7 @@ export const ObservationList: React.FC = () => {
                                         className="w-full border border-slate-300 rounded-lg p-2 text-sm"
                                         value={editForm.status}
                                         onChange={(e) => setEditForm({...editForm, status: e.target.value as any})}
+                                        aria-label="Observation status"
                                     >
                                         <option value="Open">Open</option>
                                         <option value="Closed">Closed</option>
@@ -440,8 +452,7 @@ export const ObservationList: React.FC = () => {
                                     <button 
                                         type="button" 
                                         onClick={() => setSelectedObs(null)}
-                                        className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"
-                                    >
+                                        className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg"                                        aria-label="Cancel editing observation"                                    >
                                         Cancel
                                     </button>
                                     <button 

@@ -7,7 +7,7 @@ import {
   ArrowRight, CheckCircle2, BarChart2, Smartphone, 
   Users, Globe, Zap, Menu, X, Building2, HardHat, Factory,
   Check, Crown, Sparkles, Star, Quote, FileText, Lock, Shield
-} from 'lucide-react';
+} from '../utils/icons';
 import { PricingPlans } from './PricingPlans';
 
 interface FeatureCardProps {

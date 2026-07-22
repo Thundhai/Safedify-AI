@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { getDocuments } from '../services/storageService';
 import { HSEDocument, DocumentCategory } from '../types';
-import { Plus, FileText, Search, Filter, Shield, Book, FileBarChart, AlertCircle } from 'lucide-react';
+import { Plus, FileText, Search, Filter, Shield, Book, FileBarChart, AlertCircle } from '../utils/icons';
 
 export const DocumentList: React.FC = () => {
     const [documents, setDocuments] = useState<HSEDocument[]>([]);

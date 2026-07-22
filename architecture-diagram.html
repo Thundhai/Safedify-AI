@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Safedify AI — Architecture Diagram</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 32px;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #38bdf8;
+      letter-spacing: 0.05em;
+    }
+    header p {
+      color: #94a3b8;
+      margin-top: 6px;
+      font-size: 0.95rem;
+    }
+    .diagram-wrapper {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 32px;
+      overflow-x: auto;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+    .actions {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 28px;
+      flex-wrap: wrap;
+    }
+    button {
+      background: #0284c7;
+      color: white;
+      border: none;
+      padding: 10px 22px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+    button:hover { background: #0369a1; }
+    button.secondary {
+      background: #334155;
+    }
+    button.secondary:hover { background: #475569; }
+    footer {
+      text-align: center;
+      margin-top: 32px;
+      color: #475569;
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Safedify AI</h1>
+  <p>Application Architecture Diagram &mdash; Generated 2026-06-28</p>
+</header>
+
+<div class="diagram-wrapper">
+  <div class="mermaid">
+graph TB
+    subgraph Clients["🖥️ Client Layer"]
+        WEB["Web Browser\nReact PWA"]
+        AND["Android App\nCapacitor 8"]
+        IOS["iOS App\nCapacitor 8"]
+    end
+
+    subgraph Frontend["⚛️ Frontend — React 19 + TypeScript + Vite"]
+        direction TB
+
+        subgraph Pages["UI Pages"]
+            AUTH["Auth\nLogin / Register"]
+            DASH["Dashboards\nMain · Mobile · Analytics · Real-time"]
+            HSE["HSE Modules\nIncidents · Inspections · Risk · Permits · PPE"]
+            PEOPLE["People\nWorkers · Contractors · Training"]
+            ASSETS["Assets & Docs"]
+            EMERGENCY["Emergency Dashboard"]
+            AI_UI["AI Features\nAI Tools · Chat · Smart Camera"]
+            EXTRAS["Extras\nGeo-fencing · Gamification · Reg. News"]
+            WALLET["Wallet / Web3\nMetaMask Integration"]
+        end
+
+        subgraph ClientServices["Client Services Layer"]
+            STORAGE["storageService\nLocal Data CRUD"]
+            OFFLINE["offlineService\nSync Queue"]
+            AUTH_SVC["authService"]
+            PUSH["pushNotificationService"]
+            WALLET_SVC["walletService"]
+            AI_SVC["AI Services\ngeminiService\naiIncidentAnalysis\ncomputerVision\nriskAssessment\nNLP · predictive\nsmartWorkflow\nadvancedAnalytics"]
+        end
+
+        subgraph PWA["PWA Layer"]
+            SW["Service Worker\nsw.js"]
+            MANIFEST["Web Manifest\nmanifest.json"]
+        end
+    end
+
+    subgraph Backend["🖧 Backend — Node.js + Express 5"]
+        API["Express Server\nserver/index.ts"]
+
+        subgraph AIRoutes["AI Routes  /api/ai/*"]
+            R1["POST /classify-incident"]
+            R2["POST /corrective-actions"]
+            R3["POST /root-cause-analysis"]
+            R4["POST /detect-ppe"]
+            R5["POST /detect-hazards"]
+            R6["POST /extract-document"]
+            R7["POST /chat"]
+            R8["POST /predictive-alerts"]
+            R9["POST /executive-report"]
+            R10["POST /weather-risks\nPOST /regulatory-news\nPOST /generate-speech\nPOST /inspection-fix"]
+        end
+
+        GEMINI_SVC["GeminiService\nserver/services/gemini.ts\nVision · Text · Structured JSON"]
+    end
+
+    subgraph External["☁️ External Services"]
+        GEMINI["Google Gemini 1.5 Pro\n@google/generative-ai"]
+        VERCEL["Vercel\nHosting + Serverless"]
+        METAMASK["MetaMask\nEthereum Wallet"]
+    end
+
+    subgraph LocalStorage["💾 On-Device Storage"]
+        LOCAL_DB["Browser LocalStorage\nDevice Storage"]
+        SW_CACHE["Service Worker Cache\nOffline Assets"]
+    end
+
+    WEB & AND & IOS --> Pages
+    Pages --> ClientServices
+    AI_SVC -->|"HTTPS REST"| API
+    API --> AIRoutes
+    AIRoutes --> GEMINI_SVC
+    GEMINI_SVC -->|"API Key"| GEMINI
+    STORAGE & OFFLINE --> LOCAL_DB
+    SW --> SW_CACHE
+    WALLET_SVC --> METAMASK
+    Frontend -.->|"Static Deploy"| VERCEL
+    Backend -.->|"Serverless Deploy"| VERCEL
+
+    style Clients fill:#1e3a5f,color:#e2e8f0,stroke:#38bdf8
+    style Frontend fill:#14532d,color:#e2e8f0,stroke:#4ade80
+    style Backend fill:#450a0a,color:#e2e8f0,stroke:#f87171
+    style External fill:#431407,color:#e2e8f0,stroke:#fb923c
+    style LocalStorage fill:#2e1065,color:#e2e8f0,stroke:#a78bfa
+    style Pages fill:#166534,color:#e2e8f0,stroke:#86efac
+    style ClientServices fill:#14532d,color:#e2e8f0,stroke:#4ade80
+    style PWA fill:#0f4c32,color:#e2e8f0,stroke:#34d399
+    style AIRoutes fill:#7f1d1d,color:#e2e8f0,stroke:#fca5a5
+  </div>
+</div>
+
+<div class="actions">
+  <button onclick="window.print()">🖨️ Print / Save as PDF</button>
+  <button class="secondary" onclick="saveSVG()">⬇️ Download SVG</button>
+  <button class="secondary" onclick="copyMermaid()">📋 Copy Mermaid Source</button>
+</div>
+
+<footer>
+  <p>Safedify AI &mdash; HSE Safety Management Platform &mdash; Architecture v1.0</p>
+</footer>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#1e40af',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#3b82f6',
+      lineColor: '#64748b',
+      secondaryColor: '#1e293b',
+      tertiaryColor: '#0f172a'
+    },
+    flowchart: { curve: 'basis', padding: 20 }
+  });
+
+  function saveSVG() {
+    const svg = document.querySelector('.mermaid svg');
+    if (!svg) { alert('Diagram not yet rendered. Please wait a moment.'); return; }
+    const serializer = new XMLSerializer();
+    const svgStr = serializer.serializeToString(svg);
+    const blob = new Blob([svgStr], { type: 'image/svg+xml' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'safedify-ai-architecture.svg';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  const MERMAID_SOURCE = `graph TB
+    subgraph Clients
+        WEB[Web Browser - React PWA]
+        AND[Android App - Capacitor 8]
+        IOS[iOS App - Capacitor 8]
+    end
+    subgraph Frontend - React 19 + TypeScript + Vite
+        AUTH[Auth Login/Register]
+        DASH[Dashboards]
+        HSE[HSE Modules]
+        PEOPLE[People Management]
+        AI_UI[AI Features]
+        STORAGE[storageService]
+        OFFLINE[offlineService]
+        AI_SVC[AI Client Services]
+        SW[Service Worker]
+    end
+    subgraph Backend - Node.js + Express 5
+        API[Express Server]
+        R1[POST /classify-incident]
+        R2[POST /detect-ppe]
+        R3[POST /chat]
+        R4[POST /predictive-alerts]
+        GEMINI_SVC[GeminiService]
+    end
+    subgraph External
+        GEMINI[Google Gemini 1.5 Pro]
+        VERCEL[Vercel Hosting]
+        METAMASK[MetaMask Wallet]
+    end
+    WEB & AND & IOS --> Frontend
+    AI_SVC --> API
+    API --> GEMINI_SVC
+    GEMINI_SVC --> GEMINI
+    Frontend -.-> VERCEL
+    Backend -.-> VERCEL`;
+
+  function copyMermaid() {
+    navigator.clipboard.writeText(MERMAID_SOURCE).then(() => {
+      alert('Mermaid source copied to clipboard!');
+    });
+  }
+</script>
+
+<style>
+  @media print {
+    body { background: white; color: black; padding: 10px; }
+    header h1 { color: #0284c7; }
+    header p { color: #64748b; }
+    .actions, footer { display: none; }
+    .diagram-wrapper { border: 1px solid #ccc; background: #f8fafc; }
+  }
+</style>
+
+</body>
+</html>

@@ -250,6 +250,7 @@ export const ContractorDetail: React.FC = () => {
                                                     onChange={(e) => updateDocument(doc.id, { title: e.target.value })}
                                                     className="border border-slate-300 rounded p-2 text-sm"
                                                     placeholder="Document Title"
+                                                    aria-label="Document title"
                                                 />
                                                 <select 
                                                     value={doc.type}
@@ -268,6 +269,7 @@ export const ContractorDetail: React.FC = () => {
                                                         value={doc.expiryDate}
                                                         onChange={(e) => updateDocument(doc.id, { expiryDate: e.target.value })}
                                                         className="border border-slate-300 rounded p-2 text-sm w-full"
+                                                        aria-label="Document expiry date"
                                                     />
                                                 </div>
                                             </div>

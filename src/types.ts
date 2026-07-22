@@ -135,14 +135,34 @@ export interface Inspection {
   signature?: string; // Base64
 }
 
+export type CAPAType = 'Corrective' | 'Preventive';
+export type CAPASource = 'Incident' | 'Inspection' | 'Observation' | 'Risk Assessment' | 'Audit' | 'Other';
+export type CAPAEffectiveness = 'Effective' | 'Partially Effective' | 'Ineffective';
+
 export interface ActionItem {
   id: string;
+  type: CAPAType;
+  source: CAPASource;
   title: string;
+  description?: string;
+  rootCause?: string;
   assignee: string;
   dueDate: string;
   priority: 'Low' | 'Medium' | 'High';
-  status: 'Open' | 'In Progress' | 'Done';
+  status: 'Open' | 'In Progress' | 'Done' | 'Verified';
+  // Cross-module references
   relatedIncidentId?: string;
+  relatedInspectionId?: string;
+  relatedObservationId?: string;
+  relatedRiskAssessmentId?: string;
+  // Lifecycle timestamps
+  createdAt: string;
+  closedAt?: string;
+  // Verification (ISO 45001 Clause 10.2.1f)
+  verifiedBy?: string;
+  verifiedAt?: string;
+  effectivenessRating?: CAPAEffectiveness;
+  effectivenessNotes?: string;
 }
 
 export interface DashboardStats {
@@ -292,6 +312,57 @@ export enum PermitStatus {
   REJECTED = 'Rejected'
 }
 
+export enum LiftingEquipmentType {
+  MOBILE_CRANE = 'Mobile Crane',
+  CRAWLER_CRANE = 'Crawler Crane',
+  TOWER_CRANE = 'Tower Crane',
+  FORKLIFT = 'Forklift',
+  CHAIN_BLOCK = 'Chain Block / Lever Hoist',
+  GANTRY = 'Gantry / A-Frame',
+  OVERHEAD_CRANE = 'Overhead Crane (EOT)'
+}
+
+export enum LiftingPlanStatus {
+  DRAFT = 'Draft',
+  PENDING_HSE = 'Pending HSE Approval',
+  APPROVED = 'Approved'
+}
+
+export interface LiftingCalculationResult {
+  totalLiftedLoad: number;
+  requiredCapacity: number;
+  ratedCapacity: number;
+  utilizationPercent: number;
+  pass: boolean;
+  notes: string[];
+  calculatedAt: string;
+}
+
+export interface LiftingPlan {
+  equipmentType: LiftingEquipmentType;
+  loadWeight: number | null;
+  riggingWeight: number | null;
+  dynamicFactor: number;
+  parameters: Record<string, number | null>;
+  calculation?: LiftingCalculationResult;
+  status: LiftingPlanStatus;
+  sentForApprovalAt?: string;
+  approvedAt?: string;
+  hseApprover?: string;
+  approvalComments?: string;
+  attachedToPermit: boolean;
+}
+
+export interface LiftingPlanRecord {
+  id: string;
+  title: string;
+  location: string;
+  description: string;
+  date: string;
+  author: string;
+  plan: LiftingPlan;
+}
+
 export interface Permit {
   id: string;
   type: PermitType;
@@ -303,6 +374,7 @@ export interface Permit {
   approver?: string;
   status: PermitStatus;
   riskAssessmentId?: string; // Link to a JHA/Risk Assessment
+  liftingPlanId?: string; // Link to approved lifting plan module
   controls: {
     id: string;
     label: string;

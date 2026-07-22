@@ -245,6 +245,7 @@ export const RiskAssessmentForm: React.FC = () => {
                     onChange={(e) => setFormData({...formData, title: e.target.value})}
                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none print:border-0 print:p-0 print:font-bold print:text-lg"
                     placeholder="e.g. Confined Space Entry - Tank A"
+                    aria-label="Risk assessment title"
                 />
             </div>
             <div className="space-y-2">
@@ -253,6 +254,7 @@ export const RiskAssessmentForm: React.FC = () => {
                     value={formData.type}
                     onChange={(e) => setFormData({...formData, type: e.target.value as any})}
                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white print:border-0 print:p-0 print:appearance-none"
+                    aria-label="Risk assessment type"
                  >
                      <option value="JHA">Job Hazard Analysis (JHA)</option>
                      <option value="HIRA">HIRA</option>
@@ -267,6 +269,7 @@ export const RiskAssessmentForm: React.FC = () => {
                         onChange={(e) => setFormData({...formData, taskDescription: e.target.value})}
                         className="w-full border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[100px] print:border-0 print:p-0 print:resize-none"
                         placeholder="Describe the steps involved in the task..."
+                        aria-label="Task description"
                     />
                     <div className="absolute bottom-3 right-3 flex gap-2 print:hidden">
                         <button 
@@ -466,7 +469,7 @@ export const RiskAssessmentForm: React.FC = () => {
                                                     className="flex-1 bg-transparent border-0 border-b border-transparent focus:border-slate-300 p-0 py-0.5 text-slate-700 focus:ring-0 placeholder:text-slate-300 transition-all text-sm print:text-black"
                                                     placeholder="Describe control measure..."
                                                  />
-                                                 <button type="button" onClick={() => removeControl(hIndex, cIndex)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity print:hidden">
+                                                 <button type="button" onClick={() => removeControl(hIndex, cIndex)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity print:hidden" aria-label="Remove this control">
                                                     <X size={16} />
                                                  </button>
                                             </div>
@@ -475,10 +478,10 @@ export const RiskAssessmentForm: React.FC = () => {
                                         {/* Manual Add Buttons */}
                                         <div className="flex flex-wrap gap-2 pt-2 print:hidden">
                                             <span className="text-xs text-slate-400 self-center mr-1">Add Control:</span>
-                                             <button type="button" onClick={() => addManualControl(hIndex, 'Elimination')} className="px-2 py-1 text-[10px] uppercase font-bold text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors">Elimination</button>
-                                             <button type="button" onClick={() => addManualControl(hIndex, 'Substitution')} className="px-2 py-1 text-[10px] uppercase font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded hover:bg-orange-100 transition-colors">Subst.</button>
-                                             <button type="button" onClick={() => addManualControl(hIndex, 'Engineering')} className="px-2 py-1 text-[10px] uppercase font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors">Engineering</button>
-                                             <button type="button" onClick={() => addManualControl(hIndex, 'Administrative')} className="px-2 py-1 text-[10px] uppercase font-bold text-yellow-600 bg-yellow-50 border border-yellow-200 rounded hover:bg-yellow-100 transition-colors">Admin</button>
+                                             <button type="button" onClick={() => addManualControl(hIndex, 'Elimination')} className="px-2 py-1 text-[10px] uppercase font-bold text-red-600 bg-red-50 border border-red-200 rounded hover:bg-red-100 transition-colors" aria-label="Add elimination control">Elimination</button>
+                                             <button type="button" onClick={() => addManualControl(hIndex, 'Substitution')} className="px-2 py-1 text-[10px] uppercase font-bold text-orange-600 bg-orange-50 border border-orange-200 rounded hover:bg-orange-100 transition-colors" aria-label="Add substitution control">Subst.</button>
+                                             <button type="button" onClick={() => addManualControl(hIndex, 'Engineering')} className="px-2 py-1 text-[10px] uppercase font-bold text-blue-600 bg-blue-50 border border-blue-200 rounded hover:bg-blue-100 transition-colors" aria-label="Add engineering control">Engineering</button>
+                                             <button type="button" onClick={() => addManualControl(hIndex, 'Administrative')} className="px-2 py-1 text-[10px] uppercase font-bold text-yellow-600 bg-yellow-50 border border-yellow-200 rounded hover:bg-yellow-100 transition-colors" aria-label="Add administrative control">Admin</button>
                                              <button type="button" onClick={() => addManualControl(hIndex, 'PPE')} className="px-2 py-1 text-[10px] uppercase font-bold text-green-600 bg-green-50 border border-green-200 rounded hover:bg-green-100 transition-colors">PPE</button>
                                         </div>
                                     </div>

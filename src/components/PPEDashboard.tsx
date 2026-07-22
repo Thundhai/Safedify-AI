@@ -471,7 +471,7 @@ export const PPEDashboard: React.FC = () => {
                       {categories.map(cat => (
                           <div key={cat} className="flex justify-between items-center bg-slate-50 p-2 rounded border border-slate-100">
                               <span className="text-sm text-slate-700 font-medium">{cat}</span>
-                              <button onClick={() => handleDeleteCategory(cat)} className="text-slate-400 hover:text-red-500">
+                              <button onClick={() => handleDeleteCategory(cat)} className="text-slate-400 hover:text-red-500" aria-label={`Delete ${cat} category`}>
                                   <Trash2 size={16} />
                               </button>
                           </div>

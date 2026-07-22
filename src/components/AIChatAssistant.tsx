@@ -1,7 +1,21 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import ReactMarkdown from 'react-markdown';
-import { MessageSquare, X, Send, Image, Loader2, Sparkles, HardHat, FileText, Volume2, Lock } from 'lucide-react';
+import React, { useState, useRef, useEffect, Suspense } from 'react';
+import { 
+  MessageSquare, 
+  X, 
+  Send, 
+  Image, 
+  Loader2, 
+  Sparkles, 
+  HardHat, 
+  FileText, 
+  Volume2, 
+  Lock 
+} from '../utils/icons';
+
+// Lazy load ReactMarkdown to reduce initial bundle size
+const ReactMarkdown = React.lazy(() => import('react-markdown'));
+
 import { chatSafetyAssistant, detectPPEAI, generateSpeechAI, playGeneratedAudio } from '../services/geminiService';
 import { calculateHSEMetrics } from '../services/storageService';
 import { useAuth } from '../context/AuthContext';
@@ -124,7 +138,7 @@ export const AIChatAssistant: React.FC = () => {
            <Sparkles size={20} className="text-brand-orange" />
            <h3 className="font-bold">Safety Assistant</h3>
         </div>
-        <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white">
+        <button onClick={() => setIsOpen(false)} className="text-slate-400 hover:text-white" aria-label="Close AI Assistant">
           <X size={20} />
         </button>
       </div>
@@ -142,7 +156,9 @@ export const AIChatAssistant: React.FC = () => {
                 <img src={msg.image} alt="Upload" className="w-full h-auto rounded-lg mb-2 border border-white/20" />
               )}
               <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1">
-                 <ReactMarkdown>{msg.text}</ReactMarkdown>
+                <Suspense fallback={<div className="text-sm text-slate-500">Loading message...</div>}>
+                  <ReactMarkdown>{msg.text}</ReactMarkdown>
+                </Suspense>
               </div>
               
               {/* TTS Button for Model Messages */}
@@ -151,6 +167,7 @@ export const AIChatAssistant: React.FC = () => {
                     onClick={() => handleReadAloud(msg.text, idx)}
                     className={`absolute -right-8 top-2 p-1.5 rounded-full bg-slate-100 text-slate-500 hover:text-blue-600 hover:bg-slate-200 transition-opacity ${isReading === idx ? 'text-blue-600 bg-blue-50' : 'opacity-0 group-hover:opacity-100'}`}
                     title="Read Aloud"
+                    aria-label="Read message aloud"
                   >
                       {isReading === idx ? <Loader2 size={14} className="animate-spin"/> : <Volume2 size={14} />}
                   </button>
@@ -194,14 +211,14 @@ export const AIChatAssistant: React.FC = () => {
                 {selectedImage && (
                     <div className="flex items-center gap-2 mb-2 p-2 bg-slate-50 rounded border border-slate-200">
                         <span className="text-xs text-slate-500 truncate flex-1">Image selected</span>
-                        <button onClick={() => setSelectedImage(null)} className="text-slate-400 hover:text-red-500"><X size={14} /></button>
+                        <button onClick={() => setSelectedImage(null)} className="text-slate-400 hover:text-red-500" aria-label="Remove selected image"><X size={14} /></button>
                     </div>
                 )}
 
                 <div className="flex items-end gap-2">
                     <label className="p-2 text-slate-400 hover:text-blue-600 cursor-pointer transition-colors" title="Upload Photo">
                         <Image size={20} />
-                        <input type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+                        <input type="file" accept="image/*" className="hidden" onChange={handleImageSelect} aria-label="Upload image to chat" />
                     </label>
                     <textarea
                         value={inputValue}
@@ -215,11 +232,13 @@ export const AIChatAssistant: React.FC = () => {
                         placeholder="Ask about safety..."
                         className="flex-1 max-h-32 min-h-[44px] p-2 border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                         rows={1}
+                        aria-label="Chat message input"
                     />
                     <button 
                         onClick={handleSendMessage}
                         disabled={(!inputValue.trim() && !selectedImage) || isLoading}
                         className="p-2.5 bg-brand-navy text-white rounded-xl hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        aria-label="Send message"
                     >
                         <Send size={18} />
                     </button>

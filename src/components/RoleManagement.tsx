@@ -229,6 +229,7 @@ export const RoleManagement: React.FC = () => {
                                         type="button" 
                                         onClick={() => setShowModal(false)}
                                         className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-100 rounded-lg transition-colors"
+                                        aria-label="Close role editing modal"
                                     >
                                         Close
                                     </button>

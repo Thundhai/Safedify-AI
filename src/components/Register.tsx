@@ -4,7 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { getRoles } from '../services/storageService';
 import { Role, UserRoles } from '../types';
-import { Loader2, ShieldCheck, Lock, Mail, User, Briefcase, AlertCircle, ArrowLeft, HardHat, CheckSquare } from 'lucide-react';
+import { Loader2, ShieldCheck, Lock, Mail, User, Briefcase, AlertCircle, ArrowLeft, HardHat, CheckSquare } from '../utils/icons';
 
 export const Register: React.FC = () => {
   const [name, setName] = useState('');
@@ -113,6 +113,7 @@ export const Register: React.FC = () => {
                 onChange={(e) => setName(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
                 placeholder="John Doe"
+                aria-label="Full name"
               />
               <User className="absolute left-3 top-2.5 text-slate-400" size={18} />
             </div>

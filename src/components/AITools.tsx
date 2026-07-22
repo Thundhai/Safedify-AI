@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Camera, HardHat, FileSearch, Loader2, UploadCloud, AlertCircle, CheckCircle2, Sparkles, Volume2, Mic } from 'lucide-react';
+import { Camera, HardHat, FileSearch, Loader2, UploadCloud, AlertCircle, CheckCircle2, Sparkles, Volume2, Mic } from '../utils/icons';
 import { detectPPEAI, extractDocumentDataAI, generateSpeechAI, playGeneratedAudio } from '../services/geminiService';
 import { FeatureGate } from './FeatureGate';
 import { SubscriptionTier } from '../types';
@@ -114,12 +114,14 @@ export const AITools: React.FC = () => {
                         onChange={(e) => setTtsText(e.target.value)}
                         className="w-full h-40 p-4 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none resize-none text-slate-700"
                         placeholder="Type safety announcement here..."
+                        aria-label="Text for audio announcement"
                     />
                     <div className="flex justify-end">
                         <button 
                             onClick={handleTTS}
                             disabled={!ttsText || isSpeaking}
                             className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-70 transition-colors shadow-md"
+                            aria-label="Generate and play audio announcement"
                         >
                             {isSpeaking ? <Loader2 className="animate-spin" /> : <Volume2 />}
                             {isSpeaking ? 'Generating Audio...' : 'Generate & Play'}

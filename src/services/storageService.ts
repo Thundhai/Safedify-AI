@@ -1,5 +1,5 @@
 
-import { Incident, Inspection, InspectionTemplate, ActionItem, IncidentType, IncidentSeverity, RiskAssessment, Observation, WorkerProfile, TrainingModule, TrainingRecord, PPEItem, PPEIssuance, Permit, PermitType, PermitStatus, Asset, AssetStatus, AssetCategory, Contractor, HSEDocument, EmergencyContact, EmergencyDrill, HSEMetrics, SafetyZone, SiteSafetyScore, HSEStatsLog, Role, UserRoles, SubscriptionTier } from "../types";
+import { Incident, Inspection, InspectionTemplate, ActionItem, IncidentType, IncidentSeverity, RiskAssessment, Observation, WorkerProfile, TrainingModule, TrainingRecord, PPEItem, PPEIssuance, Permit, PermitType, PermitStatus, Asset, AssetStatus, AssetCategory, Contractor, HSEDocument, EmergencyContact, EmergencyDrill, HSEMetrics, SafetyZone, SiteSafetyScore, HSEStatsLog, Role, UserRoles, SubscriptionTier, LiftingPlanRecord } from "../types";
 import { getCurrentUser } from "./authService";
 
 const STORAGE_KEYS = {
@@ -16,6 +16,7 @@ const STORAGE_KEYS = {
   PPE_CATEGORIES: 'hse_ppe_categories',
   PPE_ISSUANCE: 'hse_ppe_issuance',
   PERMITS: 'hse_permits',
+  LIFTING_PLANS: 'hse_lifting_plans',
   ASSETS: 'hse_assets',
   CONTRACTORS: 'hse_contractors',
   DOCUMENTS: 'hse_documents',
@@ -208,6 +209,7 @@ const initialPPEIssuance: PPEIssuance[] = [];
 // --- Permit Seed Data ---
 
 const initialPermits: Permit[] = [];
+const initialLiftingPlans: LiftingPlanRecord[] = [];
 
 const initialAssets: Asset[] = [];
 
@@ -236,6 +238,13 @@ export const getStorageUsage = (): number => {
 };
 
 export const checkQuota = (newDataSize: number = 0): boolean => {
+    // TESTING MODE: Temporarily disable storage quota checks
+    const TESTING_MODE = true; // Set to false to re-enable quota checks
+    
+    if (TESTING_MODE) {
+        return true; // Skip quota check during testing
+    }
+    
     try {
         const user = getCurrentUser();
         const limit = user?.tier === SubscriptionTier.FREE ? QUOTA_FREE : QUOTA_PRO;
@@ -332,6 +341,10 @@ export const saveAction = (action: ActionItem) => {
 export const updateAction = (action: ActionItem) => {
   const actions = getActions();
   set(STORAGE_KEYS.ACTIONS, actions.map(a => a.id === action.id ? action : a));
+};
+export const deleteAction = (id: string) => {
+  const actions = getActions();
+  set(STORAGE_KEYS.ACTIONS, actions.filter(a => a.id !== id));
 };
 
 // Risk Assessments
@@ -471,6 +484,22 @@ export const savePermit = (permit: Permit) => {
         set(STORAGE_KEYS.PERMITS, list.map(p => p.id === permit.id ? permit : p));
     } else {
         set(STORAGE_KEYS.PERMITS, [permit, ...list]);
+    }
+};
+
+// Lifting Plans
+export const getLiftingPlans = (): LiftingPlanRecord[] => {
+    const result = get(STORAGE_KEYS.LIFTING_PLANS, initialLiftingPlans);
+    return Array.isArray(result) ? result : [];
+};
+export const getLiftingPlanById = (id: string): LiftingPlanRecord | undefined => getLiftingPlans().find(p => p.id === id);
+export const saveLiftingPlan = (plan: LiftingPlanRecord) => {
+    const list = getLiftingPlans();
+    const exists = list.find(p => p.id === plan.id);
+    if (exists) {
+        set(STORAGE_KEYS.LIFTING_PLANS, list.map(p => p.id === plan.id ? plan : p));
+    } else {
+        set(STORAGE_KEYS.LIFTING_PLANS, [plan, ...list]);
     }
 };
 

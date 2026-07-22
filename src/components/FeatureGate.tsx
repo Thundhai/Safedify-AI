@@ -23,6 +23,13 @@ export const FeatureGate: React.FC<FeatureGateProps> = ({
   const { user } = useAuth();
   const navigate = useNavigate();
 
+  // TESTING MODE: Temporarily disable subscription gating
+  const TESTING_MODE = true; // Set to false to re-enable subscription checks
+  
+  if (TESTING_MODE) {
+    return <>{children}</>;
+  }
+
   const tiers = [SubscriptionTier.FREE, SubscriptionTier.PRO, SubscriptionTier.ENTERPRISE];
   const userTierIndex = tiers.indexOf(user?.tier || SubscriptionTier.FREE);
   const requiredTierIndex = tiers.indexOf(requiredTier);

@@ -89,7 +89,7 @@ export const DocumentForm: React.FC = () => {
         <div className="max-w-4xl mx-auto space-y-6">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    <button onClick={() => navigate('/documents')} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                    <button onClick={() => navigate('/documents')} className="p-2 hover:bg-slate-200 rounded-full transition-colors" aria-label="Go back to documents list">
                         <ArrowLeft size={20} className="text-slate-600" />
                     </button>
                     <div>
@@ -114,8 +114,7 @@ export const DocumentForm: React.FC = () => {
                                     value={doc.title}
                                     onChange={(e) => setDoc({...doc, title: e.target.value})}
                                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
-                                    placeholder="e.g. Work at Height SOP"
-                                />
+                                    placeholder="e.g. Work at Height SOP"                                    aria-label="Document title"                                />
                              </div>
                              <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-1">Category</label>
@@ -123,6 +122,7 @@ export const DocumentForm: React.FC = () => {
                                     value={doc.category}
                                     onChange={(e) => setDoc({...doc, category: e.target.value as any})}
                                     className="w-full border border-slate-300 rounded-lg p-2.5 text-sm"
+                                    aria-label="Document category"
                                 >
                                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                                 </select>
@@ -175,7 +175,7 @@ export const DocumentForm: React.FC = () => {
                                 <Upload size={32} className="text-slate-400 mb-2" />
                                 <span className="text-sm font-medium text-slate-600">Click to upload file</span>
                                 <span className="text-xs text-slate-400">PDF, PNG, JPG supported</span>
-                                <input type="file" onChange={handleFileUpload} className="hidden" accept="image/*,.pdf" />
+                                <input type="file" onChange={handleFileUpload} className="hidden" accept="image/*,.pdf" aria-label="Upload document file" />
                             </label>
                         ) : (
                             <div className="space-y-4">
@@ -185,7 +185,7 @@ export const DocumentForm: React.FC = () => {
                                         <p className="text-sm font-medium truncate">{doc.title}</p>
                                         <p className="text-xs text-slate-500">File uploaded</p>
                                     </div>
-                                    <button onClick={() => setDoc({...doc, contentUrl: undefined, aiSummary: undefined})} className="text-slate-400 hover:text-red-500">
+                                    <button onClick={() => setDoc({...doc, contentUrl: undefined, aiSummary: undefined})} className="text-slate-400 hover:text-red-500" aria-label="Remove uploaded file">
                                         <XCircle size={20} />
                                     </button>
                                 </div>

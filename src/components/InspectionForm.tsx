@@ -5,10 +5,10 @@ import {
   ClipboardCheck, Calendar, MapPin, Printer, Camera, 
   ArrowLeft, FileText, LayoutTemplate, Trash2
 } from 'lucide-react';
-import { saveInspection, getInspectionTemplates, getInspections, saveInspectionTemplate } from '../services/storageService';
+import { saveInspection, getInspectionTemplates, getInspections, saveInspectionTemplate, saveAction } from '../services/storageService';
 import { suggestInspectionFixAI } from '../services/geminiService';
 import { compressImage, addToSyncQueue } from '../services/offlineService';
-import { Inspection, InspectionItem, InspectionTemplate } from '../types';
+import { Inspection, InspectionItem, InspectionTemplate, ActionItem } from '../types';
 
 export const InspectionForm: React.FC = () => {
   // Mode: list (dashboard) | create-template | select-template | form (executing) | report (view/print)
@@ -176,9 +176,28 @@ export const InspectionForm: React.FC = () => {
     };
     saveInspection(finalInspection);
     addToSyncQueue('SAVE_INSPECTION', `Inspection: ${finalInspection.title}`);
-    
-    setCurrentInspection(finalInspection); // Set for report view
-    alert("Inspection Completed & Saved Locally. Queued for Sync.");
+
+    // Auto-create CAPA if inspection score is below 70%
+    if (score < 70) {
+      const inspector = (finalInspection as any).inspector || 'HSE Team';
+      const autoCapa: ActionItem = {
+        id: `capa-${Date.now()}`,
+        type: 'Corrective',
+        source: 'Inspection',
+        title: `Inspection follow-up: ${finalInspection.title} (Score: ${score}%)`,
+        description: `Inspection scored ${score}%, which is below the 70% pass threshold. Review and address all failed items.`,
+        assignee: inspector,
+        priority: score < 50 ? 'High' : 'Medium',
+        dueDate: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
+        status: 'Open',
+        relatedInspectionId: finalInspection.id,
+        createdAt: new Date().toISOString(),
+      };
+      saveAction(autoCapa);
+      addToSyncQueue('SAVE_ACTION', `Auto-CAPA for inspection score ${score}%`);
+    }
+
+    setCurrentInspection(finalInspection);
     setView('report');
   };
 
@@ -198,10 +217,10 @@ export const InspectionForm: React.FC = () => {
                 <p className="text-slate-500">Scheduled inspections, daily checks, and compliance audits.</p>
             </div>
             <div className="flex gap-2">
-                <button onClick={handleCreateTemplate} className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm flex items-center justify-center gap-2">
+                <button onClick={handleCreateTemplate} className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm flex items-center justify-center gap-2" aria-label="Manage inspection templates">
                     <LayoutTemplate size={18} /> Templates
                 </button>
-                <button onClick={handleStartNew} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm flex items-center justify-center gap-2">
+                <button onClick={handleStartNew} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 shadow-sm flex items-center justify-center gap-2" aria-label="Start new inspection">
                     <Plus size={18} /> New Inspection
                 </button>
             </div>
@@ -458,7 +477,7 @@ export const InspectionForm: React.FC = () => {
                                 <label className="w-16 h-16 flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded text-slate-400 hover:bg-slate-50 hover:border-slate-400 cursor-pointer transition-colors relative">
                                     {uploadingItem === item.id ? <Loader2 size={20} className="animate-spin text-blue-500" /> : <Camera size={20} />}
                                     <span className="text-[10px] mt-1">Add</span>
-                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoUpload(item.id, e)} disabled={uploadingItem === item.id} />
+                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handlePhotoUpload(item.id, e)} disabled={uploadingItem === item.id} aria-label="Upload photo evidence for inspection item" />
                                 </label>
                             </div>
 
@@ -505,6 +524,7 @@ export const InspectionForm: React.FC = () => {
                 <button 
                     onClick={handleSubmit}
                     className="bg-slate-900 text-white px-8 py-3 rounded-lg font-semibold hover:bg-slate-800 transition-colors shadow-lg flex items-center gap-2"
+                    aria-label="Complete and sign inspection"
                 >
                     <Check size={20} /> Complete & Sign
                 </button>

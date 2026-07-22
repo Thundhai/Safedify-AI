@@ -182,8 +182,10 @@ export const WorkerForm: React.FC = () => {
                     errors.name ? 'border-red-300' : 'border-slate-200'
                   }`}
                   placeholder="Enter full name"
+                  aria-describedby={errors.name ? 'name-error' : undefined}
+                  aria-required="true"
                 />
-                {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
+                {errors.name && <p className="text-red-500 text-sm mt-1" id="name-error">{errors.name}</p>}
               </div>
 
               <div>
