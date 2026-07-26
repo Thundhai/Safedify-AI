@@ -312,20 +312,33 @@ export enum PermitStatus {
   REJECTED = 'Rejected'
 }
 
+// ── Lifting Plan Module ────────────────────────────────────────────────────────
+
+export enum LiftCategory {
+  ROUTINE  = 'Routine Lift',
+  CRITICAL = 'Critical Lift',
+}
+
 export enum LiftingEquipmentType {
-  MOBILE_CRANE = 'Mobile Crane',
-  CRAWLER_CRANE = 'Crawler Crane',
-  TOWER_CRANE = 'Tower Crane',
-  FORKLIFT = 'Forklift',
-  CHAIN_BLOCK = 'Chain Block / Lever Hoist',
-  GANTRY = 'Gantry / A-Frame',
-  OVERHEAD_CRANE = 'Overhead Crane (EOT)'
+  MOBILE_CRANE   = 'Mobile Crane',
+  CRAWLER_CRANE  = 'Crawler Crane',
+  TOWER_CRANE    = 'Tower Crane',
+  FORKLIFT       = 'Forklift',
+  CHAIN_BLOCK    = 'Chain Block / Lever Hoist',
+  GANTRY         = 'Gantry / A-Frame',
+  OVERHEAD_CRANE = 'Overhead Crane (EOT)',
 }
 
 export enum LiftingPlanStatus {
-  DRAFT = 'Draft',
+  DRAFT       = 'Draft',
   PENDING_HSE = 'Pending HSE Approval',
-  APPROVED = 'Approved'
+  APPROVED    = 'Approved',
+}
+
+export interface LiftingCheckItem {
+  label: string;
+  pass: boolean;
+  message?: string;
 }
 
 export interface LiftingCalculationResult {
@@ -335,27 +348,69 @@ export interface LiftingCalculationResult {
   utilizationPercent: number;
   pass: boolean;
   notes: string[];
+  checks: LiftingCheckItem[];
   calculatedAt: string;
 }
 
+export interface LiftingDocument {
+  id: string;
+  name: string;
+  category: 'Crane Load Chart' | 'Equipment Certificate' | 'Lift Sketch' | 'Method Statement' | 'Other';
+  uploadedAt: string;
+  dataUrl?: string; // base64 for small files
+}
+
 export interface LiftingPlan {
+  // Core
   equipmentType: LiftingEquipmentType;
+  liftCategory: LiftCategory;
+  // Load
+  loadDescription?: string;
   loadWeight: number | null;
   riggingWeight: number | null;
+  loadDimensions?: string;
+  centerOfGravityKnown: boolean;
+  fragileLoad: boolean;
+  hazardousLoad: boolean;
   dynamicFactor: number;
+  // Equipment parameters & calculation
   parameters: Record<string, number | null>;
   calculation?: LiftingCalculationResult;
+  // Status & approval
   status: LiftingPlanStatus;
   sentForApprovalAt?: string;
   approvedAt?: string;
   hseApprover?: string;
   approvalComments?: string;
   attachedToPermit: boolean;
+  // Cross-module links
+  permitId?: string;
+  linkedPermitNumber?: string;
+  riskAssessmentId?: string;
+  // Site conditions
+  groundCondition?: string;
+  outriggersRequired: boolean;
+  exclusionZoneEstablished: boolean;
+  weatherSuitable: boolean;
+  weatherChecked: boolean;
+  weatherSummary?: string;
+  // Personnel (names from Workers module)
+  liftingSupervisor?: string;
+  craneOperator?: string;
+  rigger?: string;
+  banksman?: string;
+  hseRepresentative?: string;
+  // Method statement
+  methodStatementAttached: boolean;
+  // Supporting documents
+  documents: LiftingDocument[];
 }
 
 export interface LiftingPlanRecord {
   id: string;
+  planNumber: string;    // LP-YYYY-NNNN
   title: string;
+  project?: string;
   location: string;
   description: string;
   date: string;

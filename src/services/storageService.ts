@@ -488,6 +488,13 @@ export const savePermit = (permit: Permit) => {
 };
 
 // Lifting Plans
+export const generatePlanNumber = (): string => {
+    const year = new Date().getFullYear();
+    const plans = getLiftingPlans();
+    const yearPlans = plans.filter(p => p.planNumber?.startsWith(`LP-${year}`));
+    const seq = (yearPlans.length + 1).toString().padStart(4, '0');
+    return `LP-${year}-${seq}`;
+};
 export const getLiftingPlans = (): LiftingPlanRecord[] => {
     const result = get(STORAGE_KEYS.LIFTING_PLANS, initialLiftingPlans);
     return Array.isArray(result) ? result : [];
@@ -501,6 +508,9 @@ export const saveLiftingPlan = (plan: LiftingPlanRecord) => {
     } else {
         set(STORAGE_KEYS.LIFTING_PLANS, [plan, ...list]);
     }
+};
+export const deleteLiftingPlan = (id: string) => {
+    set(STORAGE_KEYS.LIFTING_PLANS, getLiftingPlans().filter(p => p.id !== id));
 };
 
 // Assets

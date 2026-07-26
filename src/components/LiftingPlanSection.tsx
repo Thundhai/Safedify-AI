@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Calculator, CheckCircle2, Send, AlertTriangle } from 'lucide-react';
+import { Calculator, CheckCircle2, Send, AlertTriangle, XCircle, Info, Sparkles, Loader2, RefreshCw } from 'lucide-react';
+import { liftReviewAI } from '../services/geminiService';
 import {
   LiftingEquipmentType,
   LiftingPlan,
   LiftingPlanStatus,
-  LiftingCalculationResult
+  LiftingCalculationResult,
+  LiftingCheckItem,
 } from '../types';
 
 type EquipmentFieldDefinition = {
@@ -162,52 +164,110 @@ const asNumber = (value: number | null | undefined) => typeof value === 'number'
 const calculateLiftingPlan = (plan: LiftingPlan): LiftingCalculationResult => {
   const config = equipmentConfigs[plan.equipmentType];
   const notes: string[] = [];
-  const loadWeight = asNumber(plan.loadWeight);
+  const checks: LiftingCheckItem[] = [];
+  const check = (label: string, pass: boolean, failMsg?: string) => {
+    checks.push({ label, pass, message: pass ? undefined : failMsg });
+    if (!pass && failMsg) notes.push(failMsg);
+    return pass;
+  };
+
+  const loadWeight   = asNumber(plan.loadWeight);
   const riggingWeight = asNumber(plan.riggingWeight);
   const dynamicFactor = asNumber(plan.dynamicFactor) ?? 1.1;
-  const missingFields = config.fields.filter(field => asNumber(plan.parameters[field.key]) === null);
 
-  if (loadWeight === null || riggingWeight === null) {
-    notes.push('Enter both load weight and rigging weight before running calculation.');
-  }
+  // Input guards — add to notes but don't produce check items
+  if (loadWeight === null)    notes.push('Load weight is required.');
+  if (riggingWeight === null) notes.push('Rigging weight is required.');
+
+  const missingFields = config.fields.filter(f => asNumber(plan.parameters[f.key]) === null);
   if (missingFields.length > 0) {
-    notes.push(`Complete required equipment values: ${missingFields.map(field => field.label).join(', ')}.`);
+    notes.push(`Missing equipment values: ${missingFields.map(f => f.label).join(', ')}.`);
   }
 
-  const totalLiftedLoad = (loadWeight ?? 0) + (riggingWeight ?? 0);
-  const requiredCapacity = totalLiftedLoad * dynamicFactor;
-  const ratedCapacity = asNumber(plan.parameters[config.capacityField]) ?? 0;
+  // Calculations
+  const totalLiftedLoad   = (loadWeight ?? 0) + (riggingWeight ?? 0);
+  const requiredCapacity  = totalLiftedLoad * dynamicFactor;
+  const ratedCapacity     = asNumber(plan.parameters[config.capacityField]) ?? 0;
   const utilizationPercent = ratedCapacity > 0 ? (requiredCapacity / ratedCapacity) * 100 : 0;
-  let pass = notes.length === 0 && ratedCapacity > 0;
 
-  if (ratedCapacity <= 0) {
-    notes.push('Rated capacity/WLL must be greater than zero.');
+  let pass = true;
+
+  // CHECK A — Rated Capacity > 0
+  pass = check('Rated Capacity / WLL Valid',
+    ratedCapacity > 0,
+    'Rated Capacity / WLL must be greater than zero.'
+  ) && pass;
+
+  // CHECK B — Utilization ≤ 85%
+  const utilPass = utilizationPercent <= 85 && ratedCapacity > 0;
+  const utilWarn = utilizationPercent > 70 && utilizationPercent <= 85;
+  checks.push({
+    label: `Utilization ${ratedCapacity > 0 ? utilizationPercent.toFixed(1) + '%' : '—'} (max 85%)`,
+    pass: utilPass,
+    message: utilWarn ? 'Utilization is near the 85% limit — review carefully.' : utilPass ? undefined : 'Utilization exceeds the recommended 85% lifting limit.',
+  });
+  if (!utilPass) {
+    notes.push('Utilization exceeds the recommended 85% lifting limit.');
     pass = false;
-  } else if (utilizationPercent > 85) {
-    notes.push('Utilization exceeds recommended 85% threshold for planned lift.');
-    pass = false;
+  } else if (utilWarn) {
+    notes.push(`Utilization is ${utilizationPercent.toFixed(1)}% — approaching the 85% limit.`);
   }
 
+  // CHECK C — Sling angle ≥ 30° (Chain Block only)
   const slingAngle = asNumber(plan.parameters.slingAngle);
-  if (slingAngle !== null && slingAngle < 30) {
-    notes.push('Sling angle below 30 deg is not acceptable.');
-    pass = false;
+  if (slingAngle !== null) {
+    pass = check('Sling Angle ≥ 30°',
+      slingAngle >= 30,
+      'Sling angle below 30° is not acceptable.'
+    ) && pass;
   }
 
+  // CHECK D — Side pull ≤ 5° (Chain Block only)
   const sidePull = asNumber(plan.parameters.sidePullAngle);
-  if (sidePull !== null && sidePull > 5) {
-    notes.push('Side pull angle is too high. Keep side pull near vertical.');
-    pass = false;
+  if (sidePull !== null) {
+    pass = check('Side Pull Angle ≤ 5°',
+      sidePull <= 5,
+      'Side pull angle is too high. Keep side pull near vertical.'
+    ) && pass;
   }
 
+  // CHECK E — Route gradient ≤ 10% (Forklift only)
   const routeGradient = asNumber(plan.parameters.routeGradient);
-  if (routeGradient !== null && routeGradient > 10) {
-    notes.push('Route gradient above 10% requires additional controls/engineering review.');
-    pass = false;
+  if (routeGradient !== null) {
+    pass = check('Route Gradient ≤ 10%',
+      routeGradient <= 10,
+      'Route gradient exceeds the recommended limit.'
+    ) && pass;
   }
+
+  // CHECK F — Weather confirmed suitable
+  pass = check('Weather Confirmed Suitable',
+    plan.weatherSuitable !== false,
+    'Weather conditions have not been confirmed suitable for this lift.'
+  ) && pass;
+
+  // CHECK G — Risk Assessment linked
+  pass = check('Risk Assessment Linked',
+    !!plan.riskAssessmentId,
+    'An approved Risk Assessment must be linked before approval.'
+  ) && pass;
+
+  // CHECK H — Personnel: Lift Supervisor + Crane Operator
+  pass = check('Lift Supervisor Assigned',
+    !!plan.liftingSupervisor,
+    'Lift Supervisor must be assigned.'
+  ) && pass;
+
+  pass = check('Crane Operator Assigned',
+    !!plan.craneOperator,
+    'Crane Operator must be assigned.'
+  ) && pass;
+
+  // Also guard against missing load/rigging weight
+  if (loadWeight === null || riggingWeight === null) pass = false;
 
   if (pass) {
-    notes.push('All checks passed. Lifting plan can be submitted for HSE approval.');
+    notes.push('All checks passed. Lifting Plan may be submitted for HSE Approval.');
   }
 
   return {
@@ -217,7 +277,8 @@ const calculateLiftingPlan = (plan: LiftingPlan): LiftingCalculationResult => {
     utilizationPercent,
     pass,
     notes,
-    calculatedAt: new Date().toISOString()
+    checks,
+    calculatedAt: new Date().toISOString(),
   };
 };
 
@@ -302,15 +363,13 @@ interface LiftingPlanSectionProps {
 
 export const LiftingPlanSection: React.FC<LiftingPlanSectionProps> = ({ value, readOnly, onChange, showAttachmentControl = true }) => {
   const [activeField, setActiveField] = useState<string | null>(null);
+  const [modifiedBanner, setModifiedBanner] = useState(false);
   const config = useMemo(() => equipmentConfigs[value.equipmentType], [value.equipmentType]);
 
   const updatePlan = (next: Partial<LiftingPlan>, invalidate: boolean = true) => {
-    const basePlan = {
-      ...value,
-      ...next
-    };
-
+    const basePlan = { ...value, ...next };
     if (invalidate) {
+      setModifiedBanner(true);
       onChange({
         ...basePlan,
         calculation: undefined,
@@ -319,11 +378,10 @@ export const LiftingPlanSection: React.FC<LiftingPlanSectionProps> = ({ value, r
         approvedAt: undefined,
         hseApprover: undefined,
         approvalComments: undefined,
-        attachedToPermit: false
+        attachedToPermit: false,
       });
       return;
     }
-
     onChange(basePlan);
   };
 
@@ -361,6 +419,7 @@ export const LiftingPlanSection: React.FC<LiftingPlanSectionProps> = ({ value, r
 
   const runCalculation = () => {
     const calculation = calculateLiftingPlan(value);
+    setModifiedBanner(false);
     onChange({
       ...value,
       calculation,
@@ -369,7 +428,7 @@ export const LiftingPlanSection: React.FC<LiftingPlanSectionProps> = ({ value, r
       approvedAt: undefined,
       hseApprover: undefined,
       approvalComments: undefined,
-      attachedToPermit: false
+      attachedToPermit: false,
     });
   };
 
@@ -515,61 +574,102 @@ export const LiftingPlanSection: React.FC<LiftingPlanSectionProps> = ({ value, r
         </div>
       </div>
 
+      {/* Modified banner */}
+      {modifiedBanner && !value.calculation && (
+        <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl p-3">
+          <Info size={15} className="flex-shrink-0" />
+          Plan modified. Calculation must be performed again before submitting for approval.
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         <button
           onClick={runCalculation}
           disabled={readOnly}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60 flex items-center gap-2"
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-60 flex items-center gap-2 shadow-sm"
         >
-          <Calculator size={16} /> Run Lifting Calculation
+          <Calculator size={16} /> Run Calculation
         </button>
         <button
           onClick={sendForApproval}
           disabled={readOnly || !value.calculation?.pass || value.status !== LiftingPlanStatus.DRAFT}
-          className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 disabled:opacity-60 flex items-center gap-2"
+          className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-semibold hover:bg-amber-700 disabled:opacity-60 flex items-center gap-2 shadow-sm"
         >
           <Send size={16} /> Send for HSE Approval
         </button>
         <button
           onClick={approveByHse}
           disabled={readOnly || value.status !== LiftingPlanStatus.PENDING_HSE}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-60 flex items-center gap-2"
+          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-60 flex items-center gap-2 shadow-sm"
         >
           <CheckCircle2 size={16} /> Approve by HSE
         </button>
       </div>
 
+      {/* Calculation Results Panel */}
       {value.calculation && (
-        <div className={`rounded-lg border p-4 ${
-          value.calculation.pass ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
-        }`}>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-            <div className="bg-white rounded border border-slate-200 p-2">
-              <p className="text-[11px] text-slate-500 uppercase">Total Load</p>
-              <p className="font-bold text-slate-800">{formatNumber(value.calculation.totalLiftedLoad)} t</p>
+        <div className={`rounded-xl border overflow-hidden ${value.calculation.pass ? 'border-green-300' : 'border-red-300'}`}>
+
+          {/* Pass / Fail banner */}
+          <div className={`px-4 py-3 flex items-center justify-between ${value.calculation.pass ? 'bg-green-600' : 'bg-red-600'}`}>
+            <div className="flex items-center gap-2 text-white font-bold text-sm">
+              {value.calculation.pass
+                ? <><CheckCircle2 size={18} /> All checks passed — ready for HSE Approval</>
+                : <><XCircle size={18} /> Calculation failed — review issues below</>
+              }
             </div>
-            <div className="bg-white rounded border border-slate-200 p-2">
-              <p className="text-[11px] text-slate-500 uppercase">Required Cap.</p>
-              <p className="font-bold text-slate-800">{formatNumber(value.calculation.requiredCapacity)} t</p>
-            </div>
-            <div className="bg-white rounded border border-slate-200 p-2">
-              <p className="text-[11px] text-slate-500 uppercase">Rated Cap.</p>
-              <p className="font-bold text-slate-800">{formatNumber(value.calculation.ratedCapacity)} t</p>
-            </div>
-            <div className="bg-white rounded border border-slate-200 p-2">
-              <p className="text-[11px] text-slate-500 uppercase">Utilization</p>
-              <p className={`font-bold ${value.calculation.utilizationPercent > 85 ? 'text-red-700' : 'text-slate-800'}`}>
-                {formatNumber(value.calculation.utilizationPercent)}%
-              </p>
-            </div>
+            <span className="text-xs text-white/70">{new Date(value.calculation.calculatedAt).toLocaleTimeString()}</span>
           </div>
-          <div className="space-y-1.5">
-            {value.calculation.notes.map((note, idx) => (
-              <div key={idx} className="text-sm flex items-start gap-2 text-slate-700">
-                {value.calculation.pass ? <CheckCircle2 size={15} className="mt-0.5 text-green-700" /> : <AlertTriangle size={15} className="mt-0.5 text-red-700" />}
-                <span>{note}</span>
+
+          {/* Metric cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-slate-200">
+            {[
+              { label: 'Total Lifted Load', value: value.calculation.totalLiftedLoad, unit: 't', cls: 'text-slate-800' },
+              { label: 'Required Capacity', value: value.calculation.requiredCapacity, unit: 't', cls: 'text-slate-800' },
+              { label: 'Rated Capacity', value: value.calculation.ratedCapacity, unit: 't', cls: 'text-slate-800' },
+              {
+                label: 'Utilization',
+                value: value.calculation.utilizationPercent,
+                unit: '%',
+                cls: value.calculation.utilizationPercent > 85 ? 'text-red-600' :
+                     value.calculation.utilizationPercent > 70 ? 'text-orange-600' : 'text-green-600'
+              },
+            ].map(m => (
+              <div key={m.label} className="bg-white p-3">
+                <p className="text-[10px] uppercase font-bold text-slate-500 mb-1">{m.label}</p>
+                <p className={`text-2xl font-bold ${m.cls}`}>
+                  {formatNumber(m.value)}<span className="text-sm font-medium ml-0.5">{m.unit}</span>
+                </p>
               </div>
             ))}
+          </div>
+
+          {/* Check list */}
+          <div className="bg-white px-4 py-3 space-y-1.5">
+            <p className="text-xs uppercase font-bold text-slate-500 mb-2">Validation Checks</p>
+            {value.calculation.checks.map((item, idx) => (
+              <div key={idx} className={`flex items-start gap-2 text-sm ${item.pass ? 'text-slate-700' : 'text-red-700'}`}>
+                {item.pass
+                  ? <CheckCircle2 size={15} className="flex-shrink-0 mt-0.5 text-green-600" />
+                  : <XCircle size={15} className="flex-shrink-0 mt-0.5 text-red-600" />
+                }
+                <span>
+                  <span className="font-semibold">{item.label}</span>
+                  {item.message && <span className="text-xs ml-1 opacity-80">— {item.message}</span>}
+                </span>
+              </div>
+            ))}
+            {/* Input errors not in checks */}
+            {value.calculation.notes
+              .filter(n => !n.startsWith('All checks'))
+              .filter(n => !value.calculation!.checks.some(c => c.message === n))
+              .map((n, idx) => (
+                <div key={`note-${idx}`} className="flex items-start gap-2 text-sm text-amber-700">
+                  <AlertTriangle size={15} className="flex-shrink-0 mt-0.5" />
+                  <span>{n}</span>
+                </div>
+              ))
+            }
           </div>
         </div>
       )}
@@ -593,6 +693,152 @@ export const LiftingPlanSection: React.FC<LiftingPlanSectionProps> = ({ value, r
           )}
         </div>
       )}
+
+      {/* ── AI Lift Review ── */}
+      {value.calculation?.pass && <LiftAIReview plan={value} />}
+
+      {/* ── Submission Checklist ── */}
+      <SubmissionChecklist plan={value} />
+    </div>
+  );
+};
+
+// ── AI Lift Review card ────────────────────────────────────────────────────────
+
+const LiftAIReview: React.FC<{ plan: LiftingPlan }> = ({ plan }) => {
+  const [recs, setRecs] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  const fetchRecs = async () => {
+    setLoading(true);
+    try {
+      const result = await liftReviewAI({
+        equipmentType: plan.equipmentType,
+        liftCategory: plan.liftCategory,
+        loadWeight: plan.loadWeight,
+        riggingWeight: plan.riggingWeight,
+        utilizationPercent: plan.calculation?.utilizationPercent ?? 0,
+        weatherSuitable: plan.weatherSuitable,
+        weatherSummary: plan.weatherSummary,
+        groundCondition: plan.groundCondition,
+        liftingSupervisor: plan.liftingSupervisor,
+        craneOperator: plan.craneOperator,
+        fragileLoad: plan.fragileLoad,
+        hazardousLoad: plan.hazardousLoad,
+        outriggersRequired: plan.outriggersRequired,
+      });
+
+      if (result?.fallback || result?.error) {
+        // AI unavailable — provide generic recommendations
+        setRecs([
+          'Verify crane setup matches the manufacturer\'s load chart before lifting.',
+          'Confirm outriggers are fully deployed and load-tested before the lift.',
+          'Ensure the exclusion zone is established and free of unauthorized personnel.',
+          'Verify all lifting accessories (slings, shackles, hooks) have been inspected.',
+          'Use tag lines to control load swing and prevent rotation.',
+          plan.weatherSuitable ? 'Monitor weather conditions throughout the lifting operation.' : 'Reassess weather conditions before proceeding with the lift.',
+          plan.fragileLoad ? 'Apply additional dunnage and padding for fragile load protection.' : '',
+          plan.hazardousLoad ? 'Ensure MSDS/SDS is available on site and PPE requirements are met.' : '',
+        ].filter(Boolean));
+      } else {
+        const parsed = (result?.recommendations ?? result?.message ?? '')
+          .split('\n')
+          .map((l: string) => l.replace(/^[-•\d.]+\s*/, '').trim())
+          .filter((l: string) => l.length > 10);
+        setRecs(parsed.length > 0 ? parsed : ['AI review complete. Follow standard lifting procedures and manufacturer guidance.']);
+      }
+    } catch {
+      setRecs(['AI service unavailable. Follow standard lifting procedures and industry guidance.']);
+    } finally {
+      setLoading(false);
+      setLoaded(true);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-purple-200 shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600">
+        <div className="flex items-center gap-2 text-white">
+          <Sparkles size={16} />
+          <span className="font-bold text-sm">AI Lift Review</span>
+          <span className="text-xs text-purple-200">— advisory recommendations only</span>
+        </div>
+        <button
+          onClick={fetchRecs}
+          disabled={loading}
+          className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-white/20 hover:bg-white/30 text-white rounded-lg transition-colors disabled:opacity-60"
+        >
+          {loading ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+          {loaded ? 'Refresh' : 'Generate'}
+        </button>
+      </div>
+      <div className="p-4">
+        {!loaded && !loading && (
+          <p className="text-sm text-slate-500 text-center py-4">
+            Click <strong>Generate</strong> to receive AI-powered safety recommendations for this lift.
+          </p>
+        )}
+        {loading && (
+          <div className="flex items-center justify-center gap-2 py-6 text-slate-500">
+            <Loader2 size={18} className="animate-spin text-purple-600" />
+            <span className="text-sm">Analysing lifting parameters…</span>
+          </div>
+        )}
+        {loaded && !loading && recs.length > 0 && (
+          <ul className="space-y-2">
+            {recs.map((rec, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 text-xs font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
+                {rec}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Submission Checklist ───────────────────────────────────────────────────────
+
+const SubmissionChecklist: React.FC<{ plan: LiftingPlan }> = ({ plan }) => {
+  const items = [
+    { label: 'Load weight entered', pass: plan.loadWeight !== null },
+    { label: 'Equipment type selected', pass: !!plan.equipmentType },
+    { label: 'Lift category selected', pass: !!plan.liftCategory },
+    { label: 'Risk Assessment linked', pass: !!plan.riskAssessmentId },
+    { label: 'Lift Supervisor assigned', pass: !!plan.liftingSupervisor },
+    { label: 'Crane Operator assigned', pass: !!plan.craneOperator },
+    { label: 'Weather confirmed', pass: plan.weatherSuitable !== false },
+    { label: 'Calculation passed', pass: plan.calculation?.pass === true },
+  ];
+  const allPass = items.every(i => i.pass);
+  const failCount = items.filter(i => !i.pass).length;
+
+  return (
+    <div className={`rounded-xl border overflow-hidden ${allPass ? 'border-green-200' : 'border-amber-200'}`}>
+      <div className={`px-4 py-2.5 flex items-center justify-between ${allPass ? 'bg-green-50' : 'bg-amber-50'}`}>
+        <p className={`text-sm font-bold ${allPass ? 'text-green-800' : 'text-amber-800'}`}>
+          Submission Checklist
+        </p>
+        {!allPass && (
+          <span className="text-xs font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+            {failCount} item{failCount > 1 ? 's' : ''} required
+          </span>
+        )}
+      </div>
+      <div className="bg-white px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+        {items.map((item, idx) => (
+          <div key={idx} className={`flex items-center gap-2 text-sm ${item.pass ? 'text-slate-600' : 'text-amber-700 font-semibold'}`}>
+            {item.pass
+              ? <CheckCircle2 size={14} className="flex-shrink-0 text-green-600" />
+              : <XCircle size={14} className="flex-shrink-0 text-amber-600" />
+            }
+            {item.label}
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

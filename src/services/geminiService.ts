@@ -230,6 +230,27 @@ export const evaluateContractorComplianceAI = async (contractor: any, workerCoun
 };
 
 /**
+ * 27. Lifting Plan AI Safety Review
+ */
+export const liftReviewAI = async (context: {
+  equipmentType: string;
+  liftCategory: string;
+  loadWeight: number | null;
+  riggingWeight: number | null;
+  utilizationPercent: number;
+  weatherSuitable: boolean;
+  weatherSummary?: string;
+  groundCondition?: string;
+  liftingSupervisor?: string;
+  craneOperator?: string;
+  fragileLoad: boolean;
+  hazardousLoad: boolean;
+  outriggersRequired: boolean;
+}) => {
+  return callBackendAPI('/lift-review', context);
+};
+
+/**
  * 27. Document Summarization
  */
 export const summarizeDocumentAI = async (contentUrl: string, title: string) => {
