@@ -188,34 +188,236 @@ export const RiskAssessmentForm: React.FC = () => {
     navigate('/risk-assessments');
   };
 
-  const handlePrint = () => {
-      window.print();
+  const handleApprove = () => {
+    const updated = { ...formData, status: 'Approved' as const };
+    setFormData(updated);
+    saveRiskAssessment(updated);
   };
 
   const getRiskLevel = (score: number) => {
-      if (score >= 15) return { label: 'Critical', color: 'bg-red-600', text: 'text-red-600', bg: 'bg-red-50' };
-      if (score >= 10) return { label: 'High', color: 'bg-orange-500', text: 'text-orange-500', bg: 'bg-orange-50' };
-      if (score >= 5) return { label: 'Medium', color: 'bg-yellow-500', text: 'text-yellow-600', bg: 'bg-yellow-50' };
-      return { label: 'Low', color: 'bg-green-500', text: 'text-green-600', bg: 'bg-green-50' };
+      if (score >= 15) return { label: 'Critical', color: 'bg-red-600', text: 'text-red-600', bg: 'bg-red-50', border: '#dc2626' };
+      if (score >= 10) return { label: 'High',     color: 'bg-orange-500', text: 'text-orange-500', bg: 'bg-orange-50', border: '#f97316' };
+      if (score >= 5)  return { label: 'Medium',   color: 'bg-yellow-500', text: 'text-yellow-600', bg: 'bg-yellow-50', border: '#eab308' };
+      return                  { label: 'Low',      color: 'bg-green-500',  text: 'text-green-600', bg: 'bg-green-50', border: '#22c55e' };
+  };
+
+  const controlTypeColor = (type: string) => {
+    const map: Record<string, string> = {
+      Elimination: '#fef2f2|#dc2626', Substitution: '#fff7ed|#ea580c',
+      Engineering: '#eff6ff|#2563eb', Administrative: '#fefce8|#ca8a04', PPE: '#f0fdf4|#16a34a',
+    };
+    const [bg, color] = (map[type] || '#f8fafc|#64748b').split('|');
+    return { bg, color };
+  };
+
+  const handlePrint = () => {
+    const now = new Date();
+    const docNum = `RA-${formData.id.split('-').pop()?.slice(-6).toUpperCase()}`;
+    const typeLabel: Record<string, string> = { JHA: 'Job Hazard Analysis (JHA)', HIRA: 'Hazard Identification & Risk Assessment (HIRA)', TRA: 'Task Risk Assessment (TRA)' };
+
+    const hazardRows = formData.hazards.map((h, i) => {
+      const rl = getRiskLevel(h.riskScore);
+      const controlsHTML = h.controls.map(c => {
+        const { bg, color } = controlTypeColor(c.type);
+        return `<div style="display:flex;align-items:flex-start;gap:6px;margin-bottom:4px;">
+          <span style="flex-shrink:0;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:${bg};color:${color};border:1px solid ${color};white-space:nowrap;">${c.type.toUpperCase()}</span>
+          <span style="font-size:11px;color:#374151;line-height:1.4;">${c.description || '—'}</span>
+        </div>`;
+      }).join('');
+
+      return `<tr style="break-inside:avoid;page-break-inside:avoid;">
+        <td style="text-align:center;font-weight:700;color:#64748b;border:1px solid #e2e8f0;padding:10px 8px;vertical-align:top;">${i + 1}</td>
+        <td style="border:1px solid #e2e8f0;padding:10px 8px;vertical-align:top;">
+          <div style="font-weight:600;color:#1e293b;font-size:12px;line-height:1.5;">${h.description || '—'}</div>
+        </td>
+        <td style="text-align:center;border:1px solid #e2e8f0;padding:10px 8px;vertical-align:top;font-size:13px;font-weight:700;color:#334155;">${h.probability}</td>
+        <td style="text-align:center;border:1px solid #e2e8f0;padding:10px 8px;vertical-align:top;font-size:13px;font-weight:700;color:#334155;">${h.severity}</td>
+        <td style="text-align:center;border:1px solid #e2e8f0;padding:10px 8px;vertical-align:top;">
+          <div style="font-size:16px;font-weight:800;color:#1e293b;">${h.riskScore}</div>
+        </td>
+        <td style="text-align:center;border:1px solid #e2e8f0;padding:10px 8px;vertical-align:top;">
+          <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;border:1.5px solid ${rl.border};color:${rl.border};background:${rl.bg.replace('bg-','').replace('-50','').replace('-','').length > 0 ? '#fff' : '#fff'};">${rl.label}</span>
+        </td>
+        <td style="border:1px solid #e2e8f0;padding:10px 8px;vertical-align:top;">${controlsHTML || '<span style="color:#94a3b8;font-size:11px;">No controls added</span>'}</td>
+      </tr>`;
+    }).join('');
+
+    const approvedStamp = formData.status === 'Approved' ? `
+      <div style="position:absolute;top:24px;right:24px;border:3px solid #16a34a;border-radius:8px;padding:8px 16px;text-align:center;transform:rotate(-5deg);opacity:0.85;">
+        <div style="font-size:11px;font-weight:800;color:#16a34a;letter-spacing:2px;">APPROVED</div>
+        <div style="font-size:10px;color:#15803d;">${now.toLocaleDateString()}</div>
+      </div>` : `
+      <div style="position:absolute;top:24px;right:24px;border:3px solid #64748b;border-radius:8px;padding:8px 16px;text-align:center;transform:rotate(-5deg);opacity:0.6;">
+        <div style="font-size:11px;font-weight:800;color:#64748b;letter-spacing:2px;">DRAFT</div>
+      </div>`;
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Risk Assessment — ${formData.title}</title>
+  <style>
+    @page { size: A4 portrait; margin: 18mm 15mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1e293b; background: #fff; }
+    
+    .page-header { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 3px solid #0f172a; margin-bottom: 20px; position: relative; }
+    .logo-block { display: flex; flex-direction: column; }
+    .logo-name { font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; }
+    .logo-sub { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+    .doc-title-block { text-align: right; }
+    .doc-type { font-size: 18px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 1px; }
+    .doc-num { font-size: 11px; color: #64748b; margin-top: 2px; }
+
+    .info-table { width: 100%; border-collapse: collapse; margin-bottom: 18px; }
+    .info-table td { padding: 7px 10px; font-size: 11.5px; border: 1px solid #e2e8f0; }
+    .info-table .lbl { font-weight: 700; color: #475569; background: #f8fafc; width: 22%; }
+    .info-table .val { color: #1e293b; }
+
+    .section-heading { font-size: 13px; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 12px; background: #0f172a; color: #fff; margin-bottom: 0; border-radius: 4px 4px 0 0; }
+    .task-box { border: 1px solid #e2e8f0; border-top: none; padding: 12px 14px; background: #f8fafc; border-radius: 0 0 4px 4px; font-size: 12px; line-height: 1.7; color: #374151; margin-bottom: 18px; white-space: pre-wrap; }
+
+    .hazard-section-heading { font-size: 13px; font-weight: 700; padding: 8px 12px; background: #1e3a5f; color: #fff; border-radius: 4px 4px 0 0; margin-bottom: 0; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .hazard-table { width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; border-top: none; margin-bottom: 20px; border-radius: 0 0 4px 4px; overflow: hidden; }
+    .hazard-table th { background: #1e3a5f; color: #fff; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 8px; text-align: center; border: 1px solid #2d4f80; }
+    .hazard-table th.left { text-align: left; }
+    .hazard-table tr:nth-child(even) td { background: #f8fafc; }
+
+    .risk-matrix { display: inline-grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-bottom: 18px; }
+    .risk-pill { padding: 6px 14px; border-radius: 20px; font-size: 10px; font-weight: 800; text-align: center; border: 1.5px solid; }
+
+    .sig-section { margin-top: 24px; border-top: 2px solid #e2e8f0; padding-top: 16px; }
+    .sig-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-top: 12px; }
+    .sig-box { border-top: 1px solid #334155; padding-top: 6px; }
+    .sig-label { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+    .sig-name { font-size: 12px; color: #1e293b; margin-top: 2px; font-weight: 600; }
+    .sig-space { height: 32px; }
+
+    .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    .footer { position: fixed; bottom: 0; left: 0; right: 0; text-align: center; font-size: 9px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding: 6px; background: white; }
+    .control-hierarchy { font-size: 9px; color: #64748b; font-style: italic; margin-bottom: 10px; }
+    @media print { .footer { position: fixed; bottom: 0; } }
+  </style>
+</head>
+<body>
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="logo-block">
+      <div class="logo-name">Safedify</div>
+      <div class="logo-sub">HSE Management Platform</div>
+    </div>
+    <div class="doc-title-block">
+      <div class="doc-type">Risk Assessment</div>
+      <div class="doc-num">${docNum} &nbsp;|&nbsp; ${typeLabel[formData.type] || formData.type}</div>
+    </div>
+    ${approvedStamp}
+  </div>
+
+  <!-- Document Info -->
+  <table class="info-table">
+    <tr>
+      <td class="lbl">Assessment Title</td>
+      <td class="val" colspan="3" style="font-weight:700;font-size:13px;">${formData.title}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Type</td><td class="val">${typeLabel[formData.type] || formData.type}</td>
+      <td class="lbl">Document No.</td><td class="val">${docNum}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Date</td><td class="val">${new Date(formData.date).toLocaleDateString('en-GB', {day:'2-digit',month:'long',year:'numeric'})}</td>
+      <td class="lbl">Prepared By</td><td class="val">${formData.author}</td>
+    </tr>
+    <tr>
+      <td class="lbl">Status</td>
+      <td class="val" style="font-weight:700;color:${formData.status === 'Approved' ? '#16a34a' : '#64748b'};">${formData.status.toUpperCase()}</td>
+      <td class="lbl">Total Hazards</td><td class="val">${formData.hazards.length}</td>
+    </tr>
+  </table>
+
+  <!-- Task Description -->
+  <div class="section-heading">Task / Work Description</div>
+  <div class="task-box">${formData.taskDescription || 'No task description provided.'}</div>
+
+  <!-- Risk Legend -->
+  <div class="legend">
+    <strong style="font-size:10px;color:#475569;align-self:center;">RISK LEGEND:</strong>
+    <div class="legend-item"><div class="legend-dot" style="background:#dc2626;"></div><span>Critical (≥15)</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#f97316;"></div><span>High (10–14)</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#eab308;"></div><span>Medium (5–9)</span></div>
+    <div class="legend-item"><div class="legend-dot" style="background:#22c55e;"></div><span>Low (1–4)</span></div>
+    <span style="margin-left:auto;font-size:10px;color:#64748b;font-style:italic;">Risk Score = Probability (1–5) × Severity (1–5)</span>
+  </div>
+
+  <!-- Hazard Table -->
+  <div class="hazard-section-heading">Hazard Identification, Risk Assessment &amp; Controls</div>
+  <table class="hazard-table">
+    <thead>
+      <tr>
+        <th style="width:4%;">#</th>
+        <th class="left" style="width:24%;">Hazard Description</th>
+        <th style="width:6%;">Prob.</th>
+        <th style="width:6%;">Sev.</th>
+        <th style="width:7%;">Score</th>
+        <th style="width:10%;">Risk Level</th>
+        <th class="left" style="width:43%;">Control Measures</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${hazardRows || `<tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:20px;">No hazards recorded.</td></tr>`}
+    </tbody>
+  </table>
+
+  <div class="control-hierarchy">
+    Control Hierarchy (highest to lowest preference): Elimination → Substitution → Engineering Controls → Administrative Controls → PPE
+  </div>
+
+  <!-- Signature Block -->
+  <div class="sig-section">
+    <div style="font-size:11px;font-weight:700;color:#0f172a;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;">Authorisation &amp; Signatures</div>
+    <div class="sig-grid">
+      <div class="sig-box">
+        <div class="sig-space"></div>
+        <div class="sig-label">Prepared By</div>
+        <div class="sig-name">${formData.author}</div>
+        <div style="font-size:10px;color:#94a3b8;">Date: ${new Date(formData.date).toLocaleDateString('en-GB')}</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-space"></div>
+        <div class="sig-label">Reviewed By</div>
+        <div class="sig-name">&nbsp;</div>
+        <div style="font-size:10px;color:#94a3b8;">Date: _______________</div>
+      </div>
+      <div class="sig-box">
+        <div class="sig-space"></div>
+        <div class="sig-label">Approved By (HSE)</div>
+        <div class="sig-name">${formData.status === 'Approved' ? formData.author : '&nbsp;'}</div>
+        <div style="font-size:10px;color:#94a3b8;">Date: ${formData.status === 'Approved' ? now.toLocaleDateString('en-GB') : '_______________'}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Safedify HSE Platform &nbsp;|&nbsp; ${docNum} &nbsp;|&nbsp; Generated: ${now.toLocaleString()} &nbsp;|&nbsp; CONFIDENTIAL — For authorised personnel only &nbsp;|&nbsp; Page <span class="pageNumber"></span>
+  </div>
+
+</body>
+</html>`;
+
+    const win = window.open('', '_blank', 'width=900,height=700');
+    if (!win) { alert('Please allow popups to generate the PDF.'); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => win.print(), 600);
   };
 
   return (
-    <div className="max-w-5xl mx-auto pb-10 print:p-0 print:max-w-none">
-      
-      {/* Print Only Header */}
-      <div className="hidden print:block border-b-2 border-slate-800 pb-4 mb-6">
-        <div className="flex justify-between items-center">
-            <div>
-                <h1 className="text-2xl font-bold text-slate-900 uppercase">Risk Assessment Report - Safedify</h1>
-                <p className="text-sm text-slate-500">Safedify Platform • Generated {new Date().toLocaleDateString()}</p>
-            </div>
-            <div className="text-right">
-                <p className="text-sm font-bold">Ref: {formData.id}</p>
-                <p className="text-sm text-slate-500">Status: {formData.status}</p>
-            </div>
-        </div>
-      </div>
-
+    <div className="max-w-5xl mx-auto pb-10">
       {/* Screen Header */}
       <div className="flex items-center justify-between mb-6 print:hidden">
         <div className="flex items-center gap-4">
@@ -226,8 +428,18 @@ export const RiskAssessmentForm: React.FC = () => {
         </div>
         <div className="flex gap-2">
             <button type="button" onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 font-medium">
-                <Printer size={18} /> Print PDF
+                <Printer size={18} /> {formData.status === 'Approved' ? 'Download PDF' : 'Print PDF'}
             </button>
+            {formData.status !== 'Approved' && (
+              <button type="button" onClick={handleApprove} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium shadow-sm">
+                <CheckCircle2 size={18} /> Approve
+              </button>
+            )}
+            {formData.status === 'Approved' && (
+              <span className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg font-bold border border-green-200">
+                <CheckCircle2 size={18} /> Approved
+              </span>
+            )}
             <button type="button" onClick={handleSave} className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-sm">
                 <Save size={18} /> Save
             </button>
