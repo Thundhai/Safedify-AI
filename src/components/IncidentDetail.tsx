@@ -3,12 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { 
   ArrowLeft, Calendar, MapPin, User, AlertTriangle, 
-  ClipboardList, CheckSquare, BrainCircuit, Save, Plus, Trash2, Loader2, Target, GitBranch, Upload, X, Image as ImageIcon, Link as LinkIcon, CheckCircle2, Volume2
+  ClipboardList, CheckSquare, BrainCircuit, Save, Plus, Trash2, Loader2, Target, GitBranch, Upload, X, Image as ImageIcon, Link as LinkIcon, CheckCircle2, Volume2, Printer
 } from 'lucide-react';
 import { getIncidentById, getActions, saveAction, updateIncident, updateAction } from '../services/storageService';
 import { analyzeRootCauseAI, generateSpeechAI, playGeneratedAudio } from '../services/geminiService';
 import { addToSyncQueue } from '../services/offlineService';
 import { Incident, ActionItem, IncidentSeverity } from '../types';
+import { ShareMenu } from './ShareMenu';
 
 export const IncidentDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -270,18 +271,59 @@ export const IncidentDetail: React.FC = () => {
             <p className="text-slate-500 text-sm mt-1">Reported on {new Date(incident.date).toLocaleDateString()}</p>
             </div>
         </div>
-        <button 
-            onClick={handleReadAloud}
-            disabled={isSpeaking}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm ${
-                isSpeaking 
-                ? 'bg-purple-100 text-purple-700 animate-pulse' 
-                : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
-            }`}
-        >
-            {isSpeaking ? <Loader2 size={16} className="animate-spin" /> : <Volume2 size={16} />}
-            {isSpeaking ? 'Playing Brief...' : 'Play Audio Brief'}
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+            <button 
+                onClick={() => {
+                  const inc = incident;
+                  const now = new Date();
+                  const docNum = `INC-${inc.id.split('-').pop()?.slice(-6).toUpperCase()}`;
+                  const sevColor = inc.severity === 'Critical' ? '#dc2626' : inc.severity === 'High' ? '#f97316' : inc.severity === 'Medium' ? '#eab308' : '#16a34a';
+                  const statusColor = inc.status === 'Closed' ? '#16a34a' : inc.status === 'Open' ? '#dc2626' : '#f97316';
+                  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Incident Report — ${docNum}</title><style>@page{size:A4 portrait;margin:18mm 15mm;}*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1e293b;}.footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding:5px;background:#fff;}</style></head><body>
+                  <div style="display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:12px;border-bottom:3px solid #0f172a;margin-bottom:18px;position:relative;">
+                    <div><div style="font-size:22px;font-weight:800;color:#0f172a;">Safedify</div><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">HSE Management Platform</div></div>
+                    <div style="text-align:right;"><div style="font-size:18px;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:1px;">Incident Report</div><div style="font-size:11px;color:#64748b;margin-top:2px;">${docNum}</div></div>
+                    <div style="position:absolute;top:0;right:0;border:2.5px solid ${statusColor};border-radius:8px;padding:6px 14px;text-align:center;transform:rotate(-4deg);opacity:0.9;"><div style="font-size:12px;font-weight:900;color:${statusColor};letter-spacing:2px;">${inc.status.toUpperCase()}</div></div>
+                  </div>
+                  <table style="width:100%;border-collapse:collapse;margin-bottom:18px;">
+                    <tr><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;width:22%;">Incident Type</td><td style="padding:7px 10px;border:1px solid #e2e8f0;font-weight:700;">${inc.type}</td><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Reference No.</td><td style="padding:7px 10px;border:1px solid #e2e8f0;font-family:monospace;font-weight:700;">${docNum}</td></tr>
+                    <tr><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Severity</td><td style="padding:7px 10px;border:1px solid #e2e8f0;font-weight:800;color:${sevColor};">${inc.severity}</td><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Date &amp; Time</td><td style="padding:7px 10px;border:1px solid #e2e8f0;">${new Date(inc.date).toLocaleString('en-GB')}</td></tr>
+                    <tr><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Location</td><td style="padding:7px 10px;border:1px solid #e2e8f0;">${inc.location}</td><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Reported By</td><td style="padding:7px 10px;border:1px solid #e2e8f0;">${inc.reporter||'—'}</td></tr>
+                    <tr><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Status</td><td colspan="3" style="padding:7px 10px;border:1px solid #e2e8f0;font-weight:800;color:${statusColor};">${inc.status.toUpperCase()}</td></tr>
+                  </table>
+                  <div style="font-size:13px;font-weight:700;padding:8px 12px;background:#0f172a;color:#fff;border-radius:4px 4px 0 0;text-transform:uppercase;letter-spacing:0.5px;">Incident Description</div>
+                  <div style="border:1px solid #e2e8f0;border-top:none;padding:14px;background:#f8fafc;border-radius:0 0 4px 4px;font-size:12px;line-height:1.7;color:#374151;margin-bottom:18px;">${inc.description}</div>
+                  ${inc.aiClassification ? `<div style="font-size:13px;font-weight:700;padding:8px 12px;background:#1e3a5f;color:#fff;border-radius:4px 4px 0 0;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0;">AI Classification</div><div style="border:1px solid #e2e8f0;border-top:none;padding:14px;background:#f0f9ff;border-radius:0 0 4px 4px;margin-bottom:18px;"><div style="font-size:12px;color:#1e293b;line-height:1.6;">${inc.aiClassification.reasoning||''}</div>${inc.aiClassification.causes?.length ? `<div style="margin-top:8px;"><span style="font-size:10px;font-weight:700;color:#475569;text-transform:uppercase;">Root Causes:</span><ul style="margin-top:4px;padding-left:16px;">${inc.aiClassification.causes.map((c: string)=>`<li style="font-size:11px;color:#374151;margin-bottom:2px;">${c}</li>`).join('')}</ul></div>` : ''}</div>` : ''}
+                  <div style="margin-top:20px;border-top:2px solid #e2e8f0;padding-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;">
+                    <div style="border-top:1px solid #334155;padding-top:6px;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Reported By</div><div style="font-size:12px;font-weight:600;margin-top:2px;">${inc.reporter||'—'}</div><div style="font-size:10px;color:#94a3b8;">Date: ${new Date(inc.date).toLocaleDateString('en-GB')}</div><div style="height:32px;"></div></div>
+                    <div style="border-top:1px solid #334155;padding-top:6px;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Investigated By</div><div style="font-size:12px;font-weight:600;margin-top:2px;">&nbsp;</div><div style="font-size:10px;color:#94a3b8;">Date: ___________</div><div style="height:32px;"></div></div>
+                    <div style="border-top:1px solid #334155;padding-top:6px;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Approved By (HSE)</div><div style="font-size:12px;font-weight:600;margin-top:2px;">&nbsp;</div><div style="font-size:10px;color:#94a3b8;">Date: ___________</div><div style="height:32px;"></div></div>
+                  </div>
+                  <div class="footer">Safedify HSE Platform &nbsp;|&nbsp; ${docNum} &nbsp;|&nbsp; Generated: ${now.toLocaleString()} &nbsp;|&nbsp; CONFIDENTIAL</div>
+                  </body></html>`;
+                  const win = window.open('','_blank','width=900,height=700'); if(!win){alert('Allow popups.');return;} win.document.write(html); win.document.close(); win.focus(); setTimeout(()=>win.print(),600);
+                }}
+                className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 shadow-sm"
+            >
+                <Printer size={15} /> Print PDF
+            </button>
+            <ShareMenu
+              title={`Incident Report — INC-${incident.id.split('-').pop()?.slice(-6).toUpperCase()}`}
+              text={`Safedify Incident Report\nType: ${incident.type} | Severity: ${incident.severity}\nLocation: ${incident.location}\n${incident.description.slice(0,120)}...`}
+            />
+            <button 
+                onClick={handleReadAloud}
+                disabled={isSpeaking}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all shadow-sm ${
+                    isSpeaking 
+                    ? 'bg-purple-100 text-purple-700 animate-pulse' 
+                    : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+                }`}
+            >
+                {isSpeaking ? <Loader2 size={16} className="animate-spin" /> : <Volume2 size={16} />}
+                {isSpeaking ? 'Playing Brief...' : 'Play Audio Brief'}
+            </button>
+        </div>
       </div>
 
       {/* Navigation Tabs */}

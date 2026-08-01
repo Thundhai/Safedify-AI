@@ -21,7 +21,6 @@ const IncidentDetail = React.lazy(() => import('./components/IncidentDetail').th
 const InspectionForm = React.lazy(() => import('./components/InspectionForm').then(module => ({default: module.InspectionForm})));
 const AITools = React.lazy(() => import('./components/AITools').then(module => ({default: module.AITools})));
 const SmartCamera = React.lazy(() => import('./components/SmartCamera').then(module => ({default: module.SmartCamera})));
-const GeoFencing = React.lazy(() => import('./components/GeoFencing').then(module => ({default: module.GeoFencing})));
 const Gamification = React.lazy(() => import('./components/Gamification').then(module => ({default: module.Gamification})));
 const RiskAssessmentList = React.lazy(() => import('./components/RiskAssessmentList').then(module => ({default: module.RiskAssessmentList})));
 const RiskAssessmentForm = React.lazy(() => import('./components/RiskAssessmentForm').then(module => ({default: module.RiskAssessmentForm})));
@@ -413,7 +412,6 @@ function App() {
                   <Route index element={<Dashboard />} />
                   <Route path="analytics" element={<AnalyticsDashboard />} />
                   <Route path="smart-camera" element={<SmartCamera />} />
-                  <Route path="geo-fencing" element={<GeoFencing />} />
                   <Route path="gamification" element={<Gamification />} />
                   <Route path="incidents" element={<IncidentList />} />
                   <Route path="incidents/new" element={<IncidentReport />} />

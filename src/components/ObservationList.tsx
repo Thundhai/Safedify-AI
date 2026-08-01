@@ -6,6 +6,7 @@ import { getObservations, deleteObservation, updateObservation } from '../servic
 import { analyzeObservationTrendsAI } from '../services/geminiService';
 import { addToSyncQueue } from '../services/offlineService';
 import { Observation, ObservationType } from '../types';
+import { ShareMenu } from './ShareMenu';
 
 export const ObservationList: React.FC = () => {
     const navigate = useNavigate();
@@ -527,7 +528,46 @@ export const ObservationList: React.FC = () => {
 
                                 <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-sm">
                                     <span className="text-slate-500">Status: <span className={`font-bold ${selectedObs.status === 'Open' ? 'text-blue-600' : 'text-slate-600'}`}>{selectedObs.status}</span></span>
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-2 flex-wrap">
+                                        <button
+                                          onClick={() => {
+                                            const obs = selectedObs; const now = new Date();
+                                            const docNum = `OBS-${obs.id.split('-').pop()?.slice(-6).toUpperCase()}`;
+                                            const typeColor = obs.type==='Unsafe Act'?'#dc2626':obs.type==='Unsafe Condition'?'#f97316':obs.type==='Near Miss'?'#7c3aed':'#16a34a';
+                                            const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Observation Card — ${docNum}</title><style>@page{size:A4 portrait;margin:18mm 15mm;}*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1e293b;}.footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding:5px;background:#fff;}</style></head><body>
+                                            <div style="display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:12px;border-bottom:3px solid #0f172a;margin-bottom:18px;">
+                                              <div><div style="font-size:22px;font-weight:800;">Safedify</div><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">HSE Management Platform</div></div>
+                                              <div style="text-align:right;"><div style="font-size:18px;font-weight:800;text-transform:uppercase;letter-spacing:1px;">Safety Observation Card</div><div style="font-size:11px;color:#64748b;">${docNum} &nbsp;|&nbsp; STOP Card / BBS</div></div>
+                                            </div>
+                                            <div style="margin-bottom:16px;display:flex;align-items:center;gap:12px;">
+                                              <span style="display:inline-block;padding:6px 18px;border-radius:30px;font-size:14px;font-weight:800;color:${typeColor};border:2.5px solid ${typeColor};letter-spacing:0.5px;">${obs.type.toUpperCase()}</span>
+                                              <span style="font-size:12px;color:#64748b;">${obs.category} &nbsp;|&nbsp; ${new Date(obs.date).toLocaleString('en-GB')}</span>
+                                            </div>
+                                            <table style="width:100%;border-collapse:collapse;margin-bottom:18px;">
+                                              <tr><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;width:22%;">Reference</td><td style="padding:7px 10px;border:1px solid #e2e8f0;font-family:monospace;font-weight:700;">${docNum}</td><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Date / Time</td><td style="padding:7px 10px;border:1px solid #e2e8f0;">${new Date(obs.date).toLocaleString('en-GB')}</td></tr>
+                                              <tr><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Location</td><td style="padding:7px 10px;border:1px solid #e2e8f0;">${obs.location}</td><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Category</td><td style="padding:7px 10px;border:1px solid #e2e8f0;">${obs.category}</td></tr>
+                                              <tr><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Observer</td><td style="padding:7px 10px;border:1px solid #e2e8f0;">${obs.isAnonymous?'Anonymous':(obs.observer||'—')}</td><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Status</td><td style="padding:7px 10px;border:1px solid #e2e8f0;font-weight:700;color:${obs.status==='Closed'?'#16a34a':'#2563eb'};">${obs.status}</td></tr>
+                                            </table>
+                                            <div style="font-size:13px;font-weight:700;padding:8px 12px;background:#0f172a;color:#fff;border-radius:4px 4px 0 0;text-transform:uppercase;letter-spacing:0.5px;">Observation Description</div>
+                                            <div style="border:1px solid #e2e8f0;border-top:none;padding:14px;background:#f8fafc;border-radius:0 0 4px 4px;font-size:12px;line-height:1.7;margin-bottom:16px;">${obs.description}</div>
+                                            ${obs.immediateActionTaken?`<div style="font-size:13px;font-weight:700;padding:8px 12px;background:#1e3a5f;color:#fff;border-radius:4px 4px 0 0;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0;">Immediate Action Taken</div><div style="border:1px solid #e2e8f0;border-top:none;padding:14px;background:#f0fdf4;border-radius:0 0 4px 4px;font-size:12px;line-height:1.7;margin-bottom:16px;font-style:italic;">${obs.immediateActionTaken}</div>`:''}
+                                            <div style="margin-top:20px;border-top:2px solid #e2e8f0;padding-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;">
+                                              <div style="border-top:1px solid #334155;padding-top:6px;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Observer</div><div style="font-size:12px;font-weight:600;margin-top:2px;">${obs.isAnonymous?'Anonymous':(obs.observer||'—')}</div><div style="font-size:10px;color:#94a3b8;">Date: ${new Date(obs.date).toLocaleDateString('en-GB')}</div><div style="height:32px;"></div></div>
+                                              <div style="border-top:1px solid #334155;padding-top:6px;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">Supervisor</div><div style="font-size:12px;font-weight:600;margin-top:2px;">&nbsp;</div><div style="font-size:10px;color:#94a3b8;">Date: ___________</div><div style="height:32px;"></div></div>
+                                              <div style="border-top:1px solid #334155;padding-top:6px;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;">HSE Officer</div><div style="font-size:12px;font-weight:600;margin-top:2px;">&nbsp;</div><div style="font-size:10px;color:#94a3b8;">Date: ___________</div><div style="height:32px;"></div></div>
+                                            </div>
+                                            <div class="footer">Safedify HSE Platform &nbsp;|&nbsp; ${docNum} &nbsp;|&nbsp; ${now.toLocaleString()} &nbsp;|&nbsp; CONFIDENTIAL</div>
+                                            </body></html>`;
+                                            const win=window.open('','_blank','width=900,height=700');if(!win){alert('Allow popups.');return;}win.document.write(html);win.document.close();win.focus();setTimeout(()=>win.print(),600);
+                                          }}
+                                          className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-50"
+                                        >
+                                          <Printer size={13} /> Print PDF
+                                        </button>
+                                        <ShareMenu
+                                          title={`Safety Observation — ${selectedObs.type}`}
+                                          text={`Safedify Safety Observation\nType: ${selectedObs.type} | Category: ${selectedObs.category}\nLocation: ${selectedObs.location}\n${selectedObs.description.slice(0,120)}...`}
+                                        />
                                         <button 
                                             onClick={(e) => openEditModal(selectedObs, e)}
                                             className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-100 transition-colors"

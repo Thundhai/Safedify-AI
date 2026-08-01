@@ -14,6 +14,7 @@ import {
   LiftingPlanRecord,
   LiftingPlanStatus
 } from '../types';
+import { ShareMenu } from './ShareMenu';
 
 export const PermitForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -240,6 +241,12 @@ export const PermitForm: React.FC = () => {
             </div>
         </div>
         <div className="flex gap-2">
+            {!isNew && formData.status === PermitStatus.APPROVED && (
+              <ShareMenu
+                title={`Permit to Work — ${formData.type} | ${formData.id}`}
+                text={`Safedify Permit to Work\nType: ${formData.type}\nLocation: ${formData.location}\nValid: ${new Date(formData.validFrom).toLocaleDateString()} – ${new Date(formData.validUntil).toLocaleDateString()}\nStatus: ${formData.status}`}
+              />
+            )}
             {!isReadOnly || formData.status === PermitStatus.DRAFT ? (
                 <>
                     <button onClick={() => handleSave(PermitStatus.DRAFT)} className="px-4 py-2 text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 font-medium">

@@ -181,7 +181,6 @@ export const Layout: React.FC = () => {
         { to: '/lifting-plans', icon: Truck, label: 'Lifting Plans' },
         { to: '/permits', icon: FileSignature, label: 'Permit to Work' },
         { to: '/inspections', icon: ClipboardCheck, label: 'Inspections' },
-        { to: '/geo-fencing', icon: Map, label: 'Geo-Fencing' },
       ]
     },
     {
