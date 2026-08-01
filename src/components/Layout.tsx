@@ -39,9 +39,12 @@ import {
   Download,
   Globe,
   Users,
-  Truck
+  Truck,
+  Building2,
+  Layers
 } from '../utils/icons';
 import { getSyncQueue, processSyncQueue } from '../services/offlineService';
+import { getOrgSettings, getOrgContexts } from '../services/storageService';
 import { AIChatAssistant } from './AIChatAssistant';
 import { useAuth } from '../context/AuthContext';
 import { SubscriptionTier } from '../types';
@@ -50,6 +53,8 @@ export const Layout: React.FC = () => {
   // TESTING MODE: Temporarily disable subscription checks
   const TESTING_MODE = true; // Set to false to re-enable subscription checks
   
+  const orgSettings = getOrgSettings();
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [syncing, setSyncing] = useState(false);
@@ -205,13 +210,16 @@ export const Layout: React.FC = () => {
   ];
 
   // Conditionally add Admin group if user has permission
-  if (checkPermission('manage_roles')) {
-      navGroups.push({
-          title: 'Admin',
-          items: [
-              { to: '/roles', icon: Shield, label: 'Role Management' }
-          ]
-      });
+  if (checkPermission('manage_roles') || checkPermission('manage_org')) {
+      const adminItems: any[] = [];
+      if (checkPermission('manage_org')) {
+          adminItems.push({ to: '/org-contexts', icon: Layers, label: orgSettings.contextLabel + ' Management' });
+          adminItems.push({ to: '/org-settings', icon: Building2, label: 'Organization Settings' });
+      }
+      if (checkPermission('manage_roles')) {
+          adminItems.push({ to: '/roles', icon: Shield, label: 'Role Management' });
+      }
+      navGroups.push({ title: 'Admin', items: adminItems });
   }
 
   const getPageTitle = () => {
@@ -221,6 +229,8 @@ export const Layout: React.FC = () => {
     if (location.pathname === '/pricing') return 'Subscription Plans';
     if (location.pathname === '/roles') return 'Role Management';
     if (location.pathname === '/profile') return 'Account Settings';
+    if (location.pathname === '/org-settings') return 'Organization Settings';
+    if (location.pathname === '/org-contexts') return `${orgSettings.contextLabel} Management`;
     return current ? current.label : 'Safedify';
   };
 
@@ -276,14 +286,23 @@ export const Layout: React.FC = () => {
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300 overflow-hidden print:h-auto print:overflow-visible">
       {/* Sidebar - Desktop */}
       <aside className="hidden md:flex md:flex-col md:w-64 bg-brand-navy text-white shadow-2xl z-20 border-r border-slate-800 print:hidden">
-        <div className="p-6 border-b border-slate-800">
+        <div className="p-5 border-b border-slate-800">
           <div className="flex items-center gap-2">
-            <div className="bg-brand-orange p-1.5 rounded-lg">
+            <div className="bg-brand-orange p-1.5 rounded-lg flex-shrink-0">
               <HardHat className="text-brand-navy" size={20} fill="currentColor" />
             </div>
             <h1 className="text-xl font-bold tracking-tight text-white">Safedify</h1>
           </div>
-          <p className="text-[10px] text-slate-400 uppercase tracking-wide mt-2 pl-1">HSE Platform</p>
+          {orgSettings.name ? (
+            <div className="mt-2.5 px-1">
+              <p className="text-xs font-bold text-white/80 leading-tight line-clamp-1">{orgSettings.name}</p>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide mt-0.5">
+                {orgSettings.industry} &nbsp;·&nbsp; {orgSettings.contextLabel} Based
+              </p>
+            </div>
+          ) : (
+            <p className="text-[10px] text-slate-400 uppercase tracking-wide mt-2 pl-1">HSE Platform</p>
+          )}
         </div>
         
         <nav className="flex-1 overflow-y-auto py-4 custom-scrollbar">

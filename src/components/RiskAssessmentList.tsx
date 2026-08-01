@@ -74,6 +74,7 @@ export const RiskAssessmentList: React.FC = () => {
             </div>
 
             {/* Search and Filters - Hidden on Print */}
+            <ContextFilterBar value={contextFilter} onChange={setContextFilter} className="print:hidden" />
             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 print:hidden">
                 <div className="relative flex-1">
                     <input 

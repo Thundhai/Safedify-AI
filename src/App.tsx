@@ -47,6 +47,8 @@ const PricingPlans = React.lazy(() => import('./components/PricingPlans').then(m
 const RoleManagement = React.lazy(() => import('./components/RoleManagement').then(module => ({default: module.RoleManagement})));
 const ProfileSettings = React.lazy(() => import('./components/ProfileSettings').then(module => ({default: module.ProfileSettings})));
 const CAPAModule = React.lazy(() => import('./components/CAPAModule').then(module => ({default: module.CAPAModule})));
+const OrgSettings = React.lazy(() => import('./components/OrgSettings').then(module => ({default: module.OrgSettings})));
+const OrgContextManagement = React.lazy(() => import('./components/OrgContextManagement').then(module => ({default: module.OrgContextManagement})));
 
 // PWA and Mobile Components
 import MobileNavigation from './components/MobileNavigation';
@@ -444,6 +446,8 @@ function App() {
                   <Route path="roles" element={<RoleManagement />} />
                   <Route path="profile" element={<ProfileSettings />} />
                   <Route path="regulatory-news" element={<RegulatoryNews />} />
+                  <Route path="org-settings" element={<OrgSettings />} />
+                  <Route path="org-contexts" element={<OrgContextManagement />} />
                 </>
               )}
             </Route>

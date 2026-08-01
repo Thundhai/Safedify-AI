@@ -11,6 +11,7 @@ import { compressImage, addToSyncQueue } from '../services/offlineService';
 import { IncidentSeverity, IncidentType, Incident, SubscriptionTier, ActionItem } from '../types';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { ContextSelector } from './ContextSelector';
 
 // Type definition for Web Speech API
 declare global {
@@ -25,6 +26,7 @@ export const IncidentReport: React.FC = () => {
   const { user } = useAuth();
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
+  const [contextId, setContextId] = useState<string|undefined>();
   const [isClassifying, setIsClassifying] = useState(false);
   const [isListening, setIsListening] = useState(false);
   
@@ -159,6 +161,7 @@ export const IncidentReport: React.FC = () => {
       status: 'Open' as const,
       images: selectedImage ? [selectedImage] : [],
       reporter: user?.name || 'Current User',
+      contextId,
       aiClassification: aiResult ? {
           confidence: aiResult.confidence,
           reasoning: aiResult.reasoning,
@@ -344,6 +347,7 @@ export const IncidentReport: React.FC = () => {
 
         {/* Manual Details Form */}
         <div className="space-y-4 pt-2">
+            <ContextSelector value={contextId} onChange={setContextId} />
             <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">Exact Location</label>
                 <div className="relative">

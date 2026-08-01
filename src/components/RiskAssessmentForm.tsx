@@ -8,6 +8,7 @@ import { getRiskAssessmentById, saveRiskAssessment } from '../services/storageSe
 import { identifyHazardsAI, suggestControlsAI, explainRiskScoreAI, reviewRiskAssessmentAI } from '../services/geminiService';
 import { RiskAssessment, RiskHazard, RiskControl, RiskControlType, SubscriptionTier } from '../types';
 import { useAuth } from '../context/AuthContext';
+import { ContextSelector } from './ContextSelector';
 
 export const RiskAssessmentForm: React.FC = () => {
   const { user } = useAuth();
@@ -26,6 +27,8 @@ export const RiskAssessmentForm: React.FC = () => {
     hazards: [],
     status: 'Draft'
   });
+
+  const [contextId, setContextId] = useState<string|undefined>();
 
   const [loadingHazards, setLoadingHazards] = useState(false);
   const [loadingControls, setLoadingControls] = useState<string | null>(null);
@@ -183,7 +186,7 @@ export const RiskAssessmentForm: React.FC = () => {
 
   const handleSave = () => {
     if (!formData.title) return alert("Title is required");
-    saveRiskAssessment(formData);
+    saveRiskAssessment({ ...formData, contextId });
     alert("Risk Assessment Saved!");
     navigate('/risk-assessments');
   };
@@ -472,6 +475,9 @@ export const RiskAssessmentForm: React.FC = () => {
                      <option value="HIRA">HIRA</option>
                      <option value="TRA">Task Risk Assessment (TRA)</option>
                  </select>
+            </div>
+            <div className="space-y-2 print:hidden">
+                <ContextSelector value={contextId} onChange={setContextId} />
             </div>
             <div className="md:col-span-2 space-y-2">
                 <label className="text-sm font-semibold text-slate-700">Task Description</label>

@@ -6,6 +6,7 @@ import { saveObservation, saveAction } from '../services/storageService';
 import { analyzeObservationAI } from '../services/geminiService';
 import { compressImage, addToSyncQueue } from '../services/offlineService';
 import { Observation, ObservationType, ActionItem } from '../types';
+import { ContextSelector } from './ContextSelector';
 
 export const ObservationForm: React.FC = () => {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ export const ObservationForm: React.FC = () => {
   const [category, setCategory] = useState('PPE');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
+  const [contextId, setContextId] = useState<string|undefined>();
   const [immediateAction, setImmediateAction] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [observerName, setObserverName] = useState('Current User');
@@ -75,7 +77,8 @@ export const ObservationForm: React.FC = () => {
       observer: isAnonymous ? undefined : observerName,
       status: 'Open',
       immediateActionTaken: immediateAction,
-      images: image ? [image] : []
+      images: image ? [image] : [],
+      contextId,
     };
 
     saveObservation(newObs);
@@ -183,6 +186,8 @@ export const ObservationForm: React.FC = () => {
              <MapPin size={18} className="absolute left-3 top-3 text-slate-400" />
            </div>
         </div>
+
+        <ContextSelector value={contextId} onChange={setContextId} />
 
         {/* Description */}
         <div>

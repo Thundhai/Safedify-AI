@@ -1,5 +1,5 @@
 
-import { Incident, Inspection, InspectionTemplate, ActionItem, IncidentType, IncidentSeverity, RiskAssessment, Observation, WorkerProfile, TrainingModule, TrainingRecord, PPEItem, PPEIssuance, Permit, PermitType, PermitStatus, Asset, AssetStatus, AssetCategory, Contractor, HSEDocument, EmergencyContact, EmergencyDrill, HSEMetrics, SafetyZone, SiteSafetyScore, HSEStatsLog, Role, UserRoles, SubscriptionTier, LiftingPlanRecord, LiftCategory, LiftingEquipmentType, LiftingPlanStatus } from "../types";
+import { Incident, Inspection, InspectionTemplate, ActionItem, IncidentType, IncidentSeverity, RiskAssessment, Observation, WorkerProfile, TrainingModule, TrainingRecord, PPEItem, PPEIssuance, Permit, PermitType, PermitStatus, Asset, AssetStatus, AssetCategory, Contractor, HSEDocument, EmergencyContact, EmergencyDrill, HSEMetrics, SafetyZone, SiteSafetyScore, HSEStatsLog, Role, UserRoles, SubscriptionTier, LiftingPlanRecord, LiftCategory, LiftingEquipmentType, LiftingPlanStatus, OrgContext, OrganizationSettings, IndustryType, INDUSTRY_CONTEXT_LABEL } from "../types";
 import { getCurrentUser } from "./authService";
 
 const STORAGE_KEYS = {
@@ -25,7 +25,9 @@ const STORAGE_KEYS = {
   MAN_HOURS: 'hse_man_hours',
   STATS_LOGS: 'hse_stats_logs',
   SAFETY_ZONES: 'hse_safety_zones',
-  ROLES: 'hse_roles'
+  ROLES: 'hse_roles',
+  ORG_SETTINGS: 'hse_org_settings',
+  ORG_CONTEXTS: 'hse_org_contexts',
 };
 
 // --- DEFAULT ROLES & PERMISSIONS ---
@@ -35,14 +37,14 @@ const defaultRoles: Role[] = [
         name: UserRoles.ADMIN,
         description: 'Full system access and configuration.',
         isSystem: true,
-        permissions: ['manage_roles', 'manage_users', 'view_analytics', 'create_incident', 'manage_incidents', 'perform_inspection', 'create_permit', 'approve_permit', 'manage_documents', 'ai_features']
+        permissions: ['manage_roles', 'manage_users', 'manage_org', 'view_analytics', 'create_incident', 'manage_incidents', 'perform_inspection', 'create_permit', 'approve_permit', 'manage_documents', 'ai_features']
     },
     {
         id: 'role-manager',
         name: UserRoles.MANAGER,
         description: 'HSE Dept Lead. Approvals and Analytics.',
         isSystem: true,
-        permissions: ['manage_users', 'view_analytics', 'create_incident', 'manage_incidents', 'perform_inspection', 'create_permit', 'approve_permit', 'manage_documents', 'ai_features']
+        permissions: ['manage_users', 'manage_org', 'view_analytics', 'create_incident', 'manage_incidents', 'perform_inspection', 'create_permit', 'approve_permit', 'manage_documents', 'ai_features']
     },
     {
         id: 'role-coordinator',
@@ -412,6 +414,22 @@ const initialSafetyZones: SafetyZone[] = [
   { id: 'sz-001', name: 'Crane Operating Zone — Grid F7', description: 'Exclusion zone for Liebherr LTM 1100 operations. No unauthorised entry during active crane operations.', type: 'Exclusion Zone', status: 'Active', coordinates: [], assignedTo: 'Mark Thompson', color: '#ef4444' },
   { id: 'sz-002', name: 'Hot Work Zone — Level 45 Bay B', description: 'Designated hot work area. Fire watch required. No combustibles within 10m radius.', type: 'Restricted Area', status: 'Active', coordinates: [], assignedTo: 'Carlos Mendez', color: '#f97316' },
   { id: 'sz-003', name: 'Chemical Storage — Level B1', description: 'Authorised personnel only. PPE required: chemical goggles, nitrile gloves.', type: 'Hazardous Area', status: 'Active', coordinates: [], assignedTo: 'Sarah Mitchell', color: '#eab308' },
+];
+
+// ── Organisation seed data ────────────────────────────────────────────────────
+
+const initialOrgSettings: OrganizationSettings = {
+  name: 'AlBarq Construction LLC',
+  industry: 'Construction',
+  country: 'UAE',
+  contextLabel: 'Project',
+  enableContextFilter: true,
+};
+
+const initialOrgContexts: OrgContext[] = [
+  { id: 'ctx-001', name: 'Tower A — Structural Works', code: 'CTK-P1', description: 'Main tower superstructure from Level 1 to Level 60.', location: 'Downtown Dubai — Plot A', status: 'Active', manager: 'Carlos Mendez', client: 'Khalifa Developments LLC', startDate: '2025-01-15', color: '#2563eb', createdAt: '2025-01-10T09:00:00.000Z' },
+  { id: 'ctx-002', name: 'Infrastructure & MEP', code: 'CTK-P2', description: 'Underground infrastructure, mechanical, electrical and plumbing works across all levels.', location: 'Downtown Dubai — All Levels', status: 'Active', manager: 'David Chen', client: 'Khalifa Developments LLC', startDate: '2025-03-01', color: '#7c3aed', createdAt: '2025-02-20T09:00:00.000Z' },
+  { id: 'ctx-003', name: 'Finishing & Fit-Out Works', code: 'CTK-P3', description: 'Interior finishing, cladding, glass façade and fit-out for residential units.', location: 'Downtown Dubai — Levels 10-55', status: 'On Hold', manager: 'Ahmed Al-Rashid', client: 'Khalifa Developments LLC', startDate: '2026-02-01', color: '#16a34a', createdAt: '2026-01-15T09:00:00.000Z' },
 ];
 
 const initialInspectionTemplates: InspectionTemplate[] = [
@@ -786,6 +804,32 @@ export const saveLiftingPlan = (plan: LiftingPlanRecord) => {
 export const deleteLiftingPlan = (id: string) => {
     set(STORAGE_KEYS.LIFTING_PLANS, getLiftingPlans().filter(p => p.id !== id));
 };
+
+// ── Organisation Settings ─────────────────────────────────────────────────────
+
+export const getOrgSettings = (): OrganizationSettings =>
+    get(STORAGE_KEYS.ORG_SETTINGS, initialOrgSettings);
+
+export const saveOrgSettings = (settings: OrganizationSettings) =>
+    set(STORAGE_KEYS.ORG_SETTINGS, settings);
+
+// ── Org Contexts (Projects / Operations / Plants / Sites) ─────────────────────
+
+export const getOrgContexts = (): OrgContext[] =>
+    get(STORAGE_KEYS.ORG_CONTEXTS, initialOrgContexts);
+
+export const getOrgContextById = (id: string): OrgContext | undefined =>
+    getOrgContexts().find(c => c.id === id);
+
+export const saveOrgContext = (ctx: OrgContext) => {
+    const list = getOrgContexts();
+    const idx = list.findIndex(c => c.id === ctx.id);
+    if (idx >= 0) set(STORAGE_KEYS.ORG_CONTEXTS, list.map(c => c.id === ctx.id ? ctx : c));
+    else set(STORAGE_KEYS.ORG_CONTEXTS, [ctx, ...list]);
+};
+
+export const deleteOrgContext = (id: string) =>
+    set(STORAGE_KEYS.ORG_CONTEXTS, getOrgContexts().filter(c => c.id !== id));
 
 // Assets
 export const getAssets = (): Asset[] => get(STORAGE_KEYS.ASSETS, initialAssets);

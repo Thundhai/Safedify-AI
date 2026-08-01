@@ -7,6 +7,7 @@ import { analyzeObservationTrendsAI } from '../services/geminiService';
 import { addToSyncQueue } from '../services/offlineService';
 import { Observation, ObservationType } from '../types';
 import { ShareMenu } from './ShareMenu';
+import { ContextFilterBar, ContextBadge } from './ContextSelector';
 
 export const ObservationList: React.FC = () => {
     const navigate = useNavigate();
@@ -18,6 +19,7 @@ export const ObservationList: React.FC = () => {
     const [filterType, setFilterType] = useState('All');
     const [filterCategory, setFilterCategory] = useState('All');
     const [filterStatus, setFilterStatus] = useState('All');
+    const [contextFilter, setContextFilter] = useState<string|undefined>();
 
     // Modal State
     const [selectedObs, setSelectedObs] = useState<Observation | null>(null);
@@ -82,7 +84,8 @@ export const ObservationList: React.FC = () => {
         const matchType = filterType === 'All' || obs.type === filterType;
         const matchCategory = filterCategory === 'All' || obs.category === filterCategory;
         const matchStatus = filterStatus === 'All' || obs.status === filterStatus;
-        return matchType && matchCategory && matchStatus;
+        const matchContext = !contextFilter || obs.contextId === contextFilter;
+        return matchType && matchCategory && matchStatus && matchContext;
     });
 
     const stats = {
@@ -179,6 +182,9 @@ export const ObservationList: React.FC = () => {
                     <h3 className="text-2xl font-bold text-green-700">{stats.safe}</h3>
                 </div>
             </div>
+
+            {/* Context Filter */}
+            <ContextFilterBar value={contextFilter} onChange={setContextFilter} />
 
             {/* AI Trend Analysis - Hidden on Print */}
             <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-6 text-white shadow-md relative overflow-hidden print:hidden">

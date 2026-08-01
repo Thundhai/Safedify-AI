@@ -3,6 +3,7 @@
 export type Permission = 
   | 'manage_roles'        // Create/Edit Roles
   | 'manage_users'        // Manage users
+  | 'manage_org'          // Manage organization settings, projects & operations
   | 'view_analytics'      // Access Dashboard/Analytics
   | 'create_incident'     // Report incidents
   | 'manage_incidents'    // Edit/Close incidents
@@ -11,6 +12,54 @@ export type Permission =
   | 'approve_permit'      // Approve permit
   | 'manage_documents'    // Upload/Approve docs
   | 'ai_features';        // Use AI tools
+
+// ── Organization & Project / Operation context ────────────────────────────────
+
+export type IndustryType =
+  | 'Construction'
+  | 'Oil & Gas'
+  | 'Manufacturing'
+  | 'Mining'
+  | 'Utilities'
+  | 'Healthcare'
+  | 'General';
+
+export const INDUSTRY_CONTEXT_LABEL: Record<IndustryType, string> = {
+  'Construction':   'Project',
+  'Oil & Gas':      'Operation',
+  'Manufacturing':  'Plant / Facility',
+  'Mining':         'Site',
+  'Utilities':      'Plant',
+  'Healthcare':     'Facility',
+  'General':        'Location',
+};
+
+export type OrgContextStatus = 'Active' | 'Completed' | 'On Hold' | 'Closed';
+
+export interface OrgContext {
+  id: string;
+  name: string;
+  code: string;           // e.g. PROJ-001, OPS-A3
+  description?: string;
+  location?: string;
+  status: OrgContextStatus;
+  manager?: string;
+  client?: string;        // client/owner name
+  startDate?: string;
+  endDate?: string;
+  color?: string;         // hex colour for badge
+  createdAt: string;
+}
+
+export interface OrganizationSettings {
+  name: string;
+  industry: IndustryType;
+  country?: string;
+  website?: string;
+  contextLabel: string;   // "Project" | "Operation" | "Plant" etc — can be overridden
+  enableContextFilter: boolean;
+  logoDataUrl?: string;   // base64 logo
+}
 
 export interface Role {
   id: string;
@@ -96,6 +145,7 @@ export interface Incident {
   status: 'Open' | 'Investigating' | 'Closed';
   images: string[];
   reporter: string;
+  contextId?: string;   // org project / operation / plant
   aiClassification?: {
     confidence: number;
     reasoning: string;
@@ -200,6 +250,7 @@ export interface RiskAssessment {
   author: string;
   hazards: RiskHazard[];
   status: 'Draft' | 'Approved' | 'Archived';
+  contextId?: string;
 }
 
 // --- Observation / STOP Card Types ---
@@ -209,15 +260,16 @@ export type ObservationType = 'Unsafe Act' | 'Unsafe Condition' | 'Safe Behavior
 export interface Observation {
   id: string;
   type: ObservationType;
-  category: string; // e.g. PPE, Housekeeping, Tools, Heights
+  category: string;
   description: string;
   location: string;
   date: string;
-  observer?: string; // Optional for anonymous
+  observer?: string;
   isAnonymous: boolean;
   images: string[];
   status: 'Open' | 'Closed';
   immediateActionTaken?: string;
+  contextId?: string;
 }
 
 // --- Training & Competency Types ---
