@@ -539,7 +539,61 @@ export const InspectionForm: React.FC = () => {
               <button onClick={() => setView('list')} className="flex items-center gap-2 text-slate-600 hover:text-slate-900">
                   <ArrowLeft size={18} /> Back to Dashboard
               </button>
-              <button onClick={() => window.print()} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700">
+              <button onClick={() => {
+                const insp = currentInspection;
+                const now = new Date();
+                const docNum = `INS-${insp.id?.split('-').pop()?.slice(-6).toUpperCase() || '000001'}`;
+                const scoreColor = insp.score! >= 80 ? '#16a34a' : insp.score! >= 60 ? '#ca8a04' : '#dc2626';
+                const scoreLabel = insp.score! >= 80 ? 'PASS' : insp.score! >= 60 ? 'CAUTION' : 'FAIL';
+                const failedItems = items.filter(i => i.response === 'Fail');
+                const checklistRows = items.map((item, idx) => {
+                  const resColor = item.response === 'Pass' ? '#16a34a' : item.response === 'Fail' ? '#dc2626' : '#64748b';
+                  const resBg = item.response === 'Pass' ? '#f0fdf4' : item.response === 'Fail' ? '#fef2f2' : '#f8fafc';
+                  return `<tr style="break-inside:avoid;page-break-inside:avoid;">
+                    <td style="text-align:center;color:#64748b;font-size:11px;padding:8px 6px;border:1px solid #e2e8f0;width:4%;">${idx+1}</td>
+                    <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:12px;color:#1e293b;line-height:1.5;">${item.question}</td>
+                    <td style="text-align:center;padding:8px 6px;border:1px solid #e2e8f0;width:10%;">
+                      <span style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:800;letter-spacing:0.5px;background:${resBg};color:${resColor};border:1.5px solid ${resColor};">${item.response}</span>
+                    </td>
+                    <td style="padding:8px 10px;border:1px solid #e2e8f0;font-size:11px;color:#64748b;font-style:${item.comment ? 'italic' : 'normal'};">${item.comment || '—'}</td>
+                  </tr>`;
+                }).join('');
+                const ncHTML = failedItems.length > 0 ? `
+                  <div style="margin-bottom:20px;border:1.5px solid #fecaca;border-radius:8px;overflow:hidden;">
+                    <div style="background:#fef2f2;padding:8px 14px;border-bottom:1px solid #fecaca;">
+                      <span style="font-size:12px;font-weight:800;color:#dc2626;text-transform:uppercase;letter-spacing:0.5px;">⚠ Non-Conformance Items — Immediate Action Required</span>
+                    </div>
+                    <div style="padding:12px 14px;">${failedItems.map((fi,i) => `<div style="margin-bottom:8px;"><span style="font-size:11px;font-weight:700;color:#1e293b;">${i+1}. ${fi.question}</span>${fi.comment ? `<div style="font-size:11px;color:#dc2626;margin-top:2px;padding-left:16px;font-style:italic;">Inspector note: "${fi.comment}"</div>` : ''}</div>`).join('')}</div>
+                  </div>` : '';
+                const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Inspection Report — ${insp.title}</title><style>@page{size:A4 portrait;margin:18mm 15mm;}*{box-sizing:border-box;margin:0;padding:0;}body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1e293b;background:#fff;}.footer{position:fixed;bottom:0;left:0;right:0;text-align:center;font-size:9px;color:#94a3b8;border-top:1px solid #e2e8f0;padding:5px;background:#fff;}</style></head><body>
+                  <div style="display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:12px;border-bottom:3px solid #0f172a;margin-bottom:18px;position:relative;">
+                    <div><div style="font-size:22px;font-weight:800;color:#0f172a;">Safedify</div><div style="font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:1px;">HSE Management Platform</div></div>
+                    <div style="text-align:right;"><div style="font-size:18px;font-weight:800;color:#0f172a;text-transform:uppercase;letter-spacing:1px;">Inspection Report</div><div style="font-size:11px;color:#64748b;margin-top:2px;">${docNum}</div></div>
+                    <div style="position:absolute;top:0;right:0;border:2.5px solid ${scoreColor};border-radius:8px;padding:6px 14px;text-align:center;transform:rotate(-4deg);opacity:0.9;"><div style="font-size:24px;font-weight:900;color:${scoreColor};">${insp.score}%</div><div style="font-size:10px;font-weight:800;color:${scoreColor};letter-spacing:2px;">${scoreLabel}</div></div>
+                  </div>
+                  <table style="width:100%;border-collapse:collapse;margin-bottom:18px;">
+                    <tr><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;width:22%;">Inspection Title</td><td colspan="3" style="padding:7px 10px;border:1px solid #e2e8f0;font-weight:700;font-size:13px;">${insp.title}</td></tr>
+                    <tr><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Template</td><td style="padding:7px 10px;border:1px solid #e2e8f0;">${insp.templateName}</td><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Document No.</td><td style="padding:7px 10px;border:1px solid #e2e8f0;">${docNum}</td></tr>
+                    <tr><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Location</td><td style="padding:7px 10px;border:1px solid #e2e8f0;">${insp.location}</td><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Date</td><td style="padding:7px 10px;border:1px solid #e2e8f0;">${new Date(insp.date).toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'})}</td></tr>
+                    <tr><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Inspector</td><td style="padding:7px 10px;border:1px solid #e2e8f0;">${insp.inspector}</td><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Compliance Score</td><td style="padding:7px 10px;border:1px solid #e2e8f0;font-weight:800;color:${scoreColor};font-size:15px;">${insp.score}% — ${scoreLabel}</td></tr>
+                    <tr><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Pass</td><td style="padding:7px 10px;border:1px solid #e2e8f0;color:#16a34a;font-weight:700;">${items.filter(i=>i.response==='Pass').length} items</td><td style="font-weight:700;color:#475569;background:#f8fafc;padding:7px 10px;border:1px solid #e2e8f0;">Fail / N/A</td><td style="padding:7px 10px;border:1px solid #e2e8f0;color:#dc2626;font-weight:700;">${failedItems.length} failed · ${items.filter(i=>i.response==='NA').length} N/A</td></tr>
+                  </table>
+                  ${ncHTML}
+                  <div style="font-size:13px;font-weight:700;padding:8px 12px;background:#1e3a5f;color:#fff;border-radius:4px 4px 0 0;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0;">Checklist — Full Detail</div>
+                  <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-top:none;margin-bottom:20px;">
+                    <thead><tr style="background:#1e3a5f;"><th style="color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;padding:8px 6px;border:1px solid #2d4f80;text-align:center;width:4%;">#</th><th style="color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;padding:8px 10px;border:1px solid #2d4f80;text-align:left;">Inspection Item / Question</th><th style="color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;padding:8px 6px;border:1px solid #2d4f80;text-align:center;width:10%;">Result</th><th style="color:#fff;font-size:10px;font-weight:700;text-transform:uppercase;padding:8px 10px;border:1px solid #2d4f80;text-align:left;width:28%;">Inspector Comment</th></tr></thead>
+                    <tbody>${checklistRows}</tbody>
+                  </table>
+                  <div style="margin-top:20px;border-top:2px solid #e2e8f0;padding-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;">
+                    <div><div style="border-top:1px solid #334155;padding-top:6px;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Inspector</div><div style="font-size:12px;font-weight:600;color:#1e293b;margin-top:2px;">${insp.inspector}</div><div style="font-size:10px;color:#94a3b8;">Date: ${new Date(insp.date).toLocaleDateString('en-GB')}</div><div style="height:32px;"></div></div></div>
+                    <div><div style="border-top:1px solid #334155;padding-top:6px;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Reviewed By</div><div style="font-size:12px;font-weight:600;color:#1e293b;margin-top:2px;">&nbsp;</div><div style="font-size:10px;color:#94a3b8;">Date: ___________</div><div style="height:32px;"></div></div></div>
+                    <div><div style="border-top:1px solid #334155;padding-top:6px;"><div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">HSE Approved By</div><div style="font-size:12px;font-weight:600;color:#1e293b;margin-top:2px;">&nbsp;</div><div style="font-size:10px;color:#94a3b8;">Date: ___________</div><div style="height:32px;"></div></div></div>
+                  </div>
+                  <div class="footer">Safedify HSE Platform &nbsp;|&nbsp; ${docNum} &nbsp;|&nbsp; Generated: ${now.toLocaleString()} &nbsp;|&nbsp; CONFIDENTIAL</div>
+                </body></html>`;
+                const win = window.open('','_blank','width=900,height=700'); if(!win){alert('Allow popups to generate PDF.');return;}
+                win.document.write(html); win.document.close(); win.focus(); setTimeout(()=>win.print(),600);
+              }} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700">
                   <Printer size={18} /> Print PDF
               </button>
           </div>
